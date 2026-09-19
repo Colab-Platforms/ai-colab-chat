@@ -2,7 +2,10 @@ import { Request, Response } from "express";
 import { sendResponse } from "@/utils/responseUtils.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import DocumentService from "./document.service.js";
-import { validateCreateDocumentSchema } from "./document.validators.js";
+import {
+  validateCreateDocumentSchema,
+  validateUpdateDocumentStyleSchema,
+} from "./document.validators.js";
 
 const documentService = new DocumentService();
 
@@ -79,6 +82,68 @@ export const getDocumentById = async (
     );
   } catch (error: any) {
     console.error("Get document by id error", error);
+    sendResponse(
+      res,
+      false,
+      null,
+      error.message,
+      error.statusCode ?? STATUS_CODES.SERVER_ERROR,
+    );
+  }
+};
+
+export const getDocumentSpec = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const result = await documentService.getSpec(
+      req.user!.id,
+      parseInt(req.params.id as string),
+    );
+    sendResponse(
+      res,
+      true,
+      result,
+      "Document spec fetched successfully",
+      STATUS_CODES.OK,
+    );
+  } catch (error: any) {
+    console.error("Get document spec error", error);
+    sendResponse(
+      res,
+      false,
+      null,
+      error.message,
+      error.statusCode ?? STATUS_CODES.SERVER_ERROR,
+    );
+  }
+};
+
+export const updateDocumentStyle = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { error, value } = validateUpdateDocumentStyleSchema(req.body);
+    if (error) {
+      sendResponse(res, false, error, error.message, STATUS_CODES.BAD_REQUEST);
+      return;
+    }
+    const result = await documentService.updateStyle(
+      req.user!.id,
+      parseInt(req.params.id as string),
+      value,
+    );
+    sendResponse(
+      res,
+      true,
+      result,
+      "Document is re-rendering",
+      STATUS_CODES.ACCEPTED,
+    );
+  } catch (error: any) {
+    console.error("Update document style error", error);
     sendResponse(
       res,
       false,

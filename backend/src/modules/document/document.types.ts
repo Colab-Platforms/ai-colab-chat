@@ -272,6 +272,11 @@ export interface CreateDocumentInput {
   sourceText?: string;
 }
 
+export interface UpdateDocumentStyleInput {
+  title?: string;
+  theme?: DocumentTheme;
+}
+
 export interface ListDocumentsQuery {
   page?: number;
   limit?: number;

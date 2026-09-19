@@ -54,6 +54,26 @@ export const validateCreateDocumentSchema = (data: unknown) => {
   return createDocumentSchema.validate(data, { abortEarly: false });
 };
 
+/**
+ * v1 style-edit surface: theme/title only. Structural spec edits (reordering,
+ * adding/removing blocks or pages) are a later phase and will get their own,
+ * stricter schema — this one deliberately does not accept a `spec` field.
+ */
+export const updateDocumentStyleSchema = Joi.object({
+  title: Joi.string().trim().min(1).max(MAX_TITLE_CHARS).optional(),
+  theme: Joi.string()
+    .valid(...DOCUMENT_THEMES)
+    .optional(),
+})
+  .min(1)
+  .messages({
+    "object.min": "Provide at least a title or theme to update",
+  });
+
+export const validateUpdateDocumentStyleSchema = (data: unknown) => {
+  return updateDocumentStyleSchema.validate(data, { abortEarly: false });
+};
+
 /* ------------------------------------------------------------------ *
  * Model output
  *

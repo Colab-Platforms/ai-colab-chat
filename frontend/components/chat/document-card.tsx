@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { documentService } from "@/lib/services";
 import { cn } from "@/lib/utils";
+import { useDocumentPanel } from "@/context/document-panel-context";
 
 export type DocumentFormat = "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
 
@@ -137,10 +138,25 @@ export function DocumentCard({
   const [doc, setDoc] = useState<GeneratedDocument>(initial);
   const [stage, setStage] = useState(0);
   const startedAt = useRef(Date.now());
+  const { openDocumentPanel } = useDocumentPanel();
 
   const isWorking = doc.status === "PENDING" || doc.status === "PROCESSING";
   const meta = metaFor(doc.format);
   const STAGES = stagesFor(meta.label);
+
+  // Auto-opens the preview panel the moment a document that was generating
+  // (or re-rendering after a style edit) becomes ready — not on mount of an
+  // already-completed card, so scrolling through chat history doesn't spam
+  // the panel open for every past document.
+  const wasWorkingRef = useRef(
+    initial.status === "PENDING" || initial.status === "PROCESSING",
+  );
+  useEffect(() => {
+    if (wasWorkingRef.current && doc.status === "COMPLETED") {
+      openDocumentPanel(doc);
+    }
+    wasWorkingRef.current = isWorking;
+  }, [doc, isWorking, openDocumentPanel]);
 
   // Keep in sync when the parent supplies a fresher copy (e.g. after a chat
   // reload) without discarding what polling has already learned.
@@ -289,8 +305,14 @@ export function DocumentCard({
   /* ---------------- ready ---------------- */
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={() => openDocumentPanel(doc)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") openDocumentPanel(doc);
+      }}
       className={cn(
-        "group mt-2 w-full max-w-md rounded-xl border border-border/60 bg-background px-4 py-3 transition-shadow hover:shadow-sm",
+        "group mt-2 w-full max-w-md cursor-pointer rounded-xl border border-border/60 bg-background px-4 py-3 transition-shadow hover:shadow-sm",
         className,
       )}
     >
@@ -315,7 +337,10 @@ export function DocumentCard({
               type="button"
               className="h-8 px-2"
               title="Open in a new tab"
-              onClick={() => window.open(doc.fileUrl!, "_blank", "noopener")}
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(doc.fileUrl!, "_blank", "noopener");
+              }}
             >
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
@@ -324,7 +349,8 @@ export function DocumentCard({
               size="sm"
               type="button"
               className="h-8 text-xs"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 const link = window.document.createElement("a");
                 link.href = doc.fileUrl!;
                 link.download =

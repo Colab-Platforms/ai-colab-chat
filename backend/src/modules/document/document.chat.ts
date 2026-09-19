@@ -191,23 +191,43 @@ export async function maybeGenerateDocumentFromChat(params: {
       sourceText = userPrompt;
       sourceKind = "user-pasted";
     } else if (intent.useLastAnswer) {
-      const previous = await prisma.message.findFirst({
-        where: {
-          chatId,
-          role: "ASSISTANT",
-          isDeleted: false,
-          id: { lt: messageId },
-          content: { not: "" },
-        },
+      // A prior document-generation turn deliberately leaves a content-free
+      // chat reply ("Your PDF is being prepared.") — see the REPLACE branch of
+      // buildDocumentSystemNote — so the real material for "now make a docx of
+      // the same data" lives in that document's own stored `sourceText`, not
+      // in the chat message. Check that FIRST, or a same-format-again request
+      // silently downgrades to a near-empty source.
+      const previousDocument = await prisma.generatedDocument.findFirst({
+        where: { chatId, isDeleted: false },
         orderBy: { id: "desc" },
-        select: { id: true, content: true },
+        select: { id: true, sourceText: true },
       });
 
-      // Only switch if the earlier answer actually carries more than the one
-      // we just streamed, so a bad classifier call cannot downgrade the source.
-      if (previous?.content && previous.content.length > sourceText.length) {
-        sourceText = previous.content;
-        sourceKind = `previous-answer(message=${previous.id})`;
+      if (
+        previousDocument?.sourceText &&
+        previousDocument.sourceText.length > sourceText.length
+      ) {
+        sourceText = previousDocument.sourceText;
+        sourceKind = `previous-document-source(document=${previousDocument.id})`;
+      } else {
+        const previous = await prisma.message.findFirst({
+          where: {
+            chatId,
+            role: "ASSISTANT",
+            isDeleted: false,
+            id: { lt: messageId },
+            content: { not: "" },
+          },
+          orderBy: { id: "desc" },
+          select: { id: true, content: true },
+        });
+
+        // Only switch if the earlier answer actually carries more than the one
+        // we just streamed, so a bad classifier call cannot downgrade the source.
+        if (previous?.content && previous.content.length > sourceText.length) {
+          sourceText = previous.content;
+          sourceKind = `previous-answer(message=${previous.id})`;
+        }
       }
     }
 
