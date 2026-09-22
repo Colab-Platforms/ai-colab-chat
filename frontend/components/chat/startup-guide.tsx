@@ -70,7 +70,7 @@ const BASE_STEPS: GuideStep[] = [
     skipBeacon: true,
     title: "🗂️ Sidebar",
     content:
-      "Your command centre on the left. Switch between Projects, Contexts (attach background info), Assistants (role-specific AI styles), Chat history, and Starred chats — all in one panel.",
+      "Your command centre on the left. Switch between Projects, Assistants (role-specific AI styles), Chat history, and Starred chats — all in one panel.",
     devices: ["tablet", "desktop"],
   },
   {
@@ -80,7 +80,7 @@ const BASE_STEPS: GuideStep[] = [
     skipBeacon: true,
     title: "🗂️ Sidebar",
     content:
-      "Tap this icon to open the sidebar. Inside you'll find Projects, Contexts, Assistants, Chat history, and Starred chats.",
+      "Tap this icon to open the sidebar. Inside you'll find Projects, Assistants, Chat history, and Starred chats.",
     devices: ["mobile"],
   },
   {
@@ -157,7 +157,7 @@ export function StartupGuide({
               offset: 8,
               title: "🗂️ Sidebar — Explore!",
               content:
-                "Scroll up to find Projects, Contexts, Assistants, Chat history, and Starred chats. Tap Next when done.",
+                "Scroll up to find Projects, Assistants, Chat history, and Starred chats. Tap Next when done.",
             }
           : step,
       );

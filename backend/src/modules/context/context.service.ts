@@ -20,7 +20,6 @@ class ContextService {
           STATUS_CODES.BAD_REQUEST,
         );
       }
-      data.isAutoSelected = true;
     } else if (data.type === "FOLDER" && data.folderId) {
       const folderCount = await prisma.contextMemory.count({
         where: {

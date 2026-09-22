@@ -29,7 +29,6 @@ import { toast } from "@/lib/toast";
 import { AppSidebar } from "./app-sidebar";
 import type { Assistant, Chat, FolderItem } from "./sidebar-types";
 import { ProjectsSection } from "./sidebar-projects-section";
-import { ContextsSectionContainer } from "./sidebar-contexts-section";
 import { AssistantsSection } from "./sidebar-assistants-section";
 import { ChatsSection } from "./sidebar-chats-section";
 
@@ -97,7 +96,6 @@ function SidebarInner({
     return null;
   };
   const [projectsExpanded, setProjectsExpanded] = useState(false);
-  const [contextsExpanded, setContextsExpanded] = useState(false);
   const [assistantsExpanded, setAssistantsExpanded] = useState(true);
   const [chatsExpanded, setChatsExpanded] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
@@ -112,13 +110,11 @@ function SidebarInner({
       if (!raw) return;
       const parsed = JSON.parse(raw) as Partial<{
         projectsExpanded: boolean;
-        contextsExpanded: boolean;
         assistantsExpanded: boolean;
         chatsExpanded: boolean;
       }>;
 
       if (typeof parsed.projectsExpanded === "boolean") setProjectsExpanded(parsed.projectsExpanded);
-      if (typeof parsed.contextsExpanded === "boolean") setContextsExpanded(parsed.contextsExpanded);
       if (typeof parsed.assistantsExpanded === "boolean") setAssistantsExpanded(parsed.assistantsExpanded);
       if (typeof parsed.chatsExpanded === "boolean") setChatsExpanded(parsed.chatsExpanded);
     } catch {
@@ -136,7 +132,6 @@ function SidebarInner({
         TOP_ACCORDION_STORAGE_KEY,
         JSON.stringify({
           projectsExpanded,
-          contextsExpanded,
           assistantsExpanded,
           chatsExpanded,
         }),
@@ -144,7 +139,7 @@ function SidebarInner({
     } catch {
       // ignore quota / private browsing errors
     }
-  }, [hasHydratedTopAccordion, projectsExpanded, contextsExpanded, assistantsExpanded, chatsExpanded]);
+  }, [hasHydratedTopAccordion, projectsExpanded, assistantsExpanded, chatsExpanded]);
 
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -613,14 +608,6 @@ function SidebarInner({
             filteredChats={filteredChats}
             setCreateFolderOpen={setCreateFolderOpen}
             onNewChatInFolder={(folderId: number) => handleNewChat(folderId)}
-          />
-
-          <ContextsSectionContainer
-            contextsExpanded={contextsExpanded}
-            setContextsExpanded={setContextsExpanded}
-            localFolders={localFolders}
-            pendingNewChatFolderIdKey={pendingNewChatFolderIdKey}
-            pendingNewChatContextsKey={pendingNewChatContextsKey}
           />
 
           <AssistantsSection

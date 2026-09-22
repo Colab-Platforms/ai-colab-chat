@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { getModelIcon } from "@/lib/model-icons";
 import { attachmentService } from "@/lib/services";
 import { toast } from "@/lib/toast";
+import { ContextPickerMenu } from "@/components/chat/context-picker-menu";
 
 // Dynamically imported so react-speech-recognition never runs on the server
 const MicButton = dynamic(
@@ -1261,6 +1262,8 @@ export function ChatInput({
                         <span>Image Generation</span>
                       </div>
                     </DropdownMenuItem>
+
+                    <ContextPickerMenu onNavigateAway={() => setAttachMenuOpen(false)} />
 
                     <DropdownMenuSeparator className="my-2" />
 
