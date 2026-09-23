@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ChatLayoutView } from "@/components/chat/ChatLayoutView";
+import { DocumentPanelProvider } from "@/context/document-panel-context";
 
 /**
  * Keeps a single ChatLayoutView instance for all authenticated chat routes.
@@ -34,5 +35,9 @@ export function ChatRootShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  return <ChatLayoutView>{children}</ChatLayoutView>;
+  return (
+    <DocumentPanelProvider>
+      <ChatLayoutView>{children}</ChatLayoutView>
+    </DocumentPanelProvider>
+  );
 }

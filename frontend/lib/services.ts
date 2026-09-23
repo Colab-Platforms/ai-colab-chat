@@ -201,6 +201,9 @@ export const documentService = {
   }) => api.post("/documents", data),
   retry: (id: number) => api.post(`/documents/${id}/retry`),
   delete: (id: number) => api.delete(`/documents/${id}`),
+  getSpec: (id: number) => api.get(`/documents/${id}/spec`),
+  updateStyle: (id: number, data: { title?: string; theme?: string }) =>
+    api.patch(`/documents/${id}`, data),
 };
 
 export const videoService = {

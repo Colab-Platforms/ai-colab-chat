@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StartupGuide } from "./startup-guide";
+import { DocumentPanel } from "./document-panel";
 
 interface Chat {
   id: number;
@@ -803,6 +804,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
         <main className="flex-1 flex flex-col min-w-0 md:pt-0 pt-14">
           {children}
         </main>
+
+        <DocumentPanel />
 
         <StartupGuide
           userId={typeof user?.id === "number" ? user.id : undefined}

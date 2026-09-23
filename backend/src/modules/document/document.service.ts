@@ -7,10 +7,16 @@ import {
   getSupportedFormats,
   isFormatSupported,
 } from "./document.renderers.js";
+import { getThemeTokens } from "./document.theme.js";
 import {
+  FORMAT_SPEC_KIND,
   MAX_TITLE_CHARS,
+  type AnySpec,
   type CreateDocumentInput,
+  type DocumentFormat,
+  type DocumentTheme,
   type ListDocumentsQuery,
+  type UpdateDocumentStyleInput,
 } from "./document.types.js";
 
 const DEFAULT_LIMIT = 20;
@@ -116,6 +122,88 @@ class DocumentService {
     }
 
     return document;
+  }
+
+  /**
+   * Returns the stored spec plus the raw theme tokens the renderer used, so
+   * the frontend preview panel can render the same content/colours without
+   * duplicating `document.theme.ts` client-side and drifting from it.
+   */
+  async getSpec(userId: number, id: number) {
+    const document = await prisma.generatedDocument.findFirst({
+      where: { id, userId, isDeleted: false },
+      select: { id: true, format: true, theme: true, spec: true, status: true },
+    });
+
+    if (!document) {
+      throw new ApiError("Document not found", STATUS_CODES.NOT_FOUND);
+    }
+    if (!document.spec) {
+      throw new ApiError(
+        "This document has no content yet",
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const format = document.format as DocumentFormat;
+    return {
+      format,
+      specKind: FORMAT_SPEC_KIND[format],
+      spec: document.spec as unknown as AnySpec,
+      theme: document.theme as DocumentTheme,
+      themeTokens: getThemeTokens(document.theme as DocumentTheme),
+    };
+  }
+
+  /**
+   * v1 editing: theme and title only. Both are cheap to change because they
+   * are re-render, not re-generation — the stored spec already exists, so
+   * this reuses the exact PENDING→worker path a retry uses, just without
+   * clearing the spec. No model call happens on this path.
+   */
+  async updateStyle(userId: number, id: number, input: UpdateDocumentStyleInput) {
+    const document = await prisma.generatedDocument.findFirst({
+      where: { id, userId, isDeleted: false },
+      select: { id: true, status: true, spec: true },
+    });
+
+    if (!document) {
+      throw new ApiError("Document not found", STATUS_CODES.NOT_FOUND);
+    }
+    if (document.status === "PENDING" || document.status === "PROCESSING") {
+      throw new ApiError(
+        "This document is still generating",
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+    if (!document.spec) {
+      throw new ApiError(
+        "This document has no content yet",
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const spec = document.spec as any;
+    if (input.title) {
+      spec.title = input.title;
+    }
+
+    const updated = await prisma.generatedDocument.update({
+      where: { id },
+      data: {
+        status: "PENDING",
+        attempts: 0,
+        lastError: null,
+        ...(input.title ? { title: input.title } : {}),
+        ...(input.theme ? { theme: input.theme } : {}),
+        spec,
+      },
+      omit: { spec: true, sourceText: true },
+    });
+
+    void runPendingDocumentJobs();
+
+    return updated;
   }
 
   /**

@@ -78,6 +78,20 @@ const PRODUCTION_VERB =
 const REFERENTIAL_FORM =
   /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:pdf|document|report|word|docx|excel|spreadsheet|xlsx|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck)\b|\b(?:pdf|word|docx|excel|xlsx|csv|ppt|pptx)\s+format\b/i;
 
+/**
+ * "same data", "above content", "that information" — an unambiguous back
+ * reference to material that already exists in the conversation. Checked as a
+ * deterministic override rather than left entirely to the classifier: this
+ * phrasing is common in exactly the "now also make it a docx" follow-up that
+ * chains off a prior document turn, and a classifier miss here is worse than
+ * for other fields — it makes the answering model believe there is no
+ * existing material, so it invents new content instead of reusing the real
+ * data (observed failure: "make a docx of the same data" produced a
+ * hallucinated document ABOUT the request instead of the actual content).
+ */
+const REFERS_TO_EXISTING_DATA =
+  /\b(?:same|above|that|this|previous|earlier|prior)\s+(?:data|content|information|info|material|text|details)\b/i;
+
 // Intent lives in the instruction, which sits at the very start ("generate a
 // pdf of the following: <10k of pasted data>") or occasionally at the very end
 // ("...turn that into a report"). Scanning only those windows keeps the regex
@@ -243,6 +257,15 @@ export const detectDocumentIntent = async (
     }
 
     const intent = value as DocumentIntent;
+
+    if (!intent.useLastAnswer && REFERS_TO_EXISTING_DATA.test(message)) {
+      dlog(
+        "intent:result",
+        `overriding useLastAnswer → true — message references existing data the classifier missed`,
+      );
+      intent.useLastAnswer = true;
+    }
+
     dlogBlock("intent:result", `decided ${intent.intent}`, intent);
     return intent;
   } catch (error: any) {

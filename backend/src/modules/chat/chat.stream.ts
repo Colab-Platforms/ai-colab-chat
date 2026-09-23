@@ -664,6 +664,8 @@ interface OpenRouterSseAccumulator {
   imagesToUpload: string[];
   selectedImageUrl: string | null;
   finishReason: string | null;
+  /** Real $ OpenRouter charged for this request (usage.cost), when reported. */
+  costUsd: number | null;
 }
 
 interface OpenRouterStreamError extends Error {
@@ -678,6 +680,7 @@ function createEmptyOpenRouterAccumulator(): OpenRouterSseAccumulator {
     imagesToUpload: [],
     selectedImageUrl: null,
     finishReason: null,
+    costUsd: null,
   };
 }
 
@@ -715,6 +718,7 @@ async function pipeOpenRouterStreamToClient(
   isClientAborted: () => boolean,
   acc: OpenRouterSseAccumulator,
   streamOptions: { includeImages?: boolean; includeAnnotations?: boolean },
+  modelLabel?: string,
 ): Promise<void> {
   const includeImages = streamOptions.includeImages !== false;
   const includeAnnotations = streamOptions.includeAnnotations === true;
@@ -775,6 +779,15 @@ async function pipeOpenRouterStreamToClient(
     if (chunk.usage) {
       acc.promptTokens = chunk.usage.prompt_tokens || 0;
       acc.completionTokens = chunk.usage.completion_tokens || 0;
+      if (typeof chunk.usage.cost === "number") {
+        acc.costUsd = chunk.usage.cost;
+        if (chatType === "IMAGE_GENERATION") {
+          console.log(
+            `[image-generation] model=${modelLabel ?? "?"} real OpenRouter cost=$${chunk.usage.cost} ` +
+              `promptTokens=${acc.promptTokens} completionTokens=${acc.completionTokens}`,
+          );
+        }
+      }
     }
     const fr =
       chunk.choices?.[0]?.finish_reason ||
@@ -797,6 +810,7 @@ async function runOpenRouterStreamWithEmptyRetry(params: {
   isClientAborted: () => boolean;
   streamOptions: { includeImages?: boolean; includeAnnotations?: boolean };
   createStream: () => Promise<AsyncIterable<any>>;
+  modelLabel?: string;
 }): Promise<OpenRouterSseAccumulator> {
   let acc = createEmptyOpenRouterAccumulator();
 
@@ -814,6 +828,7 @@ async function runOpenRouterStreamWithEmptyRetry(params: {
         params.isClientAborted,
         acc,
         params.streamOptions,
+        params.modelLabel,
       );
     } catch (error: any) {
       const streamError = error as OpenRouterStreamError;
@@ -1334,6 +1349,7 @@ export async function streamChat(req: Request, res: Response) {
         res,
         isClientAborted,
         streamOptions: { includeImages: true, includeAnnotations: true },
+        modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
             model: model.externalId,
@@ -2018,6 +2034,7 @@ export async function regenerateChat(req: Request, res: Response) {
         res,
         isClientAborted,
         streamOptions: { includeImages: true, includeAnnotations: false },
+        modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
             model: model.externalId,
@@ -2621,6 +2638,7 @@ export async function editAndResend(req: Request, res: Response) {
         res,
         isClientAborted,
         streamOptions: { includeImages: true, includeAnnotations: false },
+        modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
             model: model.externalId,
