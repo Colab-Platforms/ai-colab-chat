@@ -6,6 +6,7 @@ type RouteUiState = {
   isStarredRoute: boolean;
   isVoiceRoute: boolean;
   isAssetsRoute: boolean;
+  isProjectsRoute: boolean;
 };
 
 const state: RouteUiState = {
@@ -14,6 +15,7 @@ const state: RouteUiState = {
   isStarredRoute: false,
   isVoiceRoute: false,
   isAssetsRoute: false,
+  isProjectsRoute: false,
 };
 
 const listeners = new Set<() => void>();
@@ -29,6 +31,7 @@ export function setRouteUiFromPathname(pathname: string) {
   const nextIsStarredRoute = pathname === "/starred";
   const nextIsVoiceRoute = pathname === "/voice";
   const nextIsAssetsRoute = pathname === "/assets";
+  const nextIsProjectsRoute = pathname === "/projects";
   const nextIsDraftRoute = pathname === "/" || pathname === "/new";
 
   if (
@@ -36,7 +39,8 @@ export function setRouteUiFromPathname(pathname: string) {
     state.isDraftRoute === nextIsDraftRoute &&
     state.isStarredRoute === nextIsStarredRoute &&
     state.isVoiceRoute === nextIsVoiceRoute &&
-    state.isAssetsRoute === nextIsAssetsRoute
+    state.isAssetsRoute === nextIsAssetsRoute &&
+    state.isProjectsRoute === nextIsProjectsRoute
   ) {
     return;
   }
@@ -46,6 +50,7 @@ export function setRouteUiFromPathname(pathname: string) {
   state.isStarredRoute = nextIsStarredRoute;
   state.isVoiceRoute = nextIsVoiceRoute;
   state.isAssetsRoute = nextIsAssetsRoute;
+  state.isProjectsRoute = nextIsProjectsRoute;
   emit();
 }
 
@@ -82,5 +87,9 @@ export function useIsVoiceRoute() {
 
 export function useIsAssetsRoute() {
   return useSyncExternalStore(subscribeRouteUi, () => state.isAssetsRoute, () => false);
+}
+
+export function useIsProjectsRoute() {
+  return useSyncExternalStore(subscribeRouteUi, () => state.isProjectsRoute, () => false);
 }
 

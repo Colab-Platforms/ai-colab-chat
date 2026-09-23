@@ -11,7 +11,7 @@ import { buildPrismaQuery } from "prisma-qb";
 class FolderService {
   async create(userId: number, data: CreateFolderBody) {
     const folder = await prisma.folder.create({
-      data: { name: data.name, userId },
+      data: { name: data.name, description: data.description ?? null, userId },
     });
 
     return folder;
@@ -22,7 +22,7 @@ class FolderService {
 
     const { where: qbWhere, orderBy } = buildPrismaQuery({
       query,
-      searchFields: [{ field: "name" }],
+      searchFields: [{ field: "name" }, { field: "description" }],
       filterFields: [],
       sortFields: [
         { key: "createdAt", field: "createdAt" },
@@ -41,11 +41,25 @@ class FolderService {
         skip,
         take,
         orderBy,
+        include: { _count: { select: { chats: true } } },
       }),
       prisma.folder.count({ where }),
     ]);
 
     return formatPaginationResponse(folders, totalRecords, page, pageSize);
+  }
+
+  async getById(userId: number, folderId: number) {
+    const folder = await prisma.folder.findFirst({
+      where: { id: folderId, userId, isDeleted: false },
+      include: { _count: { select: { chats: true } } },
+    });
+
+    if (!folder) {
+      throw new ApiError("Folder not found", STATUS_CODES.NOT_FOUND);
+    }
+
+    return folder;
   }
 
   async update(userId: number, folderId: number, data: UpdateFolderBody) {
@@ -59,7 +73,7 @@ class FolderService {
 
     const updatedFolder = await prisma.folder.update({
       where: { id: folderId },
-      data: { name: data.name },
+      data: { name: data.name, description: data.description ?? null },
     });
 
     return updatedFolder;

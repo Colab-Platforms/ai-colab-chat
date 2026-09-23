@@ -390,7 +390,7 @@ export default function ContextsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Project Folder</DialogTitle>
+            <DialogTitle>New Project</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <Input

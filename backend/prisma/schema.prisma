@@ -160,16 +160,17 @@ model WalletTransaction {
 }
 
 model Folder {
-  id        Int             @id @default(autoincrement())
-  name      String
-  userId    Int
-  isDeleted Boolean         @default(false)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  deletedAt DateTime?
-  chats     Chat[]
-  contexts  ContextMemory[]
-  user      User            @relation(fields: [userId], references: [id])
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String?
+  userId      Int
+  isDeleted   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+  chats       Chat[]
+  contexts    ContextMemory[]
+  user        User            @relation(fields: [userId], references: [id])
 }
 
 model Chat {
