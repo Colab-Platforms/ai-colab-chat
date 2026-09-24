@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderArchive, Search, LayoutGrid, List, ChevronDown, Check, Film } from "lucide-react";
-import { documentService, videoService } from "@/lib/services";
+import { FolderArchive, Search, LayoutGrid, List, ChevronDown, Check, Film, Image as ImageIcon } from "lucide-react";
+import { documentService, videoService, imageService } from "@/lib/services";
 import { toast }  from "@/lib/toast";
 import {
   DropdownMenu,
@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DocumentCard, type GeneratedDocument } from "@/components/chat/document-card";
 import { VideoCard, type GeneratedVideo } from "@/components/chat/video-card";
+import { ImageCard, type GeneratedImage } from "@/components/chat/image-card";
 
-type AssetType = "documents" | "videos";
+type AssetType = "documents" | "videos" | "images";
 type ViewMode = "grid" | "list";
 type SortKey = "newest" | "oldest" | "title";
 type FormatFilter = "ALL" | "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
@@ -41,9 +42,14 @@ interface VideoRow extends GeneratedVideo {
   createdAt: string;
 }
 
+interface ImageRow extends GeneratedImage {
+  createdAt: string;
+}
+
 const ASSET_TYPES: { key: AssetType; label: string }[] = [
   { key: "documents", label: "Documents" },
   { key: "videos", label: "Videos" },
+  { key: "images", label: "Images" },
 ];
 
 export default function AssetsVaultPage() {
@@ -51,6 +57,7 @@ export default function AssetsVaultPage() {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<DocumentRow[]>([]);
   const [videos, setVideos] = useState<VideoRow[]>([]);
+  const [images, setImages] = useState<ImageRow[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -98,13 +105,30 @@ export default function AssetsVaultPage() {
     }
   }, []);
 
+  const fetchImages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await imageService.list({ limit: "100" });
+      setImages(res.data.data?.items || []);
+    } catch {
+      toast.error("Failed to load your images");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (assetType === "documents") fetchDocuments();
-    else fetchVideos();
-  }, [assetType, fetchDocuments, fetchVideos]);
+    else if (assetType === "videos") fetchVideos();
+    else fetchImages();
+  }, [assetType, fetchDocuments, fetchVideos, fetchImages]);
 
   const handleVideoDeleted = useCallback((id: number) => {
     setVideos((prev) => prev.filter((v) => v.id !== id));
+  }, []);
+
+  const handleImageDeleted = useCallback((id: number) => {
+    setImages((prev) => prev.filter((img) => img.id !== id));
   }, []);
 
   const visibleDocuments = useMemo(() => {
@@ -141,6 +165,22 @@ export default function AssetsVaultPage() {
     return sorted;
   }, [videos, debouncedSearch, sort]);
 
+  const visibleImages = useMemo(() => {
+    let items = images;
+    if (debouncedSearch) {
+      items = items.filter((image) => (image.prompt || "").toLowerCase().includes(debouncedSearch));
+    }
+    const sorted = [...items];
+    if (sort === "newest") {
+      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sort === "oldest") {
+      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    } else {
+      sorted.sort((a, b) => (a.prompt || "").localeCompare(b.prompt || ""));
+    }
+    return sorted;
+  }, [images, debouncedSearch, sort]);
+
   const sortLabel = useMemo(
     () => SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Sort",
     [sort],
@@ -157,7 +197,7 @@ export default function AssetsVaultPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Assets Vault</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Every document and video ColabAI has generated for you, from any chat, in one place.
+            Every document, video, and image ColabAI has generated for you, from any chat, in one place.
           </p>
         </div>
 
@@ -174,6 +214,7 @@ export default function AssetsVaultPage() {
               }`}
             >
               {opt.key === "videos" && <Film className="w-3.5 h-3.5" />}
+              {opt.key === "images" && <ImageIcon className="w-3.5 h-3.5" />}
               {opt.label}
             </button>
           ))}
@@ -302,39 +343,77 @@ export default function AssetsVaultPage() {
               ))}
             </div>
           )
-        ) : visibleVideos.length === 0 ? (
+        ) : assetType === "videos" ? (
+          visibleVideos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full px-6 text-center">
+              <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+                <Film className="w-6 h-6" />
+              </div>
+              <h2 className="text-sm font-semibold">
+                {debouncedSearch ? "No matching videos" : "No videos yet"}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                {debouncedSearch
+                  ? "Try a different search term."
+                  : "Use \"Generate Video\" in any chat and it'll show up here."}
+              </p>
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="max-w-5xl mx-auto py-6 px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {visibleVideos.map((video) => (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  className="mt-0 max-w-none"
+                  onDeleted={handleVideoDeleted}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto py-4 px-4 flex flex-col gap-1.5">
+              {visibleVideos.map((video) => (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  className="mt-0 max-w-none"
+                  onDeleted={handleVideoDeleted}
+                />
+              ))}
+            </div>
+          )
+        ) : visibleImages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full px-6 text-center">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-              <Film className="w-6 h-6" />
+              <ImageIcon className="w-6 h-6" />
             </div>
             <h2 className="text-sm font-semibold">
-              {debouncedSearch ? "No matching videos" : "No videos yet"}
+              {debouncedSearch ? "No matching images" : "No images yet"}
             </h2>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">
               {debouncedSearch
                 ? "Try a different search term."
-                : "Use \"Generate Video\" in any chat and it'll show up here."}
+                : "Ask ColabAI to generate an image in any chat and it'll show up here."}
             </p>
           </div>
         ) : viewMode === "grid" ? (
           <div className="max-w-5xl mx-auto py-6 px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {visibleVideos.map((video) => (
-              <VideoCard
-                key={video.id}
-                video={video}
+            {visibleImages.map((image) => (
+              <ImageCard
+                key={image.id}
+                image={image}
                 className="mt-0 max-w-none"
-                onDeleted={handleVideoDeleted}
+                onDeleted={handleImageDeleted}
               />
             ))}
           </div>
         ) : (
           <div className="max-w-2xl mx-auto py-4 px-4 flex flex-col gap-1.5">
-            {visibleVideos.map((video) => (
-              <VideoCard
-                key={video.id}
-                video={video}
+            {visibleImages.map((image) => (
+              <ImageCard
+                key={image.id}
+                image={image}
                 className="mt-0 max-w-none"
-                onDeleted={handleVideoDeleted}
+                onDeleted={handleImageDeleted}
               />
             ))}
           </div>

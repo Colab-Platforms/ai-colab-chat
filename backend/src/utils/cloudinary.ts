@@ -7,6 +7,9 @@ interface UploadResult {
   url: string;
   publicId: string;
   moderationStatuses?: string[];
+  bytes?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface UploadOptions {
@@ -68,6 +71,9 @@ export const uploadToCloudinary = async (
       url: result.secure_url,
       publicId: result.public_id,
       moderationStatuses: normalizeModerationStatuses((result as any).moderation),
+      bytes: result.bytes,
+      width: result.width,
+      height: result.height,
     };
   } else {
     return new Promise((resolve, reject) => {
@@ -89,6 +95,9 @@ export const uploadToCloudinary = async (
             moderationStatuses: normalizeModerationStatuses(
               (result as any).moderation,
             ),
+            bytes: result.bytes,
+            width: result.width,
+            height: result.height,
           });
         },
       );

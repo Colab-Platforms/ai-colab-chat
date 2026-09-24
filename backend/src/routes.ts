@@ -21,6 +21,7 @@ import billingRoutes from "@/modules/billing/billing.route.js";
 import supportRoutes from "@/modules/support/support.route.js";
 import documentRoutes from "@/modules/document/document.route.js";
 import videoRoutes from "@/modules/video/video.route.js";
+import imageRoutes from "@/modules/image/image.route.js";
 import voiceRoutes from "@/modules/voice/voice.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
 
@@ -59,6 +60,7 @@ router.use("/billing", billingRoutes);
 router.use("/support", supportRoutes);
 router.use("/documents", documentRoutes);
 router.use("/videos", videoRoutes);
+router.use("/images", imageRoutes);
 router.use("/voice", voiceRoutes);
 router.use("/admin", adminRoutes);
 

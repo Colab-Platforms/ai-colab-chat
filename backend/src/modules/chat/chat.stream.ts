@@ -1574,6 +1574,7 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
+    const uploadedImages: { url: string; publicId: string; bytes?: number; width?: number; height?: number }[] = [];
     if (imagesToUpload.length > 0) {
       for (const origUrl of imagesToUpload) {
         try {
@@ -1584,6 +1585,13 @@ export async function streamChat(req: Request, res: Response) {
           });
           if (result && result.url) {
             fullContent = fullContent.split(origUrl).join(result.url);
+            uploadedImages.push({
+              url: result.url,
+              publicId: result.publicId,
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            });
           }
         } catch (imgError) {
           console.error("  ❌ Failed to upload image to Cloudinary:", imgError);
@@ -1646,7 +1654,25 @@ export async function streamChat(req: Request, res: Response) {
 
       if (mr) {
         (res as any).modelResponseId = mr.id;
-      }  
+      }
+
+      if (chatType === "IMAGE_GENERATION" && uploadedImages.length > 0) {
+        await tx.generatedImage.createMany({
+          data: uploadedImages.map((img) => ({
+            userId,
+            chatId,
+            messageId: assistantMessage.id,
+            modelResponseId: mr.id,
+            modelId: model.id,
+            prompt: content.trim(),
+            fileUrl: img.url,
+            cloudinaryPublicId: img.publicId,
+            fileSize: img.bytes ?? null,
+            width: img.width ?? null,
+            height: img.height ?? null,
+          })),
+        });
+      }
 
       if (adjusted.finalBillableTotal > 0) {
         await tx.usageLog.create({
@@ -2237,6 +2263,7 @@ export async function regenerateChat(req: Request, res: Response) {
       return;
     }
 
+    const uploadedImages: { url: string; publicId: string; bytes?: number; width?: number; height?: number }[] = [];
     if (imagesToUpload.length > 0) {
       for (const origUrl of imagesToUpload) {
         try {
@@ -2247,6 +2274,13 @@ export async function regenerateChat(req: Request, res: Response) {
           });
           if (result && result.url) {
             fullContent = fullContent.split(origUrl).join(result.url);
+            uploadedImages.push({
+              url: result.url,
+              publicId: result.publicId,
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            });
           }
         } catch (imgError) {
           console.error("  ❌ Failed to upload image to Cloudinary:", imgError);
@@ -2266,6 +2300,12 @@ export async function regenerateChat(req: Request, res: Response) {
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
     let finalTotal = promptTokens + completionTokens;
+
+    // The regenerate flow has no fresh user prompt of its own — reuse the
+    // user turn this assistant message is answering, same "prompt" a normal
+    // send would have stored.
+    const regeneratedPrompt =
+      [...previousMessages].reverse().find((m: any) => m.role === "USER")?.content ?? "";
 
     await prisma.$transaction(async (tx: any) => {
       const walletRecord = await tx.userWallet.findUnique({
@@ -2303,6 +2343,24 @@ export async function regenerateChat(req: Request, res: Response) {
 
       if (mr) {
         (res as any).modelResponseId = mr.id;
+      }
+
+      if (chatType === "IMAGE_GENERATION" && uploadedImages.length > 0) {
+        await tx.generatedImage.createMany({
+          data: uploadedImages.map((img) => ({
+            userId,
+            chatId,
+            messageId,
+            modelResponseId: mr.id,
+            modelId: model.id,
+            prompt: regeneratedPrompt,
+            fileUrl: img.url,
+            cloudinaryPublicId: img.publicId,
+            fileSize: img.bytes ?? null,
+            width: img.width ?? null,
+            height: img.height ?? null,
+          })),
+        });
       }
 
       if (adjusted.finalBillableTotal > 0) {
@@ -2852,6 +2910,7 @@ export async function editAndResend(req: Request, res: Response) {
     }
 
     // Upload images to Cloudinary
+    const uploadedImages: { url: string; publicId: string; bytes?: number; width?: number; height?: number }[] = [];
     if (imagesToUpload.length > 0) {
       for (const origUrl of imagesToUpload) {
         try {
@@ -2862,6 +2921,13 @@ export async function editAndResend(req: Request, res: Response) {
           });
           if (result && result.url) {
             fullContent = fullContent.split(origUrl).join(result.url);
+            uploadedImages.push({
+              url: result.url,
+              publicId: result.publicId,
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            });
           }
         } catch (imgError) {
           console.error("  ❌ Failed to upload image to Cloudinary:", imgError);
@@ -2924,6 +2990,24 @@ export async function editAndResend(req: Request, res: Response) {
 
       if (mr) {
         (res as any).modelResponseId = mr.id;
+      }
+
+      if (chatType === "IMAGE_GENERATION" && uploadedImages.length > 0) {
+        await tx.generatedImage.createMany({
+          data: uploadedImages.map((img) => ({
+            userId,
+            chatId,
+            messageId: assistantMessage.id,
+            modelResponseId: mr.id,
+            modelId: model.id,
+            prompt: content.trim(),
+            fileUrl: img.url,
+            cloudinaryPublicId: img.publicId,
+            fileSize: img.bytes ?? null,
+            width: img.width ?? null,
+            height: img.height ?? null,
+          })),
+        });
       }
 
       if (adjusted.finalBillableTotal > 0) {

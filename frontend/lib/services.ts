@@ -225,6 +225,12 @@ export const videoService = {
   delete: (id: number) => api.delete(`/videos/${id}`),
 };
 
+export const imageService = {
+  list: (params?: Record<string, string>) => api.get("/images", { params }),
+  getById: (id: number) => api.get(`/images/${id}`),
+  delete: (id: number) => api.delete(`/images/${id}`),
+};
+
 export const voiceService = {
   createSession: (voiceId?: string, chatId?: number, attachmentIds?: number[]) =>
     api.post("/voice/session", { voiceId, chatId, attachmentIds }),
