@@ -7,12 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import imageCompression from "browser-image-compression";
 import {
-  Plus,
   Loader2,
   ArrowUp,
   Search,
   X,
-  Check,
   Sparkles,
   Image as ImageIcon,
   MessageSquare,
@@ -25,7 +23,6 @@ import {
   Paperclip,
   Maximize2,
   Minimize2,
-  ChevronDown,
   AudioLines,
   Film,
 } from "lucide-react";
@@ -34,14 +31,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { getModelIcon } from "@/lib/model-icons";
 import { attachmentService } from "@/lib/services";
 import { toast } from "@/lib/toast";
-import { ContextPickerMenu } from "@/components/chat/context-picker-menu";
+import { ModelsModal } from "@/components/chat/models-modal";
 
 // Dynamically imported so react-speech-recognition never runs on the server
 const MicButton = dynamic(
@@ -346,7 +342,7 @@ export function ChatInput({
   const [content, setContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
-  const [freeModelsOpen, setFreeModelsOpen] = useState(false);
+  const [modelsModalOpen, setModelsModalOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [chatType, setChatType] = useState<ChatType>("STANDARD");
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -928,15 +924,35 @@ export function ChatInput({
               )}
 
               {/* Selected model chip(s) — shown for single selection too, so the
-                  active model is always visible in the bar, not just in multi mode. */}
-              {selectedModels.length >= 1 && (
-                <div className="flex flex-wrap gap-1.5 px-2 mb-1 mt-1 flex-shrink-0">
-                  {models
+                  active model is always visible in the bar, not just in multi
+                  mode. This row is the ONLY trigger for the Models modal —
+                  click any chip (or the placeholder) to open it. */}
+              <div
+                data-guide="model-capability-trigger"
+                className={`flex gap-1.5 px-2 mb-1 mt-1 flex-shrink-0 ${
+                  !isSingle && selectedModels.length > 1
+                    ? "flex-nowrap overflow-x-auto scrollbar-thin"
+                    : "flex-wrap"
+                }`}
+              >
+                {selectedModels.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setModelsModalOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-muted text-muted-foreground rounded-full text-xs font-medium border border-border/40 hover:bg-muted/80 hover:text-foreground transition-colors flex-shrink-0"
+                  >
+                    Select model
+                  </button>
+                ) : (
+                  models
                     .filter((m) => selectedModels.includes(m.id))
                     .map((model) => (
-                      <div
+                      <button
                         key={model.id}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20 animate-in fade-in-0 slide-in-from-left-1 duration-200"
+                        type="button"
+                        onClick={() => setModelsModalOpen(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20 flex-shrink-0 hover:bg-primary/15 transition-colors animate-in fade-in-0 slide-in-from-left-1 duration-200"
+                        title="Change model"
                       >
                         {model.externalId && getModelIcon(model.externalId) ? (
                           <img
@@ -949,30 +965,33 @@ export function ChatInput({
                           {model.name}
                         </span>
                         {selectedModels.length > 1 && (
-                          <button
-                            onClick={() =>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onModelChange(
                                 selectedModels.filter((id) => id !== model.id),
-                              )
-                            }
+                              );
+                            }}
                             className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
                             title={`Remove ${model.name}`}
                           >
                             <X className="w-3 h-3" />
-                          </button>
+                          </span>
                         )}
-                      </div>
-                    ))}
-                  {selectedModels.length > 1 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] px-1.5 py-0.5 h-5 rounded-full bg-muted text-muted-foreground"
-                    >
-                      {selectedModels.length} models
-                    </Badge>
-                  )}
-                </div>
-              )}
+                      </button>
+                    ))
+                )}
+                {selectedModels.length > 1 && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1.5 py-0.5 h-5 rounded-full bg-muted text-muted-foreground flex-shrink-0"
+                  >
+                    {selectedModels.length} models
+                  </Badge>
+                )}
+              </div>
 
               {/* Attachment previews */}
               {attachments.length > 0 && (
@@ -1134,21 +1153,7 @@ export function ChatInput({
               <div
                 className={`flex items-center gap-1 flex-1 ${isExpanded ? "hidden" : "flex"}`}
               >
-                <DropdownMenu
-                  open={attachMenuOpen}
-                  onOpenChange={(open) => {
-                    setAttachMenuOpen(open);
-                    if (!open) setFreeModelsOpen(false);
-                    if (open)
-                      window.dispatchEvent(
-                        new Event("ai-colab:capability-menu-opened"),
-                      );
-                    else
-                      window.dispatchEvent(
-                        new Event("ai-colab:capability-menu-closed"),
-                      );
-                  }}
-                >
+                <DropdownMenu open={attachMenuOpen} onOpenChange={setAttachMenuOpen}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
@@ -1156,18 +1161,16 @@ export function ChatInput({
                       className="shrink-0 h-8 w-8 text-muted-foreground bg-muted hover:bg-muted/80 hover:text-foreground rounded-full border border-border/40"
                       disabled={isSending}
                       data-guide="attach"
-                      title="Attach / capabilities / models"
+                      title="Attach a file"
                     >
-                      <Plus className="w-5 h-5" />
+                      <Paperclip className="w-5 h-5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="start"
-                    className="w-[300px] p-2 rounded-xl z-[9500]"
+                    className="w-56 p-2 rounded-xl z-[9500]"
                     style={{ zIndex: 9500 }}
-                    data-guide="capability-menu"
                   >
-                    {/* ── ATTACH FILE group ── */}
                     <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1 px-2">
                       Attach File
                     </DropdownMenuLabel>
@@ -1198,203 +1201,6 @@ export function ChatInput({
                       </div>
                       <span>Upload a File</span>
                     </DropdownMenuItem>
-
-                    <DropdownMenuSeparator className="my-2" />
-
-                    {/* ── CAPABILITIES group ── */}
-                    <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1 px-2">
-                      Capabilities
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem
-                      className="gap-2 focus:bg-muted cursor-pointer rounded-md py-2"
-                      onClick={() => {
-                        handleChatTypeChange("STANDARD");
-                        window.dispatchEvent(
-                          new Event("ai-colab:capability-selected"),
-                        );
-                      }}
-                    >
-                      <div className="w-4 flex justify-center">
-                        {chatType === "STANDARD" && (
-                          <Check className="w-3 h-3 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-muted-foreground mr-1" />
-                        <span>Standard Chat</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-2 focus:bg-muted cursor-pointer rounded-md py-2"
-                      onClick={() => {
-                        handleChatTypeChange("WEB_SEARCH");
-                        window.dispatchEvent(
-                          new Event("ai-colab:capability-selected"),
-                        );
-                      }}
-                    >
-                      <div className="w-4 flex justify-center">
-                        {chatType === "WEB_SEARCH" && (
-                          <Check className="w-3 h-3 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Search className="w-4 h-4 text-muted-foreground mr-1" />
-                        <span>Web Search</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-2 focus:bg-muted cursor-pointer rounded-md py-2"
-                      onClick={() => {
-                        handleChatTypeChange("IMAGE_GENERATION");
-                        window.dispatchEvent(
-                          new Event("ai-colab:capability-selected"),
-                        );
-                      }}
-                    >
-                      <div className="w-4 flex justify-center">
-                        {chatType === "IMAGE_GENERATION" && (
-                          <Check className="w-3 h-3 text-primary" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <ImageIcon className="w-4 h-4 text-muted-foreground mr-1" />
-                        <span>Image Generation</span>
-                      </div>
-                    </DropdownMenuItem>
-
-                    <ContextPickerMenu onNavigateAway={() => setAttachMenuOpen(false)} />
-
-                    <DropdownMenuSeparator className="my-2" />
-
-                    {/* ── MODELS group ── */}
-                    <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1 px-2 flex justify-between items-center">
-                      <span>Models</span>
-                      {!isSingle && selectedModels.length > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="text-[10px] px-1.5 py-0 h-4 rounded-md"
-                        >
-                          {selectedModels.length} selected
-                        </Badge>
-                      )}
-                    </DropdownMenuLabel>
-
-                    <div className="max-h-[250px] overflow-y-auto scrollbar-thin">
-                      {(() => {
-                        const hasImage = attachments.some((a) =>
-                          a.mimeType.startsWith("image/"),
-                        );
-                        const selectable = models
-                          .filter(
-                            (m) =>
-                              !m.capabilities ||
-                              m.capabilities.length === 0 ||
-                              m.capabilities.includes(chatType),
-                          )
-                          .filter(
-                            (m) =>
-                              !hasImage ||
-                              (m.capabilities &&
-                                m.capabilities.includes("VISION")),
-                          );
-                        const regularModels = selectable.filter(
-                          (m) => m.tokenMultiplier !== 0,
-                        );
-                        const freeModels = selectable.filter(
-                          (m) => m.tokenMultiplier === 0,
-                        );
-
-                        const renderModelItem = (
-                          model: Model,
-                          indent?: boolean,
-                        ) => (
-                          <DropdownMenuItem
-                            key={model.id}
-                            className={`gap-2 focus:bg-muted cursor-pointer rounded-md py-2 items-start ${indent ? "ml-4" : ""}`}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              toggleModel(model.id);
-                              window.dispatchEvent(
-                                new Event("ai-colab:model-selected"),
-                              );
-                              setAttachMenuOpen(false);
-                            }}
-                          >
-                            <div className="w-4 flex justify-center mt-0.5">
-                              {selectedModels.includes(model.id) && (
-                                <Check className="w-3 h-3 text-primary" />
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 flex-1">
-                              {model.externalId &&
-                                getModelIcon(model.externalId) ? (
-                                <img
-                                  src={getModelIcon(model.externalId)!}
-                                  alt=""
-                                  className="w-4 h-4 rounded-sm object-contain flex-shrink-0"
-                                />
-                              ) : (
-                                <div className="w-4 h-4" />
-                              )}
-                              <div className="flex flex-col gap-0.5">
-                                <span className="font-medium text-[13px] leading-tight">
-                                  {model.name}
-                                </span>
-                                {model.description && (
-                                  <span className="text-[11px] text-muted-foreground leading-tight line-clamp-2">
-                                    {model.description}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </DropdownMenuItem>
-                        );
-
-                        return (
-                          <>
-                            {regularModels.map((m) => renderModelItem(m))}
-
-                            {freeModels.length > 0 && (
-                              <>
-                                <div
-                                  className="flex items-center gap-2 rounded-md py-2 px-2 cursor-pointer hover:bg-muted"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setFreeModelsOpen((o) => !o);
-                                  }}
-                                >
-                                  <div className="w-4 flex justify-center">
-                                    {freeModels.some((m) =>
-                                      selectedModels.includes(m.id),
-                                    ) && (
-                                      <Check className="w-3 h-3 text-primary" />
-                                    )}
-                                  </div>
-                                  <span className="font-medium text-[13px] flex-1">
-                                    Free Models
-                                  </span>
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[10px] px-1.5 py-0 h-4 rounded-md"
-                                  >
-                                    {freeModels.length}
-                                  </Badge>
-                                  <ChevronDown
-                                    className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${freeModelsOpen ? "rotate-180" : ""}`}
-                                  />
-                                </div>
-                                {freeModelsOpen &&
-                                  freeModels.map((m) =>
-                                    renderModelItem(m, true),
-                                  )}
-                              </>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -1568,6 +1374,28 @@ export function ChatInput({
         </div>
       </div>
       <VoiceModal open={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} />
+      <ModelsModal
+        open={modelsModalOpen}
+        onOpenChange={(next) => {
+          setModelsModalOpen(next);
+          window.dispatchEvent(
+            new Event(
+              next
+                ? "ai-colab:capability-menu-opened"
+                : "ai-colab:capability-menu-closed",
+            ),
+          );
+        }}
+        models={models}
+        selectedModels={selectedModels}
+        isSingle={isSingle}
+        onToggleModel={toggleModel}
+        chatType={chatType}
+        onChatTypeChange={handleChatTypeChange}
+        hasImageAttachment={attachments.some((a) =>
+          a.mimeType.startsWith("image/"),
+        )}
+      />
     </>
   );
 }
