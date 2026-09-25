@@ -25,6 +25,7 @@ import {
   maybeGenerateDocumentFromChat,
   prepareDocumentTurn,
 } from "@/modules/document/document.chat.js";
+import { detectImageIntent } from "@/modules/image/image.intent.js";
 
 const attachmentService = new AttachmentService();
 
@@ -858,7 +859,7 @@ export async function streamChat(req: Request, res: Response) {
   const {
     content,
     modelId,
-    chatType,
+    chatType: rawChatType,
     userMessageId,
     assistantMessageId,
     attachmentIds,
@@ -892,7 +893,7 @@ export async function streamChat(req: Request, res: Response) {
     }
 
     // Get model
-    const model = await prisma.model.findFirst({
+    let model = await prisma.model.findFirst({
       where: { id: modelId, isActive: true, isDeleted: false },
       include: { modelProvider: true },
     });
@@ -916,6 +917,46 @@ export async function streamChat(req: Request, res: Response) {
 
     console.log(" it is returning from here 2")
 
+    // Auto-detect image-generation intent for a normal chat turn — never
+    // overrides an explicit manual mode (Image Gen / Web Search / etc, all
+    // still selectable via the mode pill). Per-message only: this never
+    // touches the chat's persisted capability/modelIds, so the very next
+    // message in the same chat can be a normal question again.
+    let chatType = rawChatType || "STANDARD";
+    let autoImageDetected = false;
+
+    if (chatType === "STANDARD") {
+      const intent = await detectImageIntent(content.trim());
+      if (intent.isImageRequest) {
+        let effectiveModel: typeof model | null = model;
+        if (!model.capabilities.includes("IMAGE_GENERATION")) {
+          effectiveModel =
+            (await prisma.model.findFirst({
+              where: {
+                isActive: true,
+                isDeleted: false,
+                defaultForCapabilities: { has: "IMAGE_GENERATION" },
+              },
+              include: { modelProvider: true },
+            })) ??
+            (await prisma.model.findFirst({
+              where: {
+                isActive: true,
+                isDeleted: false,
+                capabilities: { has: "IMAGE_GENERATION" },
+              },
+              include: { modelProvider: true },
+            }));
+        }
+        // No image-capable model configured anywhere — fail open, turn
+        // proceeds as the normal STANDARD chat the user actually gets.
+        if (effectiveModel) {
+          model = effectiveModel;
+          chatType = "IMAGE_GENERATION";
+          autoImageDetected = true;
+        }
+      }
+    }
 
     // Reuse existing user message or create a new one
     let userMessage: { id: number };
@@ -1216,6 +1257,9 @@ export async function streamChat(req: Request, res: Response) {
       {
         userMessageId: userMessage.id,
         assistantMessageId: assistantMessage.id,
+        ...(autoImageDetected
+          ? { chatType, modelId: model.id, modelName: model.name }
+          : {}),
       },
       enableFollowUpQuestions,
     );

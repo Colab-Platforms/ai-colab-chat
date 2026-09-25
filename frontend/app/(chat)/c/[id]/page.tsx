@@ -496,11 +496,15 @@ export default function ChatPage() {
             try {
               const parsed = JSON.parse(data);
               if (parsed.type === "message_id") {
-                const { userMessageId: uId, assistantMessageId: aId } = parsed;
+                const { userMessageId: uId, assistantMessageId: aId, chatType: overrideChatType } = parsed;
                 setMessages((prev) =>
                   prev.map((msg) => {
-                    if (tempUserMsgId && msg.id === tempUserMsgId) return { ...msg, id: uId };
-                    if (msg.id === currentMsgId) return { ...msg, id: aId };
+                    if (tempUserMsgId && msg.id === tempUserMsgId) {
+                      return overrideChatType ? { ...msg, id: uId, chatType: overrideChatType } : { ...msg, id: uId };
+                    }
+                    if (msg.id === currentMsgId) {
+                      return overrideChatType ? { ...msg, id: aId, chatType: overrideChatType } : { ...msg, id: aId };
+                    }
                     return msg;
                   })
                 );
