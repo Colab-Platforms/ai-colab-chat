@@ -8,9 +8,11 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { walletService, billingService } from "@/lib/services";
-import { Loader2, Coins, TrendingUp, Eye, Download } from "lucide-react";
+import { walletService, billingService, creditWalletService } from "@/lib/services";
+import { Loader2, Coins, TrendingUp, Eye, Download, Video } from "lucide-react";
 import { DataTable, Column } from "@/components/dashboard/data-table";
+import { CreditTopUpCard } from "@/components/wallet/credit-topup-card";
+import { StatValue } from "@/components/dashboard/stat-value";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +20,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const CREDIT_TOPUP_BASELINE_KEY = "credit_topup_baseline";
+
 export default function WalletPage() {
   const [wallet, setWallet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Credit wallet state
+  const [creditWallet, setCreditWallet] = useState<any>(null);
+  const [creditWalletLoading, setCreditWalletLoading] = useState(true);
+  const [creditTransactions, setCreditTransactions] = useState<any[]>([]);
+  const [creditTxLoading, setCreditTxLoading] = useState(false);
+  const [creditSort, setCreditSort] = useState("");
+  const [creditPage, setCreditPage] = useState(1);
+  const [creditPageSize, setCreditPageSize] = useState(10);
+  const [creditPagination, setCreditPagination] = useState<any>({});
 
   // Transactions state
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -44,7 +58,46 @@ export default function WalletPage() {
       .then((res) => setWallet(res.data.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+    creditWalletService
+      .get()
+      .then((res) => setCreditWallet(res.data.data))
+      // A 404 here just means no CreditWallet row exists yet (e.g. the
+      // account subscribed before video credits existed, or is on Free) —
+      // not an error to hide the section for. It's created on first top-up
+      // or the next plan renewal.
+      .catch(() => setCreditWallet(null))
+      .finally(() => setCreditWalletLoading(false));
   }, []);
+
+  const fetchCreditTransactions = useCallback(async () => {
+    if (!creditWallet) return;
+    setCreditTxLoading(true);
+    try {
+      const params: any = { page: String(creditPage), pageSize: String(creditPageSize) };
+      if (creditSort) params.sort = creditSort;
+      const res = await creditWalletService.getTransactions(params);
+      const result = res.data.data;
+      setCreditTransactions(result?.data || []);
+      setCreditPagination(result || {});
+    } catch {
+      // ignore
+    } finally {
+      setCreditTxLoading(false);
+    }
+  }, [creditSort, creditPage, creditPageSize, creditWallet]);
+
+  useEffect(() => {
+    fetchCreditTransactions();
+  }, [fetchCreditTransactions]);
+
+  useEffect(() => {
+    setCreditPage(1);
+  }, [creditSort, creditPageSize]);
+
+  const handleTopUpCheckoutStart = () => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(CREDIT_TOPUP_BASELINE_KEY, String(creditWallet?.creditsRemaining ?? 0));
+  };
 
   const fetchTransactions = useCallback(async () => {
     if (!wallet) return;
@@ -256,6 +309,56 @@ export default function WalletPage() {
     },
   ];
 
+  const creditColumns: Column[] = [
+    {
+      key: "referenceId",
+      label: "Reference ID",
+      render: (r: any) => (
+        <span className="font-mono text-xs text-muted-foreground">{r.referenceId || "-"}</span>
+      ),
+    },
+    {
+      key: "type",
+      label: "Type",
+      sortable: true,
+      render: (r: any) => {
+        const isAddition = r.type !== "DEBIT";
+        return (
+          <span
+            className={`text-xs uppercase px-2 py-1 rounded-md ${
+              isAddition ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
+            }`}
+          >
+            {r.type.replace(/_/g, " ")}
+          </span>
+        );
+      },
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      sortable: true,
+      render: (r: any) => {
+        const isAddition = r.type !== "DEBIT";
+        const color = isAddition ? "text-emerald-500" : "text-rose-500";
+        return (
+          <span className={`font-mono text-sm font-medium ${color}`}>
+            {isAddition ? "+" : "-"}
+            {Math.abs(r.amount).toLocaleString()}
+          </span>
+        );
+      },
+    },
+    {
+      key: "createdAt",
+      label: "Date",
+      sortable: true,
+      render: (r) => (
+        <span className="text-muted-foreground text-sm">{new Date(r.createdAt).toLocaleString()}</span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -270,7 +373,7 @@ export default function WalletPage() {
           <CardContent className="p-6 text-center">
             <Coins className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
             <p className="text-3xl font-bold">
-              {wallet.tokensRemaining.toLocaleString()}
+              <StatValue value={wallet.tokensRemaining} />
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Tokens Remaining
@@ -281,7 +384,7 @@ export default function WalletPage() {
           <CardContent className="p-6 text-center">
             <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
             <p className="text-3xl font-bold">
-              {wallet.tokensUsed.toLocaleString()}
+              <StatValue value={wallet.tokensUsed} />
             </p>
             <p className="text-xs text-muted-foreground mt-1">Tokens Used</p>
           </CardContent>
@@ -323,6 +426,67 @@ export default function WalletPage() {
           </div>
         </CardContent>
       </Card>
+
+      {!creditWalletLoading && (
+        <>
+          <div>
+            <h2 className="text-lg font-semibold">Video Credits</h2>
+            <p className="text-muted-foreground text-sm mt-1">
+              Separate from tokens — spent only on video generation, top up any time
+            </p>
+          </div>
+
+          {!creditWallet && (
+            <p className="text-xs text-muted-foreground -mt-2">
+              No credits yet — they're added automatically on your plan's next renewal, or as soon as you top up below.
+            </p>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-card/90 backdrop-blur-sm border-border/30">
+              <CardContent className="p-6 text-center">
+                <Video className="w-8 h-8 mx-auto text-purple-500 mb-2" />
+                <p className="text-3xl font-bold"><StatValue value={creditWallet?.creditsRemaining ?? 0} /></p>
+                <p className="text-xs text-muted-foreground mt-1">Total Credits</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/90 backdrop-blur-sm border-border/30">
+              <CardContent className="p-6 text-center">
+                <p className="text-3xl font-bold"><StatValue value={creditWallet?.bundledCredits ?? 0} /></p>
+                <p className="text-xs text-muted-foreground mt-1">Plan Credits (resets monthly)</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-card/90 backdrop-blur-sm border-border/30">
+              <CardContent className="p-6 text-center">
+                <p className="text-3xl font-bold"><StatValue value={creditWallet?.topupCredits ?? 0} /></p>
+                <p className="text-xs text-muted-foreground mt-1">Top-up Credits (never expire)</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <CreditTopUpCard onCheckoutStart={handleTopUpCheckoutStart} />
+
+          {creditWallet && (
+            <DataTable
+              columns={creditColumns}
+              data={creditTransactions}
+              title="Video Credit Transactions"
+              description="History of credit grants, top-ups, and video generation spend"
+              sort={creditSort}
+              onSortChange={setCreditSort}
+              page={creditPage}
+              pageSize={creditPageSize}
+              totalRecords={creditPagination.totalRecords || 0}
+              totalPages={creditPagination.totalPages || 1}
+              hasNextPage={creditPagination.hasNextPage}
+              hasPreviousPage={creditPagination.hasPreviousPage}
+              onPageChange={setCreditPage}
+              onPageSizeChange={setCreditPageSize}
+              loading={creditTxLoading}
+            />
+          )}
+        </>
+      )}
 
       <DataTable
         columns={columns}

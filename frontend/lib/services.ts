@@ -91,6 +91,14 @@ export const walletService = {
     api.get("/wallet/transactions", { params }),
 };
 
+export const creditWalletService = {
+  get: () => api.get("/credit-wallet"),
+  getTransactions: (params?: Record<string, string>) =>
+    api.get("/credit-wallet/transactions", { params }),
+  getPricing: () => api.get("/credit-wallet/pricing"),
+  topup: (amountInr: number) => api.post("/credit-wallet/topup", { amountInr }),
+};
+
 export const subscriptionService = {
   create: (data: {
     planId: number;

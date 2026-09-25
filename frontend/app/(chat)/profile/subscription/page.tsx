@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { subscriptionService, planService, paymentService } from "@/lib/services";
-import { Loader2 } from "lucide-react";
+import { openSubscriptionCheckout, openPaymentCheckout } from "@/lib/cashfree";
+import { getPlanFeatureLines } from "@/lib/planFeatures";
+import { Loader2, Check, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -45,72 +47,6 @@ export default function SubscriptionPage() {
   const markCheckoutFlowStart = () => {
     if (typeof window === "undefined") return;
     sessionStorage.setItem("subscription_checkout_in_progress", "1");
-  };
-
-  const loadCashfreeSdk = async () => {
-    if (typeof window === "undefined") return null;
-    if ((window as any).Cashfree) return (window as any).Cashfree;
-
-    await new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector('script[data-cashfree-sdk="true"]') as HTMLScriptElement | null;
-      if (existing) {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("Cashfree SDK failed to load")), { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
-      script.async = true;
-      script.setAttribute("data-cashfree-sdk", "true");
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Cashfree SDK failed to load"));
-      document.head.appendChild(script);
-    });
-
-    return (window as any).Cashfree ?? null;
-  };
-
-  const openSubscriptionCheckout = async (sessionId: string) => {
-    const Cashfree = await loadCashfreeSdk();
-    if (!Cashfree) {
-      toast.error("Failed to load Cashfree checkout");
-      return;
-    }
-
-    const mode = String(process.env.NEXT_PUBLIC_CASHFREE_MODE || "production").toLowerCase() === "sandbox"
-      ? "sandbox"
-      : "production";
-    const cashfree = Cashfree({ mode });
-    const result = await cashfree.subscriptionsCheckout({
-      subsSessionId: sessionId,
-      // Keep checkout in same tab so browser back returns here.
-      redirectTarget: "_self",
-    });
-
-    if (result?.error) {
-      toast.error(result.error?.message || "Failed to open payment checkout");
-    }
-  };
-
-  const openPaymentCheckout = async (paymentSessionId: string) => {
-    const Cashfree = await loadCashfreeSdk();
-    if (!Cashfree) {
-      toast.error("Failed to load Cashfree checkout");
-      return;
-    }
-
-    const mode = String(process.env.NEXT_PUBLIC_CASHFREE_MODE || "production").toLowerCase() === "sandbox"
-      ? "sandbox"
-      : "production";
-    const cashfree = Cashfree({ mode });
-    const result = await cashfree.checkout({
-      paymentSessionId,
-      redirectTarget: "_self",
-    });
-
-    if (result?.error) {
-      toast.error(result.error?.message || "Failed to open payment checkout");
-    }
   };
 
   const fetchData = useCallback(async () => {
@@ -606,14 +542,26 @@ export default function SubscriptionPage() {
                     {plan.monthlyPrice === 0 ? "Free" : `₹${plan.monthlyPrice}/mo`}
                   </span>
                 </div>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>
-                    🎯 {plan.tokenLimit >= 1_000_000
-                      ? `${(plan.tokenLimit / 1_000_000).toFixed(plan.tokenLimit % 1_000_000 === 0 ? 0 : 1)}M`
-                      : `${(plan.tokenLimit / 1000).toFixed(0)}k`} tokens / month
-                  </p>
-                  <p>🤖 {plan.features?.maxModels === -1 ? "Unlimited" : plan.features?.maxModels} model{plan.features?.maxModels !== 1 ? "s" : ""}</p>
-                  {plan.features?.attachments && <p>📎 File attachments</p>}
+                <div className="text-sm space-y-1">
+                  {(() => {
+                    const { included, excluded } = getPlanFeatureLines(plan);
+                    return (
+                      <>
+                        {included.map((line) => (
+                          <p key={line} className="flex items-center gap-1.5 text-muted-foreground">
+                            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            {line}
+                          </p>
+                        ))}
+                        {excluded.map((line) => (
+                          <p key={line} className="flex items-center gap-1.5 text-muted-foreground/50">
+                            <X className="w-3.5 h-3.5 shrink-0" />
+                            {line}
+                          </p>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
                 {(() => {
                   const isCurrentPlan = !!subscription && subscription.planId === plan.id;

@@ -28,6 +28,7 @@ interface ModelResponse {
   // answer produces its own document.
   generatedDocuments?: GeneratedDocument[];
   insufficientBalance?: boolean;
+  planRestricted?: boolean;
 }
 
 // Historical FAILED responses (loaded from DB after a refresh) don't carry
@@ -42,6 +43,14 @@ function isInsufficientBalanceFailure(resp?: ModelResponse | null): boolean {
     text.includes("insufficient balance") ||
     text.includes("token limit exceeded")
   );
+}
+
+// A hard plan restriction (free-tier picked a paid model, or a plan without
+// image/video generation) — unlike insufficient balance, switching to a free
+// model can't fix this, so it gets a different recovery action.
+function isPlanRestrictedFailure(resp?: ModelResponse | null): boolean {
+  if (!resp || resp.status !== "FAILED") return false;
+  return Boolean(resp.planRestricted);
 }
 
 function isImageGenerationMessage(message: Message): boolean {
@@ -476,7 +485,18 @@ export const MessageBubble = React.memo(function MessageBubble({
           <div className=" rounded-2xl rounded-tl-md px-4 py-2.5 break-words overflow-hidden w-full">
             {singleResp ? (
               singleResp.status === "FAILED" && !isStoppedByUser(singleResp) ? (
-                isInsufficientBalanceFailure(singleResp) ? (
+                isPlanRestrictedFailure(singleResp) ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-destructive">
+                      {singleResp.content?.trim() || "This isn't included in your current plan."}
+                    </p>
+                    {!sharedView && (
+                      <Button variant="outline" size="sm" className="h-8 text-xs" type="button" asChild>
+                        <Link href="/profile/subscription">Upgrade your plan</Link>
+                      </Button>
+                    )}
+                  </div>
+                ) : isInsufficientBalanceFailure(singleResp) ? (
                   <div className="space-y-2">
                     <p className="text-sm text-destructive">
                       {isImageGenerationMessage(message)
@@ -654,7 +674,18 @@ export const MessageBubble = React.memo(function MessageBubble({
                       {/* Card content */}
                       <div className="flex-1 px-3 py-2.5 text-sm overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20 w-full min-w-0 max-w-full prose-pre:max-w-full prose-pre:overflow-x-auto">
                         {resp?.status === "FAILED" && !isStoppedByUser(resp) ? (
-                          isInsufficientBalanceFailure(resp) ? (
+                          isPlanRestrictedFailure(resp) ? (
+                            <div className="space-y-2">
+                              <p className="text-sm text-destructive">
+                                {resp.content?.trim() || "This isn't included in your current plan."}
+                              </p>
+                              {!sharedView && (
+                                <Button variant="outline" size="sm" className="h-8 text-xs" type="button" asChild>
+                                  <Link href="/profile/subscription">Upgrade your plan</Link>
+                                </Button>
+                              )}
+                            </div>
+                          ) : isInsufficientBalanceFailure(resp) ? (
                             <div className="space-y-2">
                               <p className="text-sm text-destructive">
                                 {isImageGenerationMessage(message)
@@ -805,7 +836,7 @@ export const MessageBubble = React.memo(function MessageBubble({
   for (let i = 0; i < pResps.length; i++) {
     const pr = pResps[i];
     const nr = nResps[i];
-    if (pr.id !== nr.id || pr.status !== nr.status || pr.content !== nr.content || pr.isLiked !== nr.isLiked || pr.isStarred !== nr.isStarred || pr.insufficientBalance !== nr.insufficientBalance || pr.finishReason !== nr.finishReason) {
+    if (pr.id !== nr.id || pr.status !== nr.status || pr.content !== nr.content || pr.isLiked !== nr.isLiked || pr.isStarred !== nr.isStarred || pr.insufficientBalance !== nr.insufficientBalance || pr.planRestricted !== nr.planRestricted || pr.finishReason !== nr.finishReason) {
       return false;
     }
   }

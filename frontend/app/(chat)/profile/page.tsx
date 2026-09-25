@@ -14,11 +14,14 @@ import {
   type DailyModelUsageRow,
 } from "@/components/dashboard/model-usage-line-chart";
 import { dashboardService } from "@/lib/services";
-import { Wallet, CreditCard, Coins, TrendingUp, Loader2 } from "lucide-react";
+import { Wallet, CreditCard, Coins, TrendingUp, Loader2, Video } from "lucide-react";
+import Link from "next/link";
+import { StatValue } from "@/components/dashboard/stat-value";
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [wallet, setWallet] = useState<any>(null);
+  const [creditWallet, setCreditWallet] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [dailyByModel, setDailyByModel] = useState<DailyModelUsageRow[]>([]);
   const [chartDays, setChartDays] = useState(30);
@@ -35,6 +38,7 @@ export default function DashboardPage() {
         const data = res?.data?.data;
 
         setWallet(data?.wallet ?? null);
+        setCreditWallet(data?.creditWallet ?? null);
         setSubscription(
           data?.subscription?.subscription ??
             data?.subscription?.subscription ??
@@ -71,14 +75,14 @@ export default function DashboardPage() {
   const stats = [
     {
       label: "Tokens Remaining",
-      value: wallet?.tokensRemaining?.toLocaleString() || "0",
+      value: <StatValue value={wallet?.tokensRemaining ?? 0} />,
       icon: Coins,
       gradient: "from-emerald-500/20 to-teal-500/10",
       iconColor: "text-emerald-500",
     },
     {
       label: "Tokens Used",
-      value: wallet?.tokensUsed?.toLocaleString() || "0",
+      value: <StatValue value={wallet?.tokensUsed ?? 0} />,
       icon: TrendingUp,
       gradient: "from-blue-500/20 to-indigo-500/10",
       iconColor: "text-blue-500",
@@ -91,11 +95,19 @@ export default function DashboardPage() {
       iconColor: "text-purple-500",
     },
     {
-      label: "Wallet Balance",
-      value: `${usagePercent.toFixed(1)}% used`,
+      label: "Wallet Used",
+      value: `${usagePercent.toFixed(1)}%`,
       icon: Wallet,
       gradient: "from-amber-500/20 to-orange-500/10",
       iconColor: "text-amber-500",
+    },
+    {
+      label: "Video Credits",
+      value: <StatValue value={creditWallet?.creditsRemaining ?? 0} />,
+      icon: Video,
+      gradient: "from-violet-500/20 to-fuchsia-500/10",
+      iconColor: "text-violet-500",
+      href: "/profile/wallet",
     },
   ];
 
@@ -113,29 +125,37 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Card
-            key={stat.label}
-            className={`bg-card/90 backdrop-blur-sm border-border/30 shadow-sm hover:shadow-md transition-shadow overflow-hidden`}
-          >
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                    {stat.label}
-                  </p>
-                  <p className="text-2xl font-bold mt-1.5">{stat.value}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-stretch">
+        {stats.map((stat) => {
+          const card = (
+            <Card
+              className={`h-full bg-card/90 backdrop-blur-sm border-border/30 shadow-sm hover:shadow-md transition-shadow overflow-hidden ${stat.href ? "cursor-pointer" : ""}`}
+            >
+              <CardContent className="p-5 h-full">
+                <div className="flex items-start justify-between h-full gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider leading-tight min-h-[2rem] flex items-center">
+                      {stat.label}
+                    </p>
+                    <p className="text-2xl font-bold mt-1.5 flex items-center">{stat.value}</p>
+                  </div>
+                  <div
+                    className={`w-10 h-10 rounded-xl bg-background/50 flex items-center justify-center shrink-0 ${stat.iconColor}`}
+                  >
+                    <stat.icon className="w-5 h-5" />
+                  </div>
                 </div>
-                <div
-                  className={`w-10 h-10 rounded-xl bg-background/50 flex items-center justify-center ${stat.iconColor}`}
-                >
-                  <stat.icon className="w-5 h-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+          return stat.href ? (
+            <Link key={stat.label} href={stat.href} className="block h-full">
+              {card}
+            </Link>
+          ) : (
+            <div key={stat.label} className="h-full">{card}</div>
+          );
+        })}
       </div>
 
       {wallet && (

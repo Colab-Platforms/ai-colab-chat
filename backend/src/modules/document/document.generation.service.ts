@@ -1,5 +1,6 @@
 import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
+import { debitTokens } from "@/utils/walletUtils.js";
 import { dlog, dlogBlock, dlogError, dtime } from "./document.logger.js";
 import { getRenderer } from "./document.renderers.js";
 import { generateSpec } from "./document.spec.service.js";
@@ -143,6 +144,27 @@ export const processDocument = async (id: number): Promise<void> => {
           completionTokens,
         },
       });
+
+      // Metered once, on first generation only — a stored-spec re-render
+      // (retry, theme change) makes no new model call, so it must not be
+      // billed again. Real token counts, no multiplier.
+      const billableTotal = (promptTokens ?? 0) + (completionTokens ?? 0);
+      if (billableTotal > 0) {
+        const wallet = await prisma.userWallet.findUnique({ where: { userId: document.userId } });
+        if (wallet) {
+          await prisma.$transaction((tx) =>
+            debitTokens(tx, {
+              userId: document.userId,
+              walletId: wallet.id,
+              amount: billableTotal,
+              referenceId: `document_generation_${id}`,
+              meta: { reason: "DOCUMENT_GENERATION", documentId: id, promptTokens, completionTokens },
+            }),
+          );
+        } else {
+          dlogError("worker", `job=${id} user=${document.userId} has no wallet — skipping debit`, null);
+        }
+      }
       dlog("worker", `job=${id} spec persisted — re-renders are now free`);
     } else {
       dlog("worker", `job=${id} reusing stored spec — no model call`);

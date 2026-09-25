@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
+import { getUserPlanContext, assertCanUseModel, assertCanGenerateImage } from "@/modules/plan-access/planAccess.service.js";
 import { createOpenRouterStream } from "@/utils/openrouter.js";
 import { estimateMessageTokens } from "@/utils/tokenCounter.js";
 import { checkPredefinedResponse } from "@/utils/predefinedResponses.js";
@@ -910,7 +911,18 @@ export async function streamChat(req: Request, res: Response) {
 
     const isfreeModel = model.isFreeModel
 
-    console.log(" it is returning from here 1", isfreeModel, model.isFreeModel, model.name, model.externalId, model.modelProvider.name)
+    // Plan-based access control: Free-tier accounts may only use free models,
+    // and image generation is a paid-plan-only capability.
+    const planContext = await getUserPlanContext(userId);
+    try {
+      assertCanUseModel(planContext, model);
+      if (chatType === "IMAGE_GENERATION") {
+        assertCanGenerateImage(planContext);
+      }
+    } catch (err: any) {
+      res.status(err.statusCode ?? 403).json({ status: false, code: "PLAN_RESTRICTED", message: err.message });
+      return;
+    }
 
     // Check wallet
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
@@ -918,8 +930,6 @@ export async function streamChat(req: Request, res: Response) {
       res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
       return;
     }
-
-    console.log(" it is returning from here 2")
 
 
     // Reuse existing user message or create a new one

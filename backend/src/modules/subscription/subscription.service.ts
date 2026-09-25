@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import { CreateSubscriptionBody } from "./subscription.types.js";
-import { createWalletTransaction } from "@/utils/walletUtils.js";
+import { createWalletTransaction, creditBundledCredits } from "@/utils/walletUtils.js";
 import SubscriptionCashfreeService from "./subscription.cashfree.service.js";
 import { CashfreePlanSource } from "@/utils/cashfreePlan.js";
 
@@ -197,6 +197,15 @@ class SubscriptionService {
                     amount: plan.tokenLimit,
                     type: "CREDIT",
                     referenceId: "free_subscription_activation",
+                    meta: { reason: "FREE_PLAN_ACTIVATION", planId: plan.id, planName: plan.name },
+                });
+
+                // Bundled video credits reset (overwrite) to this plan's grant —
+                // unlike tokens above, they never carry forward across a switch.
+                await creditBundledCredits(tx, {
+                    userId,
+                    monthlyVideoCredits: plan.monthlyVideoCredits,
+                    referenceId: `free_subscription_activation_${subscription.id}`,
                     meta: { reason: "FREE_PLAN_ACTIVATION", planId: plan.id, planName: plan.name },
                 });
 

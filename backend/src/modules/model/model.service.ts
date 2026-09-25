@@ -41,18 +41,24 @@ class ModelService {
       ],
       defaultSort: { key: "createdAt", order: "desc" },
       softDelete: { field: "isDeleted", value: false },
-      allowedQueryKeys: ["page", "pageSize"],
+      allowedQueryKeys: ["page", "pageSize", "capability"],
     });
+
+    // Array-contains filter — buildPrismaQuery's generic filterFields do
+    // equality only, so this one is applied by hand.
+    const finalWhere = query.capability
+      ? { ...where, capabilities: { has: query.capability } }
+      : where;
 
     const [models, totalRecords] = await Promise.all([
       prisma.model.findMany({
-        where,
+        where: finalWhere,
         skip,
         take,
         orderBy,
         include: { modelProvider: { select: { id: true, name: true } } },
       }),
-      prisma.model.count({ where }),
+      prisma.model.count({ where: finalWhere }),
     ]);
 
     return formatPaginationResponse(models, totalRecords, page, pageSize);
@@ -89,6 +95,8 @@ class ModelService {
       updateData.tokenMultiplier = data.tokenMultiplier;
     if (data.videoCostPerSecond !== undefined)
       updateData.videoCostPerSecond = data.videoCostPerSecond;
+    if (data.creditCostPerSecond !== undefined)
+      updateData.creditCostPerSecond = data.creditCostPerSecond;
 
     const updated = await prisma.model.update({
       where: { id: modelId },

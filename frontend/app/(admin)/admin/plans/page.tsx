@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DataTable, Column } from "@/components/dashboard/data-table";
-import { planService } from "@/lib/services";
+import { planService, modelService } from "@/lib/services";
 import { Loader2, Eye, Pencil, Trash2, Plus, Save } from "lucide-react";
 import { toast } from "@/lib/toast";
 
@@ -22,8 +22,15 @@ export default function PlansAdminPage() {
     tokenLimit: 10000,
     isActive: true,
     features: JSON.stringify(defaultFeatures, null, 2),
+    restrictToFreeModels: false,
+    documentGenEnabled: true,
+    imageGenEnabled: false,
+    videoGenEnabled: false,
+    monthlyVideoCredits: 0,
+    allowedVideoModelIds: [] as number[],
   };
   const [plans, setPlans] = useState<any[]>([]);
+  const [videoModels, setVideoModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("");
@@ -57,6 +64,12 @@ export default function PlansAdminPage() {
 
   useEffect(() => { fetchPlans(); }, [fetchPlans]);
   useEffect(() => { setPage(1); }, [search, sort, pageSize, activeFilters]);
+  useEffect(() => {
+    modelService
+      .list({ capability: "VIDEO_GENERATION", pageSize: "100" })
+      .then((res) => setVideoModels(res.data?.data?.data || res.data?.data || []))
+      .catch(() => {});
+  }, []);
 
   const openCreate = () => { setForm(defaultForm); setEditPlan({ _isNew: true }); };
   const openEdit = (p: any) => {
@@ -68,6 +81,12 @@ export default function PlansAdminPage() {
       tokenLimit: p.tokenLimit,
       isActive: p.isActive ?? true,
       features: JSON.stringify(p.features ?? defaultFeatures, null, 2),
+      restrictToFreeModels: Boolean(p.restrictToFreeModels),
+      documentGenEnabled: p.documentGenEnabled !== false,
+      imageGenEnabled: Boolean(p.imageGenEnabled),
+      videoGenEnabled: Boolean(p.videoGenEnabled),
+      monthlyVideoCredits: p.monthlyVideoCredits ?? 0,
+      allowedVideoModelIds: (p.allowedVideoModels || []).map((v: any) => v.modelId ?? v.model?.id ?? v.id),
     });
     setEditPlan(p);
   };
@@ -91,6 +110,12 @@ export default function PlansAdminPage() {
         tokenLimit: form.tokenLimit,
         isActive: form.isActive,
         features: parsedFeatures,
+        restrictToFreeModels: form.restrictToFreeModels,
+        documentGenEnabled: form.documentGenEnabled,
+        imageGenEnabled: form.imageGenEnabled,
+        videoGenEnabled: form.videoGenEnabled,
+        monthlyVideoCredits: form.monthlyVideoCredits,
+        allowedVideoModelIds: form.allowedVideoModelIds,
       };
 
       if (editPlan._isNew) { await planService.create(payload); toast.success("Plan created"); }
@@ -115,6 +140,10 @@ export default function PlansAdminPage() {
     },
     { key: "tokenLimit", label: "Token Limit", sortable: true, render: (r) => `${(r.tokenLimit / 1000).toFixed(0)}k` },
     { key: "models", label: "Models", render: (r) => r.features?.maxModels === -1 ? "∞" : r.features?.maxModels },
+    {
+      key: "videoCredits", label: "Video Credits",
+      render: (r) => r.videoGenEnabled ? `${r.monthlyVideoCredits ?? 0}/mo` : <span className="text-muted-foreground">—</span>,
+    },
     {
       key: "actions", label: "Actions", className: "text-right",
       render: (r) => (
@@ -154,6 +183,35 @@ export default function PlansAdminPage() {
               <div><span className="text-muted-foreground">Yearly:</span> ₹{viewPlan.yearlyPrice}</div>
               <div><span className="text-muted-foreground">Token Limit:</span> {viewPlan.tokenLimit?.toLocaleString()}</div>
               <div><span className="text-muted-foreground">Status:</span> <Badge variant={viewPlan.isActive ? "default" : "secondary"}>{viewPlan.isActive ? "Active" : "Inactive"}</Badge></div>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Badge variant={viewPlan.restrictToFreeModels ? "secondary" : "default"}>
+                  {viewPlan.restrictToFreeModels ? "Free models only" : "All models"}
+                </Badge>
+                <Badge variant={viewPlan.documentGenEnabled ? "default" : "secondary"}>
+                  {viewPlan.documentGenEnabled ? "Docs ✓" : "Docs ✗"}
+                </Badge>
+                <Badge variant={viewPlan.imageGenEnabled ? "default" : "secondary"}>
+                  {viewPlan.imageGenEnabled ? "Image ✓" : "Image ✗"}
+                </Badge>
+                <Badge variant={viewPlan.videoGenEnabled ? "default" : "secondary"}>
+                  {viewPlan.videoGenEnabled ? `Video ✓ (${viewPlan.monthlyVideoCredits ?? 0}/mo)` : "Video ✗"}
+                </Badge>
+              </div>
+              {viewPlan.videoGenEnabled && (
+                <div>
+                  <span className="text-muted-foreground block mb-1">Allowed video models:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(viewPlan.allowedVideoModels || []).length === 0 ? (
+                      <span className="text-xs text-muted-foreground">None assigned</span>
+                    ) : (
+                      viewPlan.allowedVideoModels.map((v: any) => {
+                        const model = videoModels.find((m) => m.id === v.modelId);
+                        return <Badge key={v.modelId} variant="outline">{model?.name || `#${v.modelId}`}</Badge>;
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
               <div><span className="text-muted-foreground">Features:</span> <pre className="mt-1 text-xs bg-muted p-2 rounded">{JSON.stringify(viewPlan.features, null, 2)}</pre></div>
             </div>
           )}
@@ -162,7 +220,7 @@ export default function PlansAdminPage() {
 
       {/* Create/Edit */}
       <Dialog open={!!editPlan} onOpenChange={() => setEditPlan(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editPlan?._isNew ? "Create Plan" : "Edit Plan"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1"><label className="text-sm font-medium">Name</label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
@@ -182,6 +240,71 @@ export default function PlansAdminPage() {
               />
               <label htmlFor="planActive" className="text-sm">Active</label>
             </div>
+
+            <div className="space-y-2 rounded-md border border-border/40 p-3">
+              <label className="text-sm font-medium">Capabilities</label>
+              {[
+                { key: "restrictToFreeModels" as const, label: "Restrict chat to free models only" },
+                { key: "documentGenEnabled" as const, label: "Document generation" },
+                { key: "imageGenEnabled" as const, label: "Image generation" },
+                { key: "videoGenEnabled" as const, label: "Video generation" },
+              ].map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form[key]}
+                    onChange={(e) => setForm({ ...form, [key]: e.target.checked })}
+                    id={key}
+                    className="rounded"
+                  />
+                  <label htmlFor={key} className="text-sm">{label}</label>
+                </div>
+              ))}
+            </div>
+
+            {form.videoGenEnabled && (
+              <>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Video Credits / Month</label>
+                  <Input
+                    type="number"
+                    value={form.monthlyVideoCredits}
+                    onChange={(e) => setForm({ ...form, monthlyVideoCredits: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Allowed Video Models</label>
+                  <div className="space-y-1.5 rounded-md border border-border/40 p-3 max-h-40 overflow-y-auto">
+                    {videoModels.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No video models found</p>
+                    )}
+                    {videoModels.map((m) => {
+                      const checked = form.allowedVideoModelIds.includes(m.id);
+                      return (
+                        <div key={m.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                allowedVideoModelIds: e.target.checked
+                                  ? [...form.allowedVideoModelIds, m.id]
+                                  : form.allowedVideoModelIds.filter((id) => id !== m.id),
+                              })
+                            }
+                            id={`video-model-${m.id}`}
+                            className="rounded"
+                          />
+                          <label htmlFor={`video-model-${m.id}`} className="text-sm">{m.name}</label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="space-y-1">
               <label className="text-sm font-medium">Features (JSON)</label>
               <Textarea

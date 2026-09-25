@@ -16,6 +16,14 @@ export interface DashboardSummary {
     createdAt: Date;
     updatedAt: Date;
   } | null;
+  creditWallet: {
+    id: number;
+    userId: number;
+    bundledCredits: number;
+    topupCredits: number;
+    creditsUsed: number;
+    creditsRemaining: number;
+  } | null;
   subscription: {
     subscription: Record<string, unknown> | null;
     pendingSubscription: Record<string, unknown> | null;

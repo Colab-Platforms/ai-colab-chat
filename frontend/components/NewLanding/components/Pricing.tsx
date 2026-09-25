@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Sparkles, Loader2, Lock } from "lucide-react";
 import { planService } from "@/lib/services";
 import { useAuth } from "@/context/auth-context";
+import { getPlanFeatureLines } from "@/lib/planFeatures";
 
 // ─────────────────────────────────────────────────────
 //  Types
@@ -104,39 +105,10 @@ export default function Pricing() {
           .filter((plan: any) => plan.isActive && !plan.isDeleted)
           .sort((a: any, b: any) => Number(a.monthlyPrice) - Number(b.monthlyPrice))
           .map((plan: any) => {
-            const features: string[] = [];
-
-            // Match features parser from PricingSection.tsx
-            if (plan.features && typeof plan.features === "object" && !Array.isArray(plan.features)) {
-              if (plan.features.maxModels === -1) {
-                features.push("Unlimited AI Models");
-              } else if (plan.features.maxModels) {
-                features.push(`${plan.features.maxModels} AI Models`);
-              }
-
-              if (plan.features.attachments) {
-                features.push("File Uploads & Attachments");
-              }
-
-              if (plan.features.support) {
-                const raw = plan.features.support as string;
-                const label = raw
-                  .split("_")
-                  .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(" ");
-                features.push(`${label} Support`);
-              }
-            } else if (Array.isArray(plan.features)) {
-              features.push(...plan.features);
-            }
-
-            if (plan.tokenLimit) {
-              features.push(`${Number(plan.tokenLimit).toLocaleString("en-IN")} monthly tokens`);
-            }
-
-            if (features.length === 0) {
-              features.push(`Everything in ${plan.name}`);
-            }
+            // Shared parser (lib/planFeatures.ts) — also used by the real
+            // subscription page, so marketing copy stays in sync with what a
+            // subscriber actually gets.
+            const features = getPlanFeatureLines(plan).included;
 
             const isFree = Number(plan.monthlyPrice) === 0;
 

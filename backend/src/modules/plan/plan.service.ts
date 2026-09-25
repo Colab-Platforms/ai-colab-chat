@@ -9,9 +9,23 @@ import SubscriptionCashfreeService from "@/modules/subscription/subscription.cas
 class PlanService {
     private cashfreeService = new SubscriptionCashfreeService();
 
+    /** allowedVideoModelIds isn't a Plan column — it backs the PlanVideoModel join table. */
+    private async setAllowedVideoModels(planId: number, modelIds?: number[]) {
+        if (!modelIds) return;
+        await prisma.planVideoModel.deleteMany({ where: { planId } });
+        if (modelIds.length > 0) {
+            await prisma.planVideoModel.createMany({
+                data: modelIds.map((modelId) => ({ planId, modelId })),
+                skipDuplicates: true,
+            });
+        }
+    }
+
     async create(data: CreatePlanBody) {
-        const plan = await prisma.plan.create({ data });
+        const { allowedVideoModelIds, ...planData } = data;
+        const plan = await prisma.plan.create({ data: planData });
         try {
+            await this.setAllowedVideoModels(plan.id, allowedVideoModelIds);
             await this.cashfreeService.syncAllPlanCycles(plan as any);
             return plan;
         } catch (error) {
@@ -43,7 +57,13 @@ class PlanService {
         });
 
         const [plans, totalRecords] = await Promise.all([
-            prisma.plan.findMany({ where, skip, take, orderBy }),
+            prisma.plan.findMany({
+                where,
+                skip,
+                take,
+                orderBy,
+                include: { allowedVideoModels: { select: { modelId: true } } },
+            }),
             prisma.plan.count({ where }),
         ]);
 
@@ -53,6 +73,7 @@ class PlanService {
     async getById(planId: number) {
         const plan = await prisma.plan.findFirst({
             where: { id: planId, isDeleted: false },
+            include: { allowedVideoModels: { select: { modelId: true } } },
         });
         if (!plan) throw new ApiError("Plan not found", STATUS_CODES.NOT_FOUND);
         return plan;
@@ -64,10 +85,12 @@ class PlanService {
         });
         if (!plan) throw new ApiError("Plan not found", STATUS_CODES.NOT_FOUND);
 
+        const { allowedVideoModelIds, ...planData } = data;
         const updated = await prisma.plan.update({
             where: { id: planId },
-            data,
+            data: planData,
         });
+        await this.setAllowedVideoModels(planId, allowedVideoModelIds);
 
         try {
             await this.cashfreeService.syncAllPlanCycles(updated as any);

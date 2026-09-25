@@ -24,6 +24,9 @@ export const createModelSchema = Joi.object({
   // VIDEO_GENERATION model, but not conditionally required here since
   // capabilities can be set before this is calibrated.
   videoCostPerSecond: Joi.number().integer().min(0).optional(),
+  // Video-credit price per second (CreditWallet unit, $0.03/credit real
+  // cost) — the flat fallback rate; per-resolution rates are seed-managed.
+  creditCostPerSecond: Joi.number().min(0).optional(),
   isActive: Joi.boolean().optional(),
   defaultForCapabilities: Joi.array()
     .items(
@@ -61,6 +64,7 @@ export const updateModelSchema = Joi.object({
   description: Joi.string().trim().allow(null, "").optional(),
   tokenMultiplier: Joi.number().optional(),
   videoCostPerSecond: Joi.number().integer().min(0).optional(),
+  creditCostPerSecond: Joi.number().min(0).optional(),
   isActive: Joi.boolean().optional(),
   defaultForCapabilities: Joi.array()
     .items(

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/context/theme-context";
 import { AuthProvider } from "@/context/auth-context";
+import { PlanCapabilitiesProvider } from "@/context/plan-capabilities-context";
 import { ChatRootShell } from "@/components/chat/chat-root-shell";
 import { Toaster } from "@/components/ui/toast";
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
@@ -122,8 +123,10 @@ fbq('track', 'PageView');`,
         <Toaster />
         <ThemeProvider>
           <AuthProvider>
-            <ChatRootShell>{children}</ChatRootShell>
-            <PwaInstallPrompt />
+            <PlanCapabilitiesProvider>
+              <ChatRootShell>{children}</ChatRootShell>
+              <PwaInstallPrompt />
+            </PlanCapabilitiesProvider>
           </AuthProvider>
         </ThemeProvider>
         <ServiceWorkerRegister />

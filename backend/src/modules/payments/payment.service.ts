@@ -2,7 +2,7 @@ import dayjs from "dayjs";
 import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
-import { createWalletTransaction } from "@/utils/walletUtils.js";
+import { createWalletTransaction, creditBundledCredits, creditTopupCredits, calculateTopUpCredits } from "@/utils/walletUtils.js";
 import PaymentCashfreeService from "./payment.cashfree.service.js";
 import BillingService from "@/modules/billing/billing.service.js";
 import InvoiceService from "@/modules/billing/invoice.service.js";
@@ -119,6 +119,117 @@ class PaymentService {
     }
   }
 
+  /**
+   * Pay-as-you-go video-credit top-up — a standalone Cashfree order with no
+   * subscriptionId, distinguished from a plan purchase by the "credittopup_"
+   * order-id prefix and Payment.purpose. Reuses the same one-time-order
+   * plumbing as createSubscriptionOneTimePayment.
+   */
+  async createCreditTopUp(userId: number, amountInr: number) {
+    if (!Number.isFinite(amountInr) || amountInr <= 0) {
+      throw new ApiError("Top-up amount must be a positive number", STATUS_CODES.BAD_REQUEST);
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new ApiError("User not found", STATUS_CODES.NOT_FOUND);
+    }
+
+    const orderId = `credittopup_${userId}_${Date.now()}`;
+    const customerName =
+      [user.firstName, user.lastName]
+        .filter((part) => typeof part === "string" && part.trim().length > 0)
+        .join(" ")
+        .trim() || user.email.split("@")[0] || `user_${user.id}`;
+
+    const order = await this.cashfreeService.createOrder({
+      orderId,
+      orderAmount: amountInr,
+      customerId: `user_${user.id}`,
+      customerName,
+      customerEmail: user.email,
+      customerPhone: this.normalizePhone(user.phoneNumber),
+      returnPath: "/profile/wallet/topup-success",
+    });
+
+    await prisma.payment.create({
+      data: {
+        userId,
+        type: "ONE_TIME",
+        purpose: "CREDIT_TOPUP",
+        provider: "CASHFREE",
+        providerOrderId: orderId,
+        amount: amountInr,
+        currency: "INR",
+        status: "PENDING",
+      },
+    });
+
+    return {
+      order_id: order.order_id,
+      payment_session_id: order.payment_session_id,
+    };
+  }
+
+  private async handleCreditTopUpWebhook(
+    orderId: string,
+    normalizedPaymentId: string | null,
+    success: boolean,
+    failed: boolean,
+  ) {
+    const payment = await prisma.payment.findFirst({
+      where: { providerOrderId: orderId, purpose: "CREDIT_TOPUP" },
+    });
+    if (!payment) {
+      return { ignored: true, reason: "Credit top-up payment not found" };
+    }
+    if (payment.status !== "PENDING") {
+      return { ignored: true, reason: "Credit top-up already processed" };
+    }
+
+    if (success) {
+      const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
+      if (!pricing) {
+        throw new ApiError("Credit pricing isn't configured", STATUS_CODES.SERVER_ERROR);
+      }
+      const credits = calculateTopUpCredits(Number(payment.amount), {
+        costPerCreditInr: Number(pricing.costPerCreditInr),
+        marginPercent: Number(pricing.marginPercent),
+        gstPercent: Number(pricing.gstPercent),
+      });
+
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: "COMPLETED",
+            providerPaymentId: normalizedPaymentId,
+            creditsGranted: credits,
+          },
+        });
+
+        await creditTopupCredits(tx, {
+          userId: payment.userId,
+          amount: credits,
+          referenceId: `credit_topup_${payment.id}`,
+          meta: { reason: "CREDIT_TOPUP", orderId, paymentId: normalizedPaymentId, amountInr: payment.amount },
+        });
+      });
+
+      return { ignored: false, processed: "success", creditsGranted: credits };
+    }
+
+    if (failed) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: "FAILED", providerPaymentId: normalizedPaymentId },
+      });
+      return { ignored: false, processed: "failed" };
+    }
+
+    return { ignored: true, reason: "Unhandled event" };
+  }
+
   async handleCashfreePaymentWebhook(req: any) {
     this.cashfreeService.verifyWebhookSignature(req);
 
@@ -156,7 +267,29 @@ class PaymentService {
       null;
     const normalizedPaymentId = paymentId != null ? String(paymentId) : null;
 
-    if (!orderId || !String(orderId).startsWith("subpay_")) {
+    if (!orderId) {
+      return { ignored: true, reason: "No order id on webhook payload" };
+    }
+
+    const normalizedType = String(eventType ?? "").toUpperCase();
+    const success =
+      normalizedType.includes("PAYMENT_SUCCESS") ||
+      normalizedType === "ORDER_PAID" ||
+      paymentStatus === "SUCCESS" ||
+      paymentStatus === "PAID";
+    const failed =
+      normalizedType.includes("PAYMENT_FAILED") ||
+      normalizedType === "PAYMENT_USER_DROPPED" ||
+      paymentStatus === "FAILED" ||
+      paymentStatus === "CANCELLED";
+
+    if (String(orderId).startsWith("credittopup_")) {
+      const result = await this.handleCreditTopUpWebhook(String(orderId), normalizedPaymentId, success, failed);
+      await this.billingService.markWebhookEvent(webhookEvent?.id, "PROCESSED");
+      return result;
+    }
+
+    if (!String(orderId).startsWith("subpay_")) {
       return { ignored: true, reason: "Not a subscription one-time order" };
     }
     const parts = String(orderId).split("_");
@@ -172,18 +305,6 @@ class PaymentService {
     if (!subscription) {
       return { ignored: true, reason: "Local subscription not found" };
     }
-
-    const normalizedType = String(eventType ?? "").toUpperCase();
-    const success =
-      normalizedType.includes("PAYMENT_SUCCESS") ||
-      normalizedType === "ORDER_PAID" ||
-      paymentStatus === "SUCCESS" ||
-      paymentStatus === "PAID";
-    const failed =
-      normalizedType.includes("PAYMENT_FAILED") ||
-      normalizedType === "PAYMENT_USER_DROPPED" ||
-      paymentStatus === "FAILED" ||
-      paymentStatus === "CANCELLED";
 
     if (success) {
       const now = new Date();
@@ -294,6 +415,16 @@ class PaymentService {
             orderId,
             paymentId: normalizedPaymentId,
           },
+        });
+
+        // Bundled video credits reset (overwrite) to this plan's monthly
+        // grant on every activation/renewal — unlike tokens above, they
+        // never carry forward. topupCredits is untouched.
+        await creditBundledCredits(tx, {
+          userId: subscription.userId,
+          monthlyVideoCredits: subscription.plan.monthlyVideoCredits,
+          referenceId: `one_time_subscription_activation_${subscription.id}`,
+          meta: { reason: "ONE_TIME_PAYMENT_SUCCESS", orderId, paymentId: normalizedPaymentId },
         });
 
         return this.billingService.createPaymentAndInvoice(tx, {

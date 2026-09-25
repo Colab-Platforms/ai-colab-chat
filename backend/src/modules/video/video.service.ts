@@ -1,13 +1,14 @@
 import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
-import { createWalletTransaction } from "@/utils/walletUtils.js";
+import { debitCredits, creditsToCostBreakdown, USD_PER_CREDIT } from "@/utils/walletUtils.js";
 import { deleteFromCloudinary } from "@/utils/cloudinary.js";
 import { listVideoModels, type VideoModelInfo } from "@/utils/openrouterVideo.js";
 import { runPendingVideoJobs } from "./video.generation.service.js";
 import { containsDisallowedContent } from "./video.moderation.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
 import { MAX_TITLE_CHARS, type CreateVideoInput, type ListVideosQuery } from "./video.types.js";
+import { getUserPlanContext, assertCanGenerateVideo } from "@/modules/plan-access/planAccess.service.js";
 
 const DEFAULT_LIMIT = 20;
 const DEFAULT_DURATION = 4;
@@ -77,66 +78,127 @@ class VideoService {
     );
   }
 
-  /** Active VIDEO_GENERATION models a user can pick from, cheapest first. */
-  async listAvailableModels() {
-    return prisma.model.findMany({
-      where: {
-        isActive: true,
-        isDeleted: false,
-        capabilities: { has: "VIDEO_GENERATION" },
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        externalId: true,
-        videoCostPerSecond: true,
-        videoCostPerSecondByResolution: true,
-        videoCostPerSecondByResolutionImageInput: true,
-      },
-      orderBy: { videoCostPerSecond: "asc" },
+  /**
+   * Active VIDEO_GENERATION models, cheapest first, each annotated with
+   * whether the requesting user's plan is allowed to use it — the frontend
+   * shows locked models (rather than hiding them) with an upgrade badge, so
+   * it needs this rather than a pre-filtered list.
+   */
+  async listAvailableModels(userId: number) {
+    const [models, planContext, allPlans] = await Promise.all([
+      prisma.model.findMany({
+        where: {
+          isActive: true,
+          isDeleted: false,
+          capabilities: { has: "VIDEO_GENERATION" },
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          externalId: true,
+          creditCostPerSecond: true,
+          creditCostPerSecondByResolution: true,
+          creditCostPerSecondByResolutionImageInput: true,
+        },
+        orderBy: { creditCostPerSecond: "asc" },
+      }),
+      getUserPlanContext(userId),
+      prisma.plan.findMany({
+        where: { isActive: true, isDeleted: false },
+        orderBy: { monthlyPrice: "asc" },
+        select: { name: true, monthlyPrice: true, allowedVideoModels: { select: { modelId: true } } },
+      }),
+    ]);
+
+    const allowedModelIds = new Set(
+      await prisma.planVideoModel
+        .findMany({ where: { planId: planContext.plan.id }, select: { modelId: true } })
+        .then((rows) => rows.map((r) => r.modelId)),
+    );
+
+    return models.map((model) => {
+      const allowedForPlan = allowedModelIds.has(model.id);
+      const unlockPlan = allowedForPlan
+        ? null
+        : allPlans.find((p) => p.allowedVideoModels.some((v) => v.modelId === model.id));
+      return {
+        ...model,
+        allowedForPlan,
+        unlockPlanName: unlockPlan?.name ?? null,
+      };
     });
   }
 
-  /**
-   * Wallet tokens/second for this model at this resolution — the
-   * per-resolution map wins when it has an entry (Seedance 2.0's price
-   * scales ~11x from 480p to 4K, so a flat rate would badly underprice the
-   * expensive tiers), otherwise falls back to the flat videoCostPerSecond.
-   */
-  private resolveCostPerSecond(
+
+  private static readonly EXACT_USD_PER_SECOND: Record<string, Record<string, number>> = {
+    "bytedance/seedance-2.0": { "480p": 0.06728, "720p": 0.1512, "1080p": 0.37422, "4k": 0.7776 },
+    "bytedance/seedance-2.0-mini": { "480p": 0.03364, "720p": 0.0756 },
+    "google/veo-3.1-lite": { "720p": 0.05, "1080p": 0.08 },
+  };
+
+
+  private async resolveExactCreditsPerSecond(
     model: {
       name: string;
-      videoCostPerSecond: number | null;
-      videoCostPerSecondByResolution: unknown;
-      videoCostPerSecondByResolutionImageInput: unknown;
+      externalId: string;
+      creditCostPerSecond: number | null;
+      creditCostPerSecondByResolution: unknown;
+      creditCostPerSecondByResolutionImageInput: unknown;
     },
     resolution: string,
     hasImageInput: boolean,
-  ): number {
-    // Image-conditioned generation is CHEAPER for some models (Seedance's
-    // own pricing_skus: video_tokens_with_video_input is ~39% below
-    // video_tokens) — only used when the model actually has a distinct
-    // rate; Veo has none, so it falls through to the normal map for it.
+  ): Promise<number> {
+    // 1. Known exact OpenRouter rate card — deterministic, matches what will
+    // actually be billed, so this is authoritative when present.
+    const exactUsdPerSecond = VideoService.EXACT_USD_PER_SECOND[model.externalId]?.[resolution.toLowerCase()];
+    if (typeof exactUsdPerSecond === "number") return exactUsdPerSecond / USD_PER_CREDIT;
+
+    // 2. Per-resolution DB config, when someone has bothered to calibrate it
+    // (e.g. a model not yet in the hardcoded table above).
     if (hasImageInput) {
-      const byResolutionImage = model.videoCostPerSecondByResolutionImageInput as Record<
+      const byResolutionImage = model.creditCostPerSecondByResolutionImageInput as Record<
         string,
         number
       > | null;
       const perResolutionImage = byResolutionImage?.[resolution];
       if (typeof perResolutionImage === "number") return perResolutionImage;
     }
-
-    const byResolution = model.videoCostPerSecondByResolution as Record<string, number> | null;
+    const byResolution = model.creditCostPerSecondByResolution as Record<string, number> | null;
     const perResolution = byResolution?.[resolution];
     if (typeof perResolution === "number") return perResolution;
 
-    if (model.videoCostPerSecond) return model.videoCostPerSecond;
+    // 3. Flat per-model rate, if set.
+    if (model.creditCostPerSecond) return model.creditCostPerSecond;
 
-    throw new ApiError(
-      `Video model "${model.name}" has no cost configured for resolution ${resolution}.`,
-      STATUS_CODES.SERVER_ERROR,
-    );
+    // 4. OpenRouter's own live catalogue price for this model — same source
+    // the duration/resolution validation below already fetches, so this
+    // costs nothing extra. Converts its $/sec straight to credits/sec at the
+    // fixed $0.03/credit peg.
+    try {
+      const info = await getVideoModelInfo(model.externalId);
+      const raw = info?.pricingPerVideoSecond;
+      if (raw) {
+        const usdPerSecond = Number(String(raw).replace(/[^0-9.]/g, ""));
+        if (Number.isFinite(usdPerSecond) && usdPerSecond > 0) {
+          return usdPerSecond / USD_PER_CREDIT;
+        }
+      }
+    } catch (error) {
+      vlogError("cost-estimate", `live OpenRouter pricing lookup failed for ${model.externalId}`, error);
+    }
+
+    // 5. Last resort — a deliberately generous flat estimate so we never
+    // block a generation over a missing/unreachable price source. The real
+    // OpenRouter-reported cost still settles the actual charge afterward.
+    vlog("cost-estimate", `no pricing source found for ${model.name} — using fallback estimate`);
+    return 10;
+  }
+
+  /** INR value of 1 credit, for cost logging — falls back to the seeded default if pricing isn't configured yet. */
+  private async getCostPerCreditInr(): Promise<number> {
+    const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
+    return pricing ? Number(pricing.costPerCreditInr) : 2.85;
   }
 
   /**
@@ -170,6 +232,9 @@ class VideoService {
 
     const model = await this.resolveModel(input.modelId);
     vlog("create", `user=${userId} resolved model=${model.name} (id=${model.id}, externalId=${model.externalId})`);
+
+    const planContext = await getUserPlanContext(userId);
+    await assertCanGenerateVideo(planContext, model);
 
     const duration = input.duration ?? DEFAULT_DURATION;
     const resolution = input.resolution ?? DEFAULT_RESOLUTION;
@@ -210,26 +275,26 @@ class VideoService {
     }
 
     const hasImageInput = Boolean(input.firstFrameUrl || input.lastFrameUrl);
-    const costPerSecond = this.resolveCostPerSecond(model, resolution, hasImageInput);
-    const reservedTokens = Math.ceil(duration * costPerSecond);
-    vlog(
-      "create",
-      `user=${userId} reservedTokens=${reservedTokens} (${duration}s × ${costPerSecond}/s @ ${resolution}${hasImageInput ? ", image-to-video" : ""})`,
-    );
+    const costPerSecond = await this.resolveExactCreditsPerSecond(model, resolution, hasImageInput);
+    const reservedTokens = Math.ceil(duration * costPerSecond); // credits, despite the field name — see refundReservation in video.generation.service.ts
+    const costPerCreditInr = await this.getCostPerCreditInr();
+    const estimatedCost = creditsToCostBreakdown(reservedTokens, costPerCreditInr);
 
-    const video = await prisma.$transaction(async (tx) => {
-      const wallet = await tx.userWallet.findUnique({ where: { userId } });
-      if (!wallet || wallet.tokensRemaining < reservedTokens) {
-        vlog(
-          "create",
-          `user=${userId} INSUFFICIENT TOKENS — needs=${reservedTokens} has=${wallet?.tokensRemaining ?? 0}`,
-        );
-        throw new ApiError(
-          `Insufficient tokens — this video needs ${reservedTokens} tokens, you have ${wallet?.tokensRemaining ?? 0}.`,
-          STATUS_CODES.BAD_REQUEST,
-        );
-      }
+    vlogBlock("create", `user=${userId} cost estimate before reserving`, {
+      model: model.name,
+      externalId: model.externalId,
+      resolution,
+      duration,
+      hasImageInput,
+      creditsPerSecond: costPerSecond,
+      reservedCredits: reservedTokens,
+      estimatedUsd: `$${estimatedCost.usd}`,
+      estimatedInr: `₹${estimatedCost.inr}`,
+      usdPerCredit: USD_PER_CREDIT,
+      inrPerCredit: costPerCreditInr,
+    });
 
+    const { video, debitResult } = await prisma.$transaction(async (tx) => {
       const created = await tx.generatedVideo.create({
         data: {
           userId,
@@ -247,27 +312,35 @@ class VideoService {
         },
       });
 
-      await tx.userWallet.update({
-        where: { userId },
-        data: {
-          tokensRemaining: { decrement: reservedTokens },
-          tokensUsed: { increment: reservedTokens },
-        },
-      });
-
-      await createWalletTransaction(tx, {
+      const debit = await debitCredits(tx, {
         userId,
-        walletId: wallet.id,
         amount: reservedTokens,
-        type: "DEBIT",
         referenceId: `video_reserve_${created.id}`,
-        meta: { reason: "VIDEO_GENERATION_RESERVE", videoId: created.id },
+        meta: { reason: "VIDEO_GENERATION_RESERVE", videoId: created.id, estimatedUsd: estimatedCost.usd, estimatedInr: estimatedCost.inr },
       });
 
-      return created;
+      // Recorded so a later partial refund (reconciliation, or a failed
+      // job) can be credited back into the same pools it came from instead
+      // of always dumping into topupCredits — see refundCreditsToSource.
+      const updated = await tx.generatedVideo.update({
+        where: { id: created.id },
+        data: { reservedFromBundled: debit.fromBundled, reservedFromTopup: debit.fromTopup },
+      });
+
+      return { video: updated, debitResult: debit };
     });
 
-    vlogBlock("create", `job=${video.id} created as PENDING, ${reservedTokens} tokens reserved`, {
+    vlogBlock("create", `job=${video.id} credits debited`, {
+      videoId: video.id,
+      reservedCredits: reservedTokens,
+      debitedFromBundled: debitResult.fromBundled,
+      debitedFromTopup: debitResult.fromTopup,
+      bundledRemaining: debitResult.bundledRemaining,
+      topupRemaining: debitResult.topupRemaining,
+      totalRemaining: debitResult.totalRemaining,
+    });
+
+    vlogBlock("create", `job=${video.id} created as PENDING, ${reservedTokens} credits reserved`, {
       videoId: video.id,
       userId,
       modelId: model.id,
@@ -346,33 +419,31 @@ class VideoService {
       throw new ApiError("Only failed videos can be retried", STATUS_CODES.BAD_REQUEST);
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const wallet = await tx.userWallet.findUnique({ where: { userId } });
-      if (!wallet || wallet.tokensRemaining < video.reservedTokens) {
-        throw new ApiError(
-          `Insufficient tokens to retry — needs ${video.reservedTokens} tokens.`,
-          STATUS_CODES.BAD_REQUEST,
-        );
-      }
+    // Re-check plan access — the user's plan may have changed (e.g. a
+    // downgrade) since the video was first created.
+    const model = await prisma.model.findFirst({ where: { id: video.modelId } });
+    if (model) {
+      const planContext = await getUserPlanContext(userId);
+      await assertCanGenerateVideo(planContext, model);
+    }
 
-      await tx.userWallet.update({
-        where: { userId },
-        data: {
-          tokensRemaining: { decrement: video.reservedTokens },
-          tokensUsed: { increment: video.reservedTokens },
-        },
-      });
+    const costPerCreditInr = await this.getCostPerCreditInr();
+    const estimatedCost = creditsToCostBreakdown(video.reservedTokens, costPerCreditInr);
+    vlogBlock("retry", `job=${id} re-debit cost estimate`, {
+      reservedCredits: video.reservedTokens,
+      estimatedUsd: `$${estimatedCost.usd}`,
+      estimatedInr: `₹${estimatedCost.inr}`,
+    });
 
-      await createWalletTransaction(tx, {
+    const { updated, debitResult } = await prisma.$transaction(async (tx) => {
+      const debit = await debitCredits(tx, {
         userId,
-        walletId: wallet.id,
         amount: video.reservedTokens,
-        type: "DEBIT",
         referenceId: `video_reserve_retry_${video.id}_${Date.now()}`,
-        meta: { reason: "VIDEO_GENERATION_RESERVE_RETRY", videoId: video.id },
+        meta: { reason: "VIDEO_GENERATION_RESERVE_RETRY", videoId: video.id, estimatedUsd: estimatedCost.usd, estimatedInr: estimatedCost.inr },
       });
 
-      return tx.generatedVideo.update({
+      const video2 = await tx.generatedVideo.update({
         where: { id },
         data: {
           status: "PENDING",
@@ -380,11 +451,22 @@ class VideoService {
           lastError: null,
           externalJobId: null,
           actualCostUsd: null,
+          reservedFromBundled: debit.fromBundled,
+          reservedFromTopup: debit.fromTopup,
         },
       });
+
+      return { updated: video2, debitResult: debit };
     });
 
-    vlog("retry", `job=${id} re-reserved ${video.reservedTokens} tokens, reset to PENDING`);
+    vlogBlock("retry", `job=${id} credits re-debited, reset to PENDING`, {
+      reservedCredits: video.reservedTokens,
+      debitedFromBundled: debitResult.fromBundled,
+      debitedFromTopup: debitResult.fromTopup,
+      bundledRemaining: debitResult.bundledRemaining,
+      topupRemaining: debitResult.topupRemaining,
+      totalRemaining: debitResult.totalRemaining,
+    });
     void runPendingVideoJobs();
     vlog("retry", `job=${id} worker kicked`);
 

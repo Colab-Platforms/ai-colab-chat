@@ -59,9 +59,11 @@ model User {
   usageLogs                     UsageLog[]
   subscriptions                 Subscription[]
   userWallet                    UserWallet?
+  creditWallet                  CreditWallet?
   userRoles                     UserRole[]
   preference                    UserPreference?
   walletTransactions            WalletTransaction[]
+  creditTransactions            CreditTransaction[]
   generatedDocuments            GeneratedDocument[]
   generatedVideos               GeneratedVideo[]
   payments                      Payment[]
@@ -152,6 +154,46 @@ model WalletTransaction {
   updatedAt   DateTime              @updatedAt
   user        User                  @relation(fields: [userId], references: [id])
   wallet      UserWallet            @relation(fields: [walletId], references: [id])
+
+  @@index([userId])
+  @@index([walletId])
+  @@index([createdAt])
+  @@index([referenceId])
+}
+
+// Separate from UserWallet: video-generation spend is billed in credits, not
+// tokens. Split into two balances because they reset differently — bundledCredits
+// is overwritten to the plan's monthly grant on every renewal, while topupCredits
+// only ever increases (pay-as-you-go purchase) and is never reset/expired.
+model CreditWallet {
+  id             Int                 @id @default(autoincrement())
+  userId         Int                 @unique
+  bundledCredits Int                 @default(0)
+  topupCredits   Int                 @default(0)
+  creditsUsed    Int                 @default(0)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  user           User                @relation(fields: [userId], references: [id])
+  transactions   CreditTransaction[]
+}
+
+enum CreditTransactionType {
+  CREDIT_BUNDLED
+  CREDIT_TOPUP
+  DEBIT
+}
+
+model CreditTransaction {
+  id          Int                    @id @default(autoincrement())
+  userId      Int
+  walletId    Int
+  amount      Int
+  type        CreditTransactionType
+  referenceId String?
+  meta        Json?
+  createdAt   DateTime               @default(now())
+  user        User                   @relation(fields: [userId], references: [id])
+  wallet      CreditWallet           @relation(fields: [walletId], references: [id])
 
   @@index([userId])
   @@index([walletId])
@@ -312,21 +354,12 @@ model GeneratedVideo {
   duration           Int                  @default(4)
   resolution         String               @default("720p")
   aspectRatio        String               @default("16:9")
-  // Image-to-video inputs (OpenRouter's frame_images) — public HTTPS URLs
-  // from the same attachment upload flow chat already uses. Presence of
-  // either drives the cheaper "with video input" pricing tier some models
-  // offer (see Model.videoCostPerSecondByResolutionImageInput).
   firstFrameUrl      String?
   lastFrameUrl       String?
-  // OpenRouter's own job id (POST /api/v1/videos response) — set once
-  // submission succeeds, used to poll/download and to correlate an
-  // incoming webhook back to this row.
   externalJobId      String?
-  // Wallet tokens debited up front, before the (paid) provider call is
-  // made. Refunded in full on failure/cancellation/expiry, or partially
-  // reconciled against actualCostUsd on success — see
-  // video.generation.service.ts.
   reservedTokens     Int
+  reservedFromBundled Int                 @default(0)
+  reservedFromTopup  Int                  @default(0)
   actualCostUsd      Decimal?
   fileUrl            String?
   cloudinaryPublicId String?
@@ -444,34 +477,26 @@ model Model {
   defaultForCapabilities ModelCapability[] @default([])
   tokenMultiplier        Float             @default(1.0)
   isFreeModel            Boolean           @default(false)
-  // Wallet tokens charged per second of generated video, used when a model's
-  // price does not vary by resolution. Some providers (e.g. Seedance 2.0)
-  // charge per-pixel — 4K costs ~11x what 480p does — so a single flat rate
-  // would badly underprice the expensive tiers; videoCostPerSecondByResolution
-  // below overrides this per resolution, and this remains the fallback for
-  // any resolution not present in that map (and the only rate for models
-  // whose price genuinely doesn't vary by resolution).
   videoCostPerSecond     Int?
-  // Optional map of resolution string ("480p", "720p", "1080p", "4K", ...)
-  // to wallet tokens/second, for models priced per-pixel or per-tier rather
-  // than flat. Calibrated from OpenRouter's actual GET /api/v1/videos/models
-  // pricing_skus (token-formula models) or duration_seconds_* SKUs (flat
-  // per-resolution models like Veo). Null/absent falls back to
-  // videoCostPerSecond above.
   videoCostPerSecondByResolution Json?
-  // Same shape as videoCostPerSecondByResolution, but for image-to-video
-  // (GeneratedVideo.firstFrameUrl/lastFrameUrl set) — some providers charge
-  // LESS for image-conditioned generation than pure text-to-video (e.g.
-  // Seedance 2.0's own pricing_skus: video_tokens_with_video_input is ~39%
-  // cheaper than video_tokens). Null/absent falls back to
-  // videoCostPerSecondByResolution / videoCostPerSecond, i.e. same price
-  // regardless of image input (true for Veo, which has no distinct tier).
   videoCostPerSecondByResolutionImageInput Json?
+  // Video-credit pricing (the CreditWallet unit, pegged to $0.03/credit —
+  // real cost, no multiplier). Independent of the legacy videoCostPerSecond*
+  // fields above, which priced video in wallet *tokens* before video moved
+  // to its own credit wallet.
+  // Float, unlike the legacy videoCostPerSecond* (Int) fields above: credit
+  // amounts are small (single/low-double digits), so per-second fractions
+  // matter — rounding happens once, on the ceil()'d total for a clip, not on
+  // the rate itself (see video.service.ts).
+  creditCostPerSecond    Float?
+  creditCostPerSecondByResolution Json?
+  creditCostPerSecondByResolutionImageInput Json?
   assistants             Assistant[]
   modelProvider          ModelProvider     @relation(fields: [modelProviderId], references: [id])
   responses              ModelResponse[]
   usageLogs              UsageLog[]
   generatedVideos        GeneratedVideo[]
+  allowedInPlans         PlanVideoModel[]
 
   @@unique([modelProviderId, externalId])
 }
@@ -558,19 +583,43 @@ model UsageLog {
 }
 
 model Plan {
-  id             Int            @id @default(autoincrement())
-  name           String
-  monthlyPrice   Decimal
-  quarterlyPrice Decimal
-  yearlyPrice    Decimal
-  tokenLimit     Int
-  features       Json
-  isActive       Boolean        @default(true)
-  isDeleted      Boolean        @default(false)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  deletedAt      DateTime?
-  subscriptions  Subscription[]
+  id                   Int              @id @default(autoincrement())
+  name                 String
+  monthlyPrice         Decimal
+  quarterlyPrice       Decimal
+  yearlyPrice          Decimal
+  tokenLimit           Int
+  features             Json
+  // Real, enforced access-control flags — `features` above stays for
+  // display-only metadata (support tier, attachments, etc.) but is never
+  // branched on in code; these columns are what planAccess.service.ts reads.
+  restrictToFreeModels Boolean          @default(false)
+  documentGenEnabled   Boolean          @default(true)
+  imageGenEnabled      Boolean          @default(false)
+  videoGenEnabled      Boolean          @default(false)
+  // Bundled video-credit grant applied (overwritten, not incremented) on
+  // every renewal — see CreditWallet.bundledCredits.
+  monthlyVideoCredits  Int              @default(0)
+  isActive             Boolean          @default(true)
+  isDeleted            Boolean          @default(false)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  deletedAt            DateTime?
+  subscriptions        Subscription[]
+  allowedVideoModels   PlanVideoModel[]
+}
+
+// Which video models a plan may use, e.g. Free -> none, Pro -> Seedance 2.0
+// Mini + Veo 3.1 Lite only, Pro Plus -> all (including Seedance 2.0 full).
+model PlanVideoModel {
+  id      Int   @id @default(autoincrement())
+  planId  Int
+  modelId Int
+  plan    Plan  @relation(fields: [planId], references: [id])
+  model   Model @relation(fields: [modelId], references: [id])
+
+  @@unique([planId, modelId])
+  @@index([modelId])
 }
 
 enum SubscriptionStatus {
@@ -645,30 +694,55 @@ enum PaymentStatus {
   FAILED
 }
 
+enum PaymentPurpose {
+  SUBSCRIPTION
+  CREDIT_TOPUP
+}
+
 model Payment {
-  id                     Int           @id @default(autoincrement())
+  id                     Int            @id @default(autoincrement())
   userId                 Int
   walletId               Int?
   subscriptionId         Int?
   type                   PaymentType
-  provider               String        @default("CASHFREE")
+  // Distinguishes a subscription charge from a standalone pay-as-you-go
+  // video-credit top-up — the latter has no subscriptionId and its webhook
+  // credits CreditWallet.topupCredits instead of activating a Subscription.
+  purpose                PaymentPurpose @default(SUBSCRIPTION)
+  creditsGranted         Int?
+  provider               String         @default("CASHFREE")
   providerOrderId        String?
   providerPaymentId      String?
   providerSubscriptionId String?
   amount                 Decimal
-  currency               String        @default("INR")
-  status                 PaymentStatus @default(PENDING)
+  currency               String         @default("INR")
+  status                 PaymentStatus  @default(PENDING)
   metadata               Json?
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
   invoice                Invoice?
-  subscription           Subscription? @relation(fields: [subscriptionId], references: [id])
-  user                   User          @relation(fields: [userId], references: [id])
+  subscription           Subscription?  @relation(fields: [subscriptionId], references: [id])
+  user                   User           @relation(fields: [userId], references: [id])
 
   @@unique([provider, providerPaymentId])
   @@index([userId])
   @@index([providerOrderId])
   @@index([subscriptionId])
+}
+
+// Single-row, admin-editable config for pay-as-you-go video-credit top-ups.
+// Kept out of code as a constant so pricing can be tuned without a deploy.
+// Pay-as-you-go top-up pricing. costPerCreditInr is the RAW cost basis (no
+// margin) — a top-up's rupee amount is de-taxed, has marginPercent taken off
+// the top as margin, and only what's left converts to credits at cost. This
+// keeps top-up margin explicit and independently tunable from whatever
+// margin is implied by a subscription plan's bundled credit grant.
+model CreditPricingConfig {
+  id                Int      @id @default(autoincrement())
+  costPerCreditInr  Decimal?
+  marginPercent     Decimal  @default(15)
+  gstPercent        Decimal  @default(18)
+  updatedAt         DateTime @updatedAt
 }
 
 enum InvoiceStatus {

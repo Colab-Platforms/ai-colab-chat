@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
+import Link from "next/link";
+import { ImagePlus, Loader2, Lock, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { attachmentService, videoService } from "@/lib/services";
+import { attachmentService, videoService, creditWalletService } from "@/lib/services";
 import { toast } from "@/lib/toast";
 
 export interface VideoModelOption {
@@ -27,15 +28,19 @@ export interface VideoModelOption {
   name: string;
   description?: string | null;
   externalId: string;
-  videoCostPerSecond: number;
-  /** Per-resolution wallet-token rate, when the model's real price varies
-   * by resolution (e.g. Seedance 2.0 is ~11x pricier at 4K than 480p) —
-   * takes priority over the flat videoCostPerSecond above when present. */
-  videoCostPerSecondByResolution?: Record<string, number> | null;
+  creditCostPerSecond: number;
+  /** Per-resolution credit rate, when the model's real price varies by
+   * resolution (e.g. Seedance 2.0 is ~11x pricier at 4K than 480p) — takes
+   * priority over the flat creditCostPerSecond above when present. */
+  creditCostPerSecondByResolution?: Record<string, number> | null;
   /** Same shape, but for image-to-video — some models (Seedance) charge
    * LESS when a frame image is supplied. Falls back to the map above when
    * absent (true for Veo, which has no distinct image-input rate). */
-  videoCostPerSecondByResolutionImageInput?: Record<string, number> | null;
+  creditCostPerSecondByResolutionImageInput?: Record<string, number> | null;
+  /** Whether the current user's plan is allowed to use this model — locked
+   * models are still shown (not hidden) with an upgrade badge. */
+  allowedForPlan: boolean;
+  unlockPlanName?: string | null;
 }
 
 /**
@@ -205,6 +210,7 @@ export function VideoGenerateDialog({
   const [firstFrame, setFirstFrame] = useState<FrameUpload | null>(null);
   const [lastFrame, setLastFrame] = useState<FrameUpload | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
 
   // Fetch once per time the dialog opens rather than once on mount — pricing
   // can change, and this dialog can stay mounted in the background for a
@@ -217,12 +223,20 @@ export function VideoGenerateDialog({
         const items: VideoModelOption[] = res.data?.data || [];
         setModels(items);
         if (items.length > 0) {
-          setModelId((prev) => prev ?? items[0].id);
+          // Default to the first ALLOWED model rather than just items[0] —
+          // otherwise a locked (pricier) model could be pre-selected for a
+          // user whose plan can't actually use it.
+          const firstAllowed = items.find((m) => m.allowedForPlan) ?? items[0];
+          setModelId((prev) => prev ?? firstAllowed.id);
         }
       })
       .catch(() => {
         toast.error("Couldn't load video models");
       });
+    creditWalletService
+      .get()
+      .then((res) => setCreditsRemaining(res.data?.data?.creditsRemaining ?? null))
+      .catch(() => setCreditsRemaining(null));
   }, [open]);
 
   const selectedModel = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
@@ -247,12 +261,14 @@ export function VideoGenerateDialog({
 
   const costPerSecond = selectedModel
     ? (hasImageInput
-        ? selectedModel.videoCostPerSecondByResolutionImageInput?.[resolution]
+        ? selectedModel.creditCostPerSecondByResolutionImageInput?.[resolution]
         : undefined) ??
-      selectedModel.videoCostPerSecondByResolution?.[resolution] ??
-      selectedModel.videoCostPerSecond
+      selectedModel.creditCostPerSecondByResolution?.[resolution] ??
+      selectedModel.creditCostPerSecond
     : null;
-  const estimatedTokens = costPerSecond !== null ? Math.ceil(duration * costPerSecond) : null;
+  const estimatedCredits = costPerSecond != null ? Math.ceil(duration * costPerSecond) : null;
+  const insufficientCredits =
+    estimatedCredits !== null && creditsRemaining !== null && estimatedCredits > creditsRemaining;
 
   const handleSubmit = useCallback(async () => {
     if (!prompt.trim() || !modelId) return;
@@ -272,10 +288,16 @@ export function VideoGenerateDialog({
       setLastFrame(null);
       onOpenChange(false);
     } catch (err: unknown) {
+      const response = (err as { response?: { data?: { message?: string; code?: string } } })?.response;
       const message =
-        (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data
-          ?.message ?? (err as { message?: string })?.message ?? "Failed to start video generation";
-      toast.error(message);
+        response?.data?.message ?? (err as { message?: string })?.message ?? "Failed to start video generation";
+      if (response?.data?.code === "PLAN_RESTRICTED") {
+        toast.error(`${message} — upgrade your plan to unlock this.`);
+      } else if (message.toLowerCase().includes("insufficient")) {
+        toast.error(`${message} — top up your video credits.`);
+      } else {
+        toast.error(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -287,26 +309,32 @@ export function VideoGenerateDialog({
         <DialogHeader>
           <DialogTitle>Generate a video</DialogTitle>
           <DialogDescription>
-            Describe the video you want — this uses your wallet tokens and can take a couple of minutes.
+            Describe the video you want — this spends your video credits and can take a couple of minutes.
           </DialogDescription>
         </DialogHeader>
+
+        {creditsRemaining !== null && (
+          <p className="-mb-1 text-xs text-muted-foreground">
+            You have <span className="font-medium text-foreground">{creditsRemaining} credits</span> remaining.
+          </p>
+        )}
 
         <Select value={modelId ? String(modelId) : undefined} onValueChange={(v) => setModelId(Number(v))}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Choose a model" />
           </SelectTrigger>
           <SelectContent>
-            {models.map((m) => {
-              const rates = m.videoCostPerSecondByResolution;
-              const priceLabel = rates
-                ? `${Math.min(...Object.values(rates))}-${Math.max(...Object.values(rates))} tokens/sec`
-                : `${m.videoCostPerSecond} tokens/sec`;
-              return (
-                <SelectItem key={m.id} value={String(m.id)}>
-                  {m.name}
-                </SelectItem>
-              );
-            })}
+            {models.map((m) => (
+              <SelectItem key={m.id} value={String(m.id)} disabled={!m.allowedForPlan}>
+                <div className="flex items-center gap-1.5">
+                  {!m.allowedForPlan && <Lock className="h-3 w-3 text-muted-foreground" />}
+                  <span>{m.name}</span>
+                  {!m.allowedForPlan && m.unlockPlanName && (
+                    <span className="text-[10px] text-muted-foreground">Requires {m.unlockPlanName}</span>
+                  )}
+                </div>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {selectedModel?.description && (
@@ -324,7 +352,7 @@ export function VideoGenerateDialog({
         {supportsImageToVideo && (
           <div>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-              Image-to-video (optional) — {selectedModel?.videoCostPerSecondByResolutionImageInput
+              Image-to-video (optional) — {selectedModel?.creditCostPerSecondByResolutionImageInput
                 ? "cheaper than text-to-video"
                 : "same price as text-to-video"}
             </p>
@@ -376,10 +404,19 @@ export function VideoGenerateDialog({
           </Select>
         </div>
 
+        {insufficientCredits && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Not enough credits for this — you need {estimatedCredits}, you have {creditsRemaining}.{" "}
+            <Link href="/profile/wallet" className="underline underline-offset-2">
+              Top up credits
+            </Link>
+          </p>
+        )}
+
         <DialogFooter className="items-center sm:justify-between">
-          {estimatedTokens !== null && (
+          {estimatedCredits !== null && (
             <p className="text-xs text-muted-foreground">
-              Estimated cost: <span className="font-medium text-foreground">{estimatedTokens} tokens</span>
+              Estimated cost: <span className="font-medium text-foreground">{estimatedCredits} credits</span>
               {hasImageInput && " (image-to-video rate)"}
             </p>
           )}
@@ -390,7 +427,9 @@ export function VideoGenerateDialog({
               !modelId ||
               isSubmitting ||
               firstFrame?.uploading ||
-              lastFrame?.uploading
+              lastFrame?.uploading ||
+              !selectedModel?.allowedForPlan ||
+              insufficientCredits
             }
             onClick={handleSubmit}
           >

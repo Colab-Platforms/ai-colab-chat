@@ -1,22 +1,30 @@
 import WalletService from "@/modules/wallet/wallet.service.js";
+import CreditWalletService from "@/modules/credit-wallet/creditWallet.service.js";
 import SubscriptionService from "@/modules/subscription/subscription.service.js";
 import UsageLogService from "@/modules/usage-log/usageLog.service.js";
 import type { DashboardSummary } from "./dashboard.types.js";
 
 const walletService = new WalletService();
+const creditWalletService = new CreditWalletService();
 const subscriptionService = new SubscriptionService();
 const usageLogService = new UsageLogService();
 
 class DashboardService {
   async getSummary(userId: number): Promise<DashboardSummary> {
-    // Fetch wallet and subscription in parallel; both can fail gracefully.
-    const [walletResult, subscriptionResult] = await Promise.allSettled([
+    // Fetch wallet and subscription in parallel; both can fail gracefully —
+    // a missing CreditWallet (pre-existing subscription, or Free plan) is
+    // expected, not an error.
+    const [walletResult, creditWalletResult, subscriptionResult] = await Promise.allSettled([
       walletService.getWallet(userId),
+      creditWalletService.getWallet(userId),
       subscriptionService.getCurrent(userId),
     ]);
 
     const wallet =
       walletResult.status === "fulfilled" ? walletResult.value : null;
+
+    const creditWallet =
+      creditWalletResult.status === "fulfilled" ? creditWalletResult.value : null;
 
     const subscription =
       subscriptionResult.status === "fulfilled"
@@ -49,7 +57,7 @@ class DashboardService {
       .getDailyTokensByModel(userId, chartDays)
       .catch(() => []);
 
-    return { wallet, subscription, dailyByModel, chartDays };
+    return { wallet, creditWallet, subscription, dailyByModel, chartDays };
   }
 }
 

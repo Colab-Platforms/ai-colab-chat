@@ -213,6 +213,23 @@ export async function seedModels() {
         "1080p": 21714,
         "4K": 44345,
       },
+      // Video-credit pricing (CreditWallet unit, $0.03/credit real cost, no
+      // multiplier) — same $/sec figures above divided by $0.03:
+      //   480p: 2.2427  720p: 5.04  1080p: 12.474  4K: 25.92 credits/sec
+      creditCostPerSecond: 5.04,
+      creditCostPerSecondByResolution: {
+        "480p": 2.2427,
+        "720p": 5.04,
+        "1080p": 12.474,
+        "4K": 25.92,
+      },
+      //   480p: 1.3777  720p: 3.096  1080p: 7.614  4K: 15.552 credits/sec
+      creditCostPerSecondByResolutionImageInput: {
+        "480p": 1.3777,
+        "720p": 3.096,
+        "1080p": 7.614,
+        "4K": 15.552,
+      },
     },
     {
       name: "Seedance 2.0 Mini",
@@ -239,6 +256,17 @@ export async function seedModels() {
       videoCostPerSecondByResolutionImageInput: {
         "480p": 1918,
         "720p": 4312,
+      },
+      // $0.03364/sec and $0.0756/sec above ÷ $0.03/credit:
+      creditCostPerSecond: 1.1213,
+      creditCostPerSecondByResolution: {
+        "480p": 1.1213,
+        "720p": 2.52,
+      },
+      // $0.02018/sec and $0.04536/sec above ÷ $0.03/credit:
+      creditCostPerSecondByResolutionImageInput: {
+        "480p": 0.6727,
+        "720p": 1.512,
       },
     },
     {
@@ -269,6 +297,13 @@ export async function seedModels() {
         "720p": 4752,
         "1080p": 7603,
       },
+      // $0.05/sec and $0.08/sec above ÷ $0.03/credit. No image-input
+      // variant — same as videoCostPerSecondByResolutionImageInput above.
+      creditCostPerSecond: 1.6667,
+      creditCostPerSecondByResolution: {
+        "720p": 1.6667,
+        "1080p": 2.6667,
+      },
     },
   ];
 
@@ -290,6 +325,10 @@ export async function seedModels() {
         videoCostPerSecondByResolution: (model as any).videoCostPerSecondByResolution ?? undefined,
         videoCostPerSecondByResolutionImageInput:
           (model as any).videoCostPerSecondByResolutionImageInput ?? undefined,
+        creditCostPerSecond: (model as any).creditCostPerSecond ?? null,
+        creditCostPerSecondByResolution: (model as any).creditCostPerSecondByResolution ?? undefined,
+        creditCostPerSecondByResolutionImageInput:
+          (model as any).creditCostPerSecondByResolutionImageInput ?? undefined,
       },
       create: {
         ...model,
