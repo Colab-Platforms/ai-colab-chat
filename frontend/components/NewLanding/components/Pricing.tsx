@@ -40,9 +40,9 @@ const FALLBACK_PLANS: PlanTier[] = [
   },
   {
     id: 2,
-    name: "Pro",
-    price: 1499,
-    description: "Ideal for Pro users.",
+    name: "Plus",
+    price: 1799,
+    description: "Ideal for Plus users.",
     features: [
       "Unlimited AI Models",
       "File Uploads & Attachments",
@@ -54,9 +54,9 @@ const FALLBACK_PLANS: PlanTier[] = [
   },
   {
     id: 3,
-    name: "Pro Plus",
-    price: 2799,
-    description: "Ideal for Pro Plus users.",
+    name: "Pro",
+    price: 3699,
+    description: "Ideal for Pro users.",
     features: [
       "Unlimited AI Models",
       "File Uploads & Attachments",
@@ -157,7 +157,7 @@ export default function Pricing() {
 
     return {
       amount: `₹${plan.price.toLocaleString("en-IN")}`,
-      period: "/month",
+      period: "/month + GST",
     };
   };
 
@@ -289,7 +289,7 @@ export default function Pricing() {
             <div className="p-8 lg:p-12 flex flex-col justify-between lg:border-l lg:border-neutral-800/60 min-h-[500px]">
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold tracking-wider text-neutral-400 uppercase">PRO PLUS PLAN</span>
+                  <span className="text-xs font-bold tracking-wider text-neutral-400 uppercase">PLUS PLAN</span>
                 </div>
 
                 {(() => {
@@ -311,7 +311,7 @@ export default function Pricing() {
                 <div className="mt-8">
                   <Link href={getPlanHref(proPlusPlan.id)}>
                     <button className="w-full py-3 px-6 rounded-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white font-medium text-sm transition-all duration-200">
-                      Choose Pro Plus
+                      Choose Plus
                     </button>
                   </Link>
                 </div>

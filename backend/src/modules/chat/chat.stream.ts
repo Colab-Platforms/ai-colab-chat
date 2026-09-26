@@ -12,6 +12,8 @@ import {
 import {
   createWalletTransaction,
   calculateAdjustedTokens,
+  computeBillableTokens,
+  getUsdPerToken,
 } from "@/utils/walletUtils.js";
 import AttachmentService from "@/modules/attachment/attachment.service.js";
 import mammoth from "mammoth";
@@ -925,6 +927,7 @@ export async function streamChat(req: Request, res: Response) {
     }
 
     // Check wallet
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if ((!wallet || wallet.tokensRemaining <= 0 ) && !isfreeModel) {
       res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
@@ -1262,9 +1265,18 @@ export async function streamChat(req: Request, res: Response) {
       const pTokens = Math.ceil(content.length / 3.5);
       const cTokens = Math.ceil(predefinedText.length / 3.5);
       const tTokens = pTokens + cTokens;
-      const tokenMultiplierPre = model.tokenMultiplier ?? 1.0;
-      const billablePromptPre = Math.ceil(pTokens * tokenMultiplierPre);
-      const billableCompletionPre = Math.ceil(cTokens * tokenMultiplierPre);
+      const tokenMultiplierPre = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+      // No OpenRouter call happens for a predefined/canned response, so there's
+      // no real costUsd to report here — this always falls back to the
+      // legacy multiplier math via computeBillableTokens's null-cost branch.
+      const { billablePromptTokens: billablePromptPre, billableCompletionTokens: billableCompletionPre } =
+        computeBillableTokens({
+          rawPromptTokens: pTokens,
+          rawCompletionTokens: cTokens,
+          costUsd: null,
+          tokenMultiplier: tokenMultiplierPre,
+          usdPerToken,
+        });
 
       let finalPrompt = pTokens;
       let finalCompletion = cTokens;
@@ -1357,6 +1369,7 @@ export async function streamChat(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -1381,6 +1394,7 @@ export async function streamChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -1391,19 +1405,21 @@ export async function streamChat(req: Request, res: Response) {
           imagesToUpload = partialAcc.imagesToUpload;
         }
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
         const stoppedContent =
           fullContent.trim() || "Generation stopped by user.";
         try {
-          const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-          const billablePromptTokens = Math.ceil(
-            (promptTokens || 0) * tokenMultiplier,
-          );
-          const billableCompletionTokens = Math.ceil(
-            (completionTokens || 0) * tokenMultiplier,
-          );
+          const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+          const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+            rawPromptTokens: promptTokens || 0,
+            rawCompletionTokens: completionTokens || 0,
+            costUsd,
+            tokenMultiplier,
+            usdPerToken,
+          });
 
           await prisma.$transaction(async (tx: any) => {
             const walletRecord = await tx.userWallet.findUnique({
@@ -1609,11 +1625,14 @@ export async function streamChat(req: Request, res: Response) {
       fullContent = keepOnlyFirstImageMarkdown(fullContent).trim();
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
@@ -1784,6 +1803,7 @@ export async function regenerateChat(req: Request, res: Response) {
       return;
     }
 
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
       res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
@@ -1956,9 +1976,18 @@ export async function regenerateChat(req: Request, res: Response) {
       const pTokens = Math.ceil(originalContent.length / 3.5);
       const cTokens = Math.ceil(predefinedTextRegen.length / 3.5);
       const tTokens = pTokens + cTokens;
-      const tokenMultiplierRegen = model.tokenMultiplier ?? 1.0;
-      const billablePromptRegen = Math.ceil(pTokens * tokenMultiplierRegen);
-      const billableCompletionRegen = Math.ceil(cTokens * tokenMultiplierRegen);
+      const tokenMultiplierRegen = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+      // No OpenRouter call happens for a predefined/canned response, so there's
+      // no real costUsd to report here — falls back to the legacy multiplier
+      // math via computeBillableTokens's null-cost branch.
+      const { billablePromptTokens: billablePromptRegen, billableCompletionTokens: billableCompletionRegen } =
+        computeBillableTokens({
+          rawPromptTokens: pTokens,
+          rawCompletionTokens: cTokens,
+          costUsd: null,
+          tokenMultiplier: tokenMultiplierRegen,
+          usdPerToken,
+        });
 
       let finalPrompt = pTokens;
       let finalCompletion = cTokens;
@@ -2042,6 +2071,7 @@ export async function regenerateChat(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -2064,6 +2094,7 @@ export async function regenerateChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -2074,19 +2105,21 @@ export async function regenerateChat(req: Request, res: Response) {
           imagesToUpload = partialAcc.imagesToUpload;
         }
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
         const stoppedContent =
           fullContent.trim() || "Generation stopped by user.";
         try {
-          const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-          const billablePromptTokens = Math.ceil(
-            (promptTokens || 0) * tokenMultiplier,
-          );
-          const billableCompletionTokens = Math.ceil(
-            (completionTokens || 0) * tokenMultiplier,
-          );
+          const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+          const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+            rawPromptTokens: promptTokens || 0,
+            rawCompletionTokens: completionTokens || 0,
+            costUsd,
+            tokenMultiplier,
+            usdPerToken,
+          });
 
           await prisma.$transaction(async (tx: any) => {
             const walletRecord = await tx.userWallet.findUnique({
@@ -2272,11 +2305,14 @@ export async function regenerateChat(req: Request, res: Response) {
       fullContent = keepOnlyFirstImageMarkdown(fullContent).trim();
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
@@ -2509,6 +2545,7 @@ export async function editAndResend(req: Request, res: Response) {
     }
 
     // Check wallet
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
       res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
@@ -2646,6 +2683,7 @@ export async function editAndResend(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -2668,6 +2706,7 @@ export async function editAndResend(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -2678,19 +2717,21 @@ export async function editAndResend(req: Request, res: Response) {
           imagesToUpload = partialAcc.imagesToUpload;
         }
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
         const stoppedContent =
           fullContent.trim() || "Generation stopped by user.";
         try {
-          const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-          const billablePromptTokens = Math.ceil(
-            (promptTokens || 0) * tokenMultiplier,
-          );
-          const billableCompletionTokens = Math.ceil(
-            (completionTokens || 0) * tokenMultiplier,
-          );
+          const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+          const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+            rawPromptTokens: promptTokens || 0,
+            rawCompletionTokens: completionTokens || 0,
+            costUsd,
+            tokenMultiplier,
+            usdPerToken,
+          });
 
           await prisma.$transaction(async (tx: any) => {
             const walletRecord = await tx.userWallet.findUnique({
@@ -2887,11 +2928,14 @@ export async function editAndResend(req: Request, res: Response) {
       fullContent = keepOnlyFirstImageMarkdown(fullContent).trim();
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
@@ -3145,6 +3189,7 @@ export async function continueChatStream(req: Request, res: Response) {
       return;
     }
 
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
       res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
@@ -3282,6 +3327,7 @@ export async function continueChatStream(req: Request, res: Response) {
     let promptTokens = 0;
     let completionTokens = 0;
     let finishReason: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -3304,6 +3350,7 @@ export async function continueChatStream(req: Request, res: Response) {
       promptTokens = acc.promptTokens;
       completionTokens = acc.completionTokens;
       finishReason = acc.finishReason;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -3311,6 +3358,7 @@ export async function continueChatStream(req: Request, res: Response) {
         promptTokens = partialAcc.promptTokens || promptTokens;
         completionTokens = partialAcc.completionTokens || completionTokens;
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       // Stream failed but we might have partial content
@@ -3351,11 +3399,14 @@ export async function continueChatStream(req: Request, res: Response) {
       return;
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     // Update the message by combining old text + new text
     const newCombinedText = modelResponse.content + fullContent;

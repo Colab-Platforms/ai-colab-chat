@@ -1,4 +1,5 @@
 import { Prisma, WalletTransactionType, CreditTransactionType } from "@prisma/client";
+import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 
@@ -340,6 +341,105 @@ export function calculateTopUpCredits(
   const preTax = amountInr / (1 + pricing.gstPercent / 100);
   const netOfMargin = preTax * (1 - pricing.marginPercent / 100);
   return Math.floor(netOfMargin / pricing.costPerCreditInr);
+}
+
+// Fallback only, used if CreditPricingConfig has no row yet (fresh DB before
+// the first seed). $3.50/million tokens — derived from the plan budget math:
+// $19 plan @ 50% margin = $9.50 real-cost budget, minus 200 video credits ×
+// $0.03 = $6.00, leaves $3.50 for the 1,000,000 advertised tokens. ($39 plan
+// checks out the same way: $19.50 - (410 × $0.03 = $12.30) = $7.20 for
+// 2,000,000 tokens ≈ $3.60/million — close enough to share one rate.) The
+// REAL, live value lives in CreditPricingConfig.usdPerToken (DB-configurable
+// — see getUsdPerToken below) precisely so it never needs to be hardcoded
+// again: when a plan's price changes, you retune that plan's tokenLimit to
+// match the new budget at this rate, not this rate itself.
+export const DEFAULT_USD_PER_TOKEN = 0.0000035;
+
+// Short TTL — an admin tuning this in the pricing config should see it take
+// effect quickly, unlike the video model catalogue (which genuinely only
+// changes rarely upstream).
+const TOKEN_PRICING_TTL_MS = 60 * 1000;
+let tokenPricingCache: { at: number; usdPerToken: number } | null = null;
+
+/**
+ * The live $/token rate chat/image/doc wallet tokens are billed at — a
+ * single global admin-editable setting (CreditPricingConfig.usdPerToken),
+ * not a code constant, so retuning it (or a plan's price changing) never
+ * needs a redeploy. Every plan shares this one rate; what differs per plan
+ * is tokenLimit (how many tokens that rate buys at that plan's budget).
+ */
+export async function getUsdPerToken(): Promise<number> {
+  const now = Date.now();
+  if (tokenPricingCache && now - tokenPricingCache.at < TOKEN_PRICING_TTL_MS) {
+    return tokenPricingCache.usdPerToken;
+  }
+  const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
+  const usdPerToken = pricing?.usdPerToken != null ? Number(pricing.usdPerToken) : DEFAULT_USD_PER_TOKEN;
+  tokenPricingCache = { at: now, usdPerToken };
+  return usdPerToken;
+}
+
+/** Converts a real OpenRouter $ cost into billable wallet tokens. $0/free costs bill 0, not 1. */
+export function costUsdToBillableTokens(costUsd: number | null | undefined, usdPerToken: number): number {
+  if (!costUsd || costUsd <= 0) return 0;
+  return Math.max(1, Math.ceil(costUsd / usdPerToken));
+}
+
+/**
+ * Splits a real-cost-derived billable total across prompt/completion in
+ * proportion to the raw counts OpenRouter reported. The ledger and UsageLog
+ * track prompt/completion separately, but usage.cost only ever comes back as
+ * one number, not split by role, so this is an allocation, not a measurement.
+ */
+export function splitBillableTokens(
+  billableTotal: number,
+  rawPromptTokens: number,
+  rawCompletionTokens: number,
+): { billablePromptTokens: number; billableCompletionTokens: number } {
+  const rawTotal = rawPromptTokens + rawCompletionTokens;
+  if (rawTotal <= 0) {
+    return { billablePromptTokens: 0, billableCompletionTokens: billableTotal };
+  }
+  const billablePromptTokens = Math.round((billableTotal * rawPromptTokens) / rawTotal);
+  return {
+    billablePromptTokens,
+    billableCompletionTokens: billableTotal - billablePromptTokens,
+  };
+}
+
+/**
+ * Real-cost-based billing for one chat/image/doc response — the chat
+ * equivalent of the video module's reservedTokens-vs-actualUsd reconcile,
+ * except here the real cost (usage.cost, requested via `usage: { include:
+ * true }` on every OpenRouter call — see openrouter.ts) is already known by
+ * the time we bill, so there's no reserve/refund step needed, just one debit
+ * for the real amount. Falls back to the legacy tokenMultiplier estimate
+ * only on the rare response where a provider doesn't report cost at all.
+ */
+export function computeBillableTokens(params: {
+  rawPromptTokens: number;
+  rawCompletionTokens: number;
+  costUsd: number | null | undefined;
+  tokenMultiplier: number;
+  usdPerToken: number;
+}): { billablePromptTokens: number; billableCompletionTokens: number; billableTotalTokens: number } {
+  if (params.costUsd != null && params.costUsd >= 0) {
+    const billableTotalTokens = costUsdToBillableTokens(params.costUsd, params.usdPerToken);
+    const { billablePromptTokens, billableCompletionTokens } = splitBillableTokens(
+      billableTotalTokens,
+      params.rawPromptTokens,
+      params.rawCompletionTokens,
+    );
+    return { billablePromptTokens, billableCompletionTokens, billableTotalTokens };
+  }
+
+  const billablePromptTokens = Math.ceil(params.rawPromptTokens * params.tokenMultiplier);
+  const billableCompletionTokens = Math.ceil(params.rawCompletionTokens * params.tokenMultiplier);
+  return {
+    billablePromptTokens,
+    billableCompletionTokens,
+    billableTotalTokens: billablePromptTokens + billableCompletionTokens,
+  };
 }
 
 /**

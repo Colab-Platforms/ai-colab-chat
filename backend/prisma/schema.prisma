@@ -715,6 +715,16 @@ model Payment {
   providerPaymentId      String?
   providerSubscriptionId String?
   amount                 Decimal
+  // Tax breakdown for `amount` — nullable because older rows predate this
+  // split and credit top-ups compute tax differently (extracted, not added
+  // on top; see calculateTopUpCredits). When set, baseAmount + taxAmount ==
+  // amount and taxPercent is the rate actually applied AT THE TIME of this
+  // charge — never re-derive this later from the live CreditPricingConfig,
+  // since that rate can change and an invoice must reflect what was true
+  // when the charge happened, not today's rate.
+  baseAmount             Decimal?
+  taxPercent             Decimal?
+  taxAmount              Decimal?
   currency               String         @default("INR")
   status                 PaymentStatus  @default(PENDING)
   metadata               Json?
@@ -737,11 +747,22 @@ model Payment {
 // the top as margin, and only what's left converts to credits at cost. This
 // keeps top-up margin explicit and independently tunable from whatever
 // margin is implied by a subscription plan's bundled credit grant.
+// Despite the name (kept for historical/migration reasons — this started as
+// video-credit-only pricing), this is now the single global pricing-config
+// row for BOTH wallet currencies: costPerCreditInr/marginPercent/gstPercent
+// price video credit top-ups, and usdPerToken prices chat/image/doc wallet
+// tokens (see computeBillableTokens in walletUtils.ts). One shared row so an
+// admin can retune either rate without a code change or redeploy — a plan's
+// tokenLimit/monthlyVideoCredits are what change per-plan, not these rates.
 model CreditPricingConfig {
   id                Int      @id @default(autoincrement())
   costPerCreditInr  Decimal?
   marginPercent     Decimal  @default(15)
   gstPercent        Decimal  @default(18)
+  // $ real cost per wallet token, billed off OpenRouter's actual usage.cost
+  // per response. Default derived from the $19 plan's budget math — see the
+  // comment on DEFAULT_USD_PER_TOKEN in walletUtils.ts.
+  usdPerToken       Decimal  @default(0.0000035)
   updatedAt         DateTime @updatedAt
 }
 

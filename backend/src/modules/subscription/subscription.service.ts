@@ -11,6 +11,17 @@ class SubscriptionService {
     private cashfreeService = new SubscriptionCashfreeService();
     private static readonly PENDING_AUTH_WINDOW_MINUTES = Number(process.env.SUBSCRIPTION_PENDING_AUTH_WINDOW_MINUTES ?? 15);
 
+    /**
+     * Plan prices are stored tax-exclusive — this is the live rate GST gets
+     * added at the point of actually charging Cashfree (same CreditPricingConfig
+     * row credit top-ups already read). Falls back to 18% only if the config
+     * row is somehow missing.
+     */
+    private async getGstPercent(): Promise<number> {
+        const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
+        return pricing ? Number(pricing.gstPercent) : 18;
+    }
+
     // For paid plans, we keep subscription PENDING until we receive the real debit success.
     // The expiry window should start when mandate authorization happens, not when the user initially clicks "Subscribe".
     private getPendingExpiry(baseAt: Date): Date {
@@ -231,12 +242,15 @@ class SubscriptionService {
         });
 
         try {
+            const gstPercent = await this.getGstPercent();
+
             // Best-effort sync. Subscription creation should not fail only because
             // Cashfree plan-sync endpoint is temporarily failing.
             try {
                 await this.cashfreeService.syncPlan(
                     plan as unknown as CashfreePlanSource,
                     data.billingCycle,
+                    gstPercent,
                 );
             } catch (syncError: any) {
                 console.warn("Cashfree plan sync warning:", syncError?.message ?? syncError);
@@ -247,6 +261,8 @@ class SubscriptionService {
                 plan as unknown as CashfreePlanSource,
                 data.billingCycle,
                 cashfreeSubscriptionId,
+                undefined,
+                gstPercent,
             );
 
             return { subscription, auth_link, subscription_session_id };
@@ -427,6 +443,7 @@ class SubscriptionService {
             data.billingCycle,
             cashfreeSubscriptionId,
             autoPayReturnUrl,
+            await this.getGstPercent(),
         );
 
         await prisma.subscription.update({

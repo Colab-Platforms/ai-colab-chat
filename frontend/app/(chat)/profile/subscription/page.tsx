@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { subscriptionService, planService, paymentService } from "@/lib/services";
+import { subscriptionService, planService, paymentService, creditWalletService } from "@/lib/services";
 import { openSubscriptionCheckout, openPaymentCheckout } from "@/lib/cashfree";
 import { getPlanFeatureLines } from "@/lib/planFeatures";
 import { Loader2, Check, X } from "lucide-react";
@@ -38,9 +38,9 @@ export default function SubscriptionPage() {
   const [cancellingPendingPayment, setCancellingPendingPayment] = useState(false);
   const [subscribingPlanId, setSubscribingPlanId] = useState<number | null>(null);
   const isSubscribingRef = useRef(false);
-  const [confirmUpgradePlanId, setConfirmUpgradePlanId] = useState<number | null>(null);
+  const [planToConfirm, setPlanToConfirm] = useState<any | null>(null);
+  const [gstPercent, setGstPercent] = useState<number>(18);
   const [autoPayUpdating, setAutoPayUpdating] = useState(false);
-  const [autoStartingPlanId, setAutoStartingPlanId] = useState<number | null>(null);
   const autoStartedPlanIdsRef = useRef<Set<number>>(new Set());
   const isUsableAuthLink = (url: string | null | undefined) =>
     Boolean(url) && !String(url).includes("/subscriptions/checkout/timer");
@@ -94,6 +94,18 @@ export default function SubscriptionPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    // Live rate, not hardcoded — same CreditPricingConfig.gstPercent the
+    // backend actually charges with, so this popup never quietly drifts
+    // from what Cashfree really bills.
+    creditWalletService
+      .getPricing()
+      .then((res: any) => {
+        const pct = res?.data?.data?.gstPercent;
+        if (typeof pct === "number" && Number.isFinite(pct)) setGstPercent(pct);
+      })
+      .catch(() => { /* keep the 18% fallback */ });
+  }, []);
   useEffect(() => {
     if (!pendingExpiresAt) {
       setPendingCountdownMs(null);
@@ -252,7 +264,7 @@ export default function SubscriptionPage() {
     if (!rawPlanId) return;
     const parsedPlanId = Number(rawPlanId);
     if (!Number.isFinite(parsedPlanId) || parsedPlanId <= 0) return;
-    if (autoStartingPlanId === parsedPlanId || subscribingPlanId !== null) return;
+    if (subscribingPlanId !== null) return;
     if (autoStartedPlanIdsRef.current.has(parsedPlanId)) return;
 
     const selectedPlan = plans.find((p: any) => p.id === parsedPlanId);
@@ -264,15 +276,14 @@ export default function SubscriptionPage() {
     const isFreePlan = Number(selectedPlan.monthlyPrice ?? 0) === 0;
     if (isFreePlan && freePlanTaken) return;
 
-    setAutoStartingPlanId(parsedPlanId);
+    // Open the price/feature confirmation popup rather than charging
+    // immediately — a deep link from the marketing page shouldn't skip the
+    // "here's what you're about to pay, including GST" step.
     autoStartedPlanIdsRef.current.add(parsedPlanId);
-    void handleSubscribe(parsedPlanId).finally(() => {
-      setAutoStartingPlanId(null);
-    });
+    setPlanToConfirm(selectedPlan);
   }, [
     loading,
     searchParams,
-    autoStartingPlanId,
     subscribingPlanId,
     plans,
     subscription,
@@ -392,30 +403,88 @@ export default function SubscriptionPage() {
         <p className="text-muted-foreground text-sm mt-1">Manage your plan and billing</p>
       </div>
 
-      <AlertDialog open={confirmUpgradePlanId !== null} onOpenChange={(open) => !open && setConfirmUpgradePlanId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm upgrade</AlertDialogTitle>
-            <AlertDialogDescription>
-              You still have remaining tokens in your current plan. If you continue, those tokens will carry over and be added to your new plan&apos;s tokens.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={subscribingPlanId !== null}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (confirmUpgradePlanId != null) {
-                  void handleSubscribe(confirmUpgradePlanId);
-                }
-                setConfirmUpgradePlanId(null);
-              }}
-              disabled={subscribingPlanId !== null}
-            >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {(() => {
+        if (!planToConfirm) return null;
+        const basePrice = Number(planToConfirm.monthlyPrice ?? 0);
+        const isFree = basePrice === 0;
+        const gstAmount = isFree ? 0 : Number(((basePrice * gstPercent) / 100).toFixed(2));
+        const totalAmount = isFree ? 0 : Number((basePrice + gstAmount).toFixed(2));
+        const currentMonthlyPrice = Number(subscription?.plan?.monthlyPrice ?? 0);
+        const currentIsFree = currentMonthlyPrice === 0;
+        const isUpgradeFromFree = Boolean(subscription) && currentIsFree && basePrice > currentMonthlyPrice;
+        const { included, excluded } = getPlanFeatureLines(planToConfirm);
+
+        return (
+          <AlertDialog open onOpenChange={(open) => !open && setPlanToConfirm(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{planToConfirm.name} plan</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-4 text-left">
+                    <ul className="space-y-1.5">
+                      {included.map((line: string) => (
+                        <li key={line} className="flex items-center gap-2 text-sm text-foreground">
+                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                      {excluded.map((line: string) => (
+                        <li key={line} className="flex items-center gap-2 text-sm text-muted-foreground/60">
+                          <X className="w-3.5 h-3.5 shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="rounded-lg border border-border/50 p-3 space-y-1.5 text-sm">
+                      {isFree ? (
+                        <div className="flex items-center justify-between font-semibold text-foreground">
+                          <span>Total</span>
+                          <span>Free</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span>Plan price</span>
+                            <span>₹{basePrice.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span>GST ({gstPercent}%)</span>
+                            <span>₹{gstAmount.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex items-center justify-between font-semibold text-foreground pt-1.5 border-t border-border/50">
+                            <span>Total to pay</span>
+                            <span>₹{totalAmount.toLocaleString("en-IN")}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {isUpgradeFromFree && (
+                      <p className="text-xs text-muted-foreground">
+                        You still have remaining tokens in your current plan. If you continue, those tokens will carry over and be added to your new plan&apos;s tokens.
+                      </p>
+                    )}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={subscribingPlanId !== null}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    const planId = planToConfirm.id;
+                    setPlanToConfirm(null);
+                    void handleSubscribe(planId);
+                  }}
+                  disabled={subscribingPlanId !== null}
+                >
+                  {isFree ? "Confirm" : "Proceed to Pay"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      })()}
 
       {subscription ? (
         <Card className="bg-card/90 backdrop-blur-sm border-border/30">
@@ -539,7 +608,7 @@ export default function SubscriptionPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold text-lg">{plan.name}</h3>
                   <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    {plan.monthlyPrice === 0 ? "Free" : `₹${plan.monthlyPrice}/mo`}
+                    {plan.monthlyPrice === 0 ? "Free" : `₹${plan.monthlyPrice}/mo + GST`}
                   </span>
                 </div>
                 <div className="text-sm space-y-1">
@@ -586,13 +655,7 @@ export default function SubscriptionPage() {
                       size="sm"
                       className="w-full"
                       disabled={subscribingPlanId !== null}
-                      onClick={() => {
-                        if (isUpgrade && currentIsFree) {
-                          setConfirmUpgradePlanId(plan.id);
-                          return;
-                        }
-                        void handleSubscribe(plan.id);
-                      }}
+                      onClick={() => setPlanToConfirm(plan)}
                     >
                       {subscribingPlanId === plan.id
                         ? "Starting..."

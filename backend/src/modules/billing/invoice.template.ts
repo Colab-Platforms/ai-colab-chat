@@ -9,6 +9,10 @@ export interface InvoiceTemplateData {
   billingCycle: string | null;
   paymentType: string;
   amount: string;
+  hasTaxBreakdown: boolean;
+  baseAmount: string | null;
+  taxPercent: string | null;
+  taxAmount: string | null;
   currency: string;
   nextBillingDate: string | null;
   autoRenew: boolean;
@@ -115,8 +119,8 @@ export const invoiceTemplate = `
           </div>
         </td>
         <td style="text-align: right;">1</td>
-        <td style="text-align: right;"><%= currency %> <%= amount %></td>
-        <td style="text-align: right;"><%= currency %> <%= amount %></td>
+        <td style="text-align: right;"><%= currency %> <%= hasTaxBreakdown ? baseAmount : amount %></td>
+        <td style="text-align: right;"><%= currency %> <%= hasTaxBreakdown ? baseAmount : amount %></td>
       </tr>
     </tbody>
   </table>
@@ -128,8 +132,14 @@ export const invoiceTemplate = `
     </colgroup>
     <tr>
       <td class="totals-label">Subtotal</td>
-      <td class="totals-value totals-label"><%= currency %> <%= amount %></td>
+      <td class="totals-value totals-label"><%= currency %> <%= hasTaxBreakdown ? baseAmount : amount %></td>
     </tr>
+    <% if (hasTaxBreakdown) { %>
+    <tr>
+      <td class="totals-label">GST (<%= taxPercent %>%)</td>
+      <td class="totals-value totals-label"><%= currency %> <%= taxAmount %></td>
+    </tr>
+    <% } %>
     <tr>
       <td class="totals-label">Total</td>
       <td class="totals-value totals-label"><%= currency %> <%= amount %></td>

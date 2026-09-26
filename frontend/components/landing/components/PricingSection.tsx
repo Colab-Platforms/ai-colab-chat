@@ -233,7 +233,7 @@ export function PricingSection() {
 
   const formatPrice = (price: number): string => {
     if (price === 0) return "Free";
-    return `₹${price.toLocaleString("en-IN")}/mo`;
+    return `₹${price.toLocaleString("en-IN")}/mo + GST`;
   };
 
   const getPlanHref = (planId: number) => {
