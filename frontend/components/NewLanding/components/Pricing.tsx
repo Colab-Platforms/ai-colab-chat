@@ -101,8 +101,18 @@ export default function Pricing() {
           ? outer.data
           : outer?.records ?? [];
 
-        const parsed = planList
-          .filter((plan: any) => plan.isActive && !plan.isDeleted)
+        const activePlans = planList.filter((plan: any) => plan.isActive && !plan.isDeleted);
+        // The entry-level PAID plan is "Most Popular", whatever it happens to
+        // be named — matching on the literal name "pro" broke the moment a
+        // plan got renamed (the ₹3699 tier briefly inherited the "pro" name
+        // and got highlighted as the cheap/popular option instead).
+        const cheapestPaidPrice = Math.min(
+          ...activePlans
+            .map((plan: any) => Number(plan.monthlyPrice))
+            .filter((price: number) => price > 0),
+        );
+
+        const parsed = activePlans
           .sort((a: any, b: any) => Number(a.monthlyPrice) - Number(b.monthlyPrice))
           .map((plan: any) => {
             // Shared parser (lib/planFeatures.ts) — also used by the real
@@ -120,7 +130,7 @@ export default function Pricing() {
                 plan.description ||
                 (isFree ? "Get started at no cost for your first month." : `Ideal for ${plan.name} users.`),
               features,
-              isPopular: plan.name.toLowerCase() === "pro",
+              isPopular: !isFree && Number(plan.monthlyPrice) === cheapestPaidPrice,
               isFree,
             };
           });
@@ -245,9 +255,9 @@ export default function Pricing() {
 
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold tracking-wider text-purple-300 uppercase">PRO PLAN</span>
+                  <span className="text-xs font-bold tracking-wider text-purple-300 uppercase">{proPlan.name} PLAN</span>
                 </div>
-                
+
                 {(() => {
                   const details = getPriceDetails(proPlan);
                   return (
@@ -267,7 +277,7 @@ export default function Pricing() {
                 <div className="mt-8">
                   <Link href={getPlanHref(proPlan.id)}>
                     <button className="w-full py-3 px-6 rounded-full bg-white hover:bg-neutral-200 text-black font-semibold text-sm transition-all duration-200 shadow-lg shadow-purple-500/10">
-                      Get Started - Pro
+                      Get Started - {proPlan.name}
                     </button>
                   </Link>
                 </div>
@@ -289,7 +299,7 @@ export default function Pricing() {
             <div className="p-8 lg:p-12 flex flex-col justify-between lg:border-l lg:border-neutral-800/60 min-h-[500px]">
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold tracking-wider text-neutral-400 uppercase">PLUS PLAN</span>
+                  <span className="text-xs font-bold tracking-wider text-neutral-400 uppercase">{proPlusPlan.name} PLAN</span>
                 </div>
 
                 {(() => {
@@ -311,7 +321,7 @@ export default function Pricing() {
                 <div className="mt-8">
                   <Link href={getPlanHref(proPlusPlan.id)}>
                     <button className="w-full py-3 px-6 rounded-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white font-medium text-sm transition-all duration-200">
-                      Choose Plus
+                      Choose {proPlusPlan.name}
                     </button>
                   </Link>
                 </div>

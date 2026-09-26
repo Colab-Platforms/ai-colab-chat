@@ -26,12 +26,15 @@ import {
   AudioLines,
   Film,
   Lock,
+  Check,
+  ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -352,6 +355,7 @@ export function ChatInput({
   const [isDragActive, setIsDragActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [freeModelsOpen, setFreeModelsOpen] = useState(false);
   const dragCounterRef = useRef(0);
   const { imageGenEnabled, videoGenEnabled } = usePlanCapabilities();
 
@@ -1379,7 +1383,7 @@ export function ChatInput({
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    setFreeModelsOpen((o) => !o);
+                                    setFreeModelsOpen((o: any) => !o);
                                   }}
                                 >
                                   <div className="w-4 flex justify-center">

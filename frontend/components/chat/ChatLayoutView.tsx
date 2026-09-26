@@ -70,6 +70,9 @@ interface Folder {
   name: string;
 }
 
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 480;
+
 export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -95,6 +98,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const [hasMore, setHasMore] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [assistantsPage, setAssistantsPage] = useState(1);
   const [assistantsHasMore, setAssistantsHasMore] = useState(false);
@@ -128,6 +133,14 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem("sidebarCollapsed");
     if (saved === "true") setSidebarCollapsed(true);
+
+    const savedWidth = localStorage.getItem("sidebarWidth");
+    if (savedWidth) {
+      const parsed = Number(savedWidth);
+      if (!Number.isNaN(parsed)) {
+        setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed)));
+      }
+    }
   }, []);
 
   const toggleSidebarCollapsed = useCallback(() => {
@@ -137,6 +150,40 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    if (sidebarCollapsed) return;
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const next = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, startWidth + (moveEvent.clientX - startX)),
+      );
+      setSidebarWidth(next);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setSidebarWidth((current) => {
+        localStorage.setItem("sidebarWidth", String(current));
+        return current;
+      });
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [sidebarCollapsed, sidebarWidth]);
 
   const isProfileRoute = pathname.startsWith("/profile");
 
@@ -690,13 +737,34 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
         style={dynamicBackgroundStyle}
       >
         <aside
-          className={`hidden md:flex shrink-0 border-r border-border/50 transition-[width] duration-300 ease-in-out ${
-            sidebarCollapsed ? "w-16" : "w-70"
-          }`}
-          style={{ contain: "layout style paint", willChange: "transform" }}
+          className={`hidden md:flex relative shrink-0 border-r border-border/50 ${
+            isResizingSidebar ? "" : "transition-[width] duration-300 ease-in-out"
+          } ${sidebarCollapsed ? "w-16" : ""}`}
+          style={{
+            contain: "layout style paint",
+            willChange: "transform",
+            width: sidebarCollapsed ? undefined : `${sidebarWidth}px`,
+          }}
           data-guide="sidebar"
         >
           {renderSidebar(false)}
+          {!sidebarCollapsed && (
+            <div
+              onMouseDown={handleSidebarResizeStart}
+              className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize z-10 group"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+            >
+              <div
+                className={`h-full w-px mx-auto transition-colors ${
+                  isResizingSidebar
+                    ? "bg-primary"
+                    : "bg-transparent group-hover:bg-primary/50"
+                }`}
+              />
+            </div>
+          )}
         </aside>
 
         <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center px-3 bg-background/80 backdrop-blur-md border-b border-border/50 justify-between">

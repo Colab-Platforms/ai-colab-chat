@@ -3,6 +3,7 @@
 import { memo, type Dispatch, type SetStateAction } from "react";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Star, AudioLines, FolderArchive } from "lucide-react";
 import { ChatItem } from "@/components/sidebar/sidebar-chat-item";
 import { SIDEBAR_SECTION_HEADER_ROW, SIDEBAR_SECTION_TITLE } from "@/components/sidebar/sidebar-section-styles";
@@ -98,6 +99,9 @@ export const ChatsSection = memo(function ChatsSection({
           >
             <AudioLines className={`w-4 h-4 ${isVoiceRoute ? "text-primary" : "text-muted-foreground"}`} />
             <span>Voice Chats</span>
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 rounded-md">
+              Beta
+            </Badge>
           </button>
           <button
             onClick={() => { onMobileClose(); router.push("/assets"); }}

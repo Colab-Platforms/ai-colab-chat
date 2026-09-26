@@ -183,8 +183,17 @@ export function PricingSection() {
           ? outer.data
           : outer?.records ?? [];
 
-        const parsed = planList
-          .filter((plan: any) => plan.isActive && !plan.isDeleted)
+        const activePlans = planList.filter((plan: any) => plan.isActive && !plan.isDeleted);
+        // The entry-level PAID plan is "Most Popular", whatever it happens to
+        // be named — matching on the literal name "pro" broke the moment a
+        // plan got renamed (see the identical fix in NewLanding/Pricing.tsx).
+        const cheapestPaidPrice = Math.min(
+          ...activePlans
+            .map((plan: any) => Number(plan.monthlyPrice))
+            .filter((price: number) => price > 0),
+        );
+
+        const parsed = activePlans
           .sort(
             (a: any, b: any) =>
               Number(a.monthlyPrice) - Number(b.monthlyPrice)
@@ -207,7 +216,7 @@ export function PricingSection() {
                   ? "Get started at no cost for your first month."
                   : `Ideal for ${plan.name} users.`),
               features,
-              isPopular: plan.name.toLowerCase() === "pro",
+              isPopular: !isFree && Number(plan.monthlyPrice) === cheapestPaidPrice,
               isFree,
             };
           });
