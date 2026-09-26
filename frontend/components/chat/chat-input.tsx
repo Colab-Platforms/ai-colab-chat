@@ -7,12 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import imageCompression from "browser-image-compression";
 import {
-  Plus,
   Loader2,
   ArrowUp,
   Search,
   X,
-  Check,
   Sparkles,
   Image as ImageIcon,
   MessageSquare,
@@ -25,7 +23,6 @@ import {
   Paperclip,
   Maximize2,
   Minimize2,
-  ChevronDown,
   AudioLines,
   Film,
   Lock,
@@ -35,7 +32,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +39,7 @@ import { getModelIcon } from "@/lib/model-icons";
 import { attachmentService } from "@/lib/services";
 import { toast } from "@/lib/toast";
 import { usePlanCapabilities } from "@/context/plan-capabilities-context";
+import { ModelsModal } from "@/components/chat/models-modal";
 
 // Dynamically imported so react-speech-recognition never runs on the server
 const MicButton = dynamic(
@@ -347,7 +344,7 @@ export function ChatInput({
   const [content, setContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
-  const [freeModelsOpen, setFreeModelsOpen] = useState(false);
+  const [modelsModalOpen, setModelsModalOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [chatType, setChatType] = useState<ChatType>("STANDARD");
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -930,15 +927,35 @@ export function ChatInput({
               )}
 
               {/* Selected model chip(s) — shown for single selection too, so the
-                  active model is always visible in the bar, not just in multi mode. */}
-              {selectedModels.length >= 1 && (
-                <div className="flex flex-wrap gap-1.5 px-2 mb-1 mt-1 flex-shrink-0">
-                  {models
+                  active model is always visible in the bar, not just in multi
+                  mode. This row is the ONLY trigger for the Models modal —
+                  click any chip (or the placeholder) to open it. */}
+              <div
+                data-guide="model-capability-trigger"
+                className={`flex gap-1.5 px-2 mb-1 mt-1 flex-shrink-0 ${
+                  !isSingle && selectedModels.length > 1
+                    ? "flex-nowrap overflow-x-auto scrollbar-thin"
+                    : "flex-wrap"
+                }`}
+              >
+                {selectedModels.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setModelsModalOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-muted text-muted-foreground rounded-full text-xs font-medium border border-border/40 hover:bg-muted/80 hover:text-foreground transition-colors flex-shrink-0"
+                  >
+                    Select model
+                  </button>
+                ) : (
+                  models
                     .filter((m) => selectedModels.includes(m.id))
                     .map((model) => (
-                      <div
+                      <button
                         key={model.id}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20 animate-in fade-in-0 slide-in-from-left-1 duration-200"
+                        type="button"
+                        onClick={() => setModelsModalOpen(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20 flex-shrink-0 hover:bg-primary/15 transition-colors animate-in fade-in-0 slide-in-from-left-1 duration-200"
+                        title="Change model"
                       >
                         {model.externalId && getModelIcon(model.externalId) ? (
                           <img
@@ -951,30 +968,33 @@ export function ChatInput({
                           {model.name}
                         </span>
                         {selectedModels.length > 1 && (
-                          <button
-                            onClick={() =>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
                               onModelChange(
                                 selectedModels.filter((id) => id !== model.id),
-                              )
-                            }
+                              );
+                            }}
                             className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
                             title={`Remove ${model.name}`}
                           >
                             <X className="w-3 h-3" />
-                          </button>
+                          </span>
                         )}
-                      </div>
-                    ))}
-                  {selectedModels.length > 1 && (
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] px-1.5 py-0.5 h-5 rounded-full bg-muted text-muted-foreground"
-                    >
-                      {selectedModels.length} models
-                    </Badge>
-                  )}
-                </div>
-              )}
+                      </button>
+                    ))
+                )}
+                {selectedModels.length > 1 && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1.5 py-0.5 h-5 rounded-full bg-muted text-muted-foreground flex-shrink-0"
+                  >
+                    {selectedModels.length} models
+                  </Badge>
+                )}
+              </div>
 
               {/* Attachment previews */}
               {attachments.length > 0 && (
@@ -1136,21 +1156,7 @@ export function ChatInput({
               <div
                 className={`flex items-center gap-1 flex-1 ${isExpanded ? "hidden" : "flex"}`}
               >
-                <DropdownMenu
-                  open={attachMenuOpen}
-                  onOpenChange={(open) => {
-                    setAttachMenuOpen(open);
-                    if (!open) setFreeModelsOpen(false);
-                    if (open)
-                      window.dispatchEvent(
-                        new Event("ai-colab:capability-menu-opened"),
-                      );
-                    else
-                      window.dispatchEvent(
-                        new Event("ai-colab:capability-menu-closed"),
-                      );
-                  }}
-                >
+                <DropdownMenu open={attachMenuOpen} onOpenChange={setAttachMenuOpen}>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
@@ -1158,18 +1164,16 @@ export function ChatInput({
                       className="shrink-0 h-8 w-8 text-muted-foreground bg-muted hover:bg-muted/80 hover:text-foreground rounded-full border border-border/40"
                       disabled={isSending}
                       data-guide="attach"
-                      title="Attach / capabilities / models"
+                      title="Attach a file"
                     >
-                      <Plus className="w-5 h-5" />
+                      <Paperclip className="w-5 h-5" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="start"
-                    className="w-[300px] p-2 rounded-xl z-[9500]"
+                    className="w-56 p-2 rounded-xl z-[9500]"
                     style={{ zIndex: 9500 }}
-                    data-guide="capability-menu"
                   >
-                    {/* ── ATTACH FILE group ── */}
                     <DropdownMenuLabel className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1 px-2">
                       Attach File
                     </DropdownMenuLabel>
@@ -1590,6 +1594,28 @@ export function ChatInput({
         </div>
       </div>
       <VoiceModal open={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} />
+      <ModelsModal
+        open={modelsModalOpen}
+        onOpenChange={(next) => {
+          setModelsModalOpen(next);
+          window.dispatchEvent(
+            new Event(
+              next
+                ? "ai-colab:capability-menu-opened"
+                : "ai-colab:capability-menu-closed",
+            ),
+          );
+        }}
+        models={models}
+        selectedModels={selectedModels}
+        isSingle={isSingle}
+        onToggleModel={toggleModel}
+        chatType={chatType}
+        onChatTypeChange={handleChatTypeChange}
+        hasImageAttachment={attachments.some((a) =>
+          a.mimeType.startsWith("image/"),
+        )}
+      />
     </>
   );
 }

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import {
   LayoutDashboard, Wallet, CreditCard, BarChart3,
-  UserCircle, ArrowLeft, Menu, X, Archive, Settings,
+  UserCircle, ArrowLeft, Menu, X, Archive, Settings, Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ const userNav = [
   { label: "My Account", href: "/profile/account", icon: UserCircle },
   { label: "Archived Chats", href: "/profile/archived", icon: Archive },
   { label: "Preferences", href: "/profile/preferences", icon: Settings },
+  { label: "Contexts", href: "/profile/contexts", icon: Brain },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

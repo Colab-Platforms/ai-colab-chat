@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { notFound, useParams } from "next/navigation";
-import { chatService, modelService, messageService, assistantService } from "@/lib/services";
+import { chatService, modelService, messageService, assistantService, folderService } from "@/lib/services";
 import { MessageList } from "@/components/chat/message-list";
 import { ChatInput } from "@/components/chat/chat-input";
+import { ProjectBanner } from "@/components/chat/project-banner";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
 import { videoService } from "@/lib/services";
 import type { GeneratedVideo } from "@/components/chat/video-card";
@@ -82,6 +83,8 @@ export default function ChatPage() {
   const [isNotFound, setIsNotFound] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
   const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string } | null>(null);
+  const [folder, setFolder] = useState<{ name: string; description?: string | null } | null>(null);
+  const folderIdRef = useRef<number | null>(null);
   const firstMessageSent = useRef(false);
   const isStreamingRef = useRef(false);
   const fetchChatInFlightRef = useRef<Promise<void> | null>(null);
@@ -182,6 +185,21 @@ export default function ChatPage() {
         } catch { /* ignore */ }
       } else {
         setAssistant(null);
+      }
+
+      if (chat.folderId) {
+        if (folderIdRef.current !== chat.folderId) {
+          folderIdRef.current = chat.folderId;
+          try {
+            const fRes = await folderService.getById(chat.folderId);
+            setFolder(fRes.data.data);
+          } catch {
+            setFolder(null);
+          }
+        }
+      } else if (folderIdRef.current !== null) {
+        folderIdRef.current = null;
+        setFolder(null);
       }
 
       setMessages((prev) => {
@@ -1520,6 +1538,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-full">
+      {folder && <ProjectBanner name={folder.name} />}
       <MessageList
         messages={messages}
         activeModelTabs={activeModelTabs}

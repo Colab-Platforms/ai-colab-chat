@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
-import { chatService, messageService, modelService, assistantService, videoService } from "@/lib/services";
+import { chatService, messageService, modelService, assistantService, folderService, videoService } from "@/lib/services";
 import * as LucideIcons from "lucide-react";
 import { ChatInput } from "@/components/chat/chat-input";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
-import { MessageSquare, Sparkles } from "lucide-react";
+import { MessageSquare, Sparkles, Folder } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { ChatHyperspeedBackground } from "@/components/chat/ChatHyperspeedBackground";
 
@@ -48,6 +48,7 @@ export function NewChatPage() {
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
 
   const [assistant, setAssistant] = useState<any | null>(null);
+  const [activeFolder, setActiveFolder] = useState<{ name: string; description?: string | null } | null>(null);
 
   const SUGGESTED_PROMPTS = [
     { text: "Brainstorm ideas for...", value: "Brainstorm ideas for ", icon: Sparkles, className: "w-3.5 h-3.5 inline mr-2" },
@@ -126,13 +127,32 @@ export function NewChatPage() {
     }
   }, []);
 
+  const loadActiveFolder = useCallback(async () => {
+    try {
+      const rawFolderId = localStorage.getItem("pending_new_chat_folder_id");
+      const folderId = rawFolderId ? Number(rawFolderId) : null;
+      if (!folderId || Number.isNaN(folderId)) {
+        setActiveFolder(null);
+        return;
+      }
+      const res = await folderService.getById(folderId);
+      setActiveFolder(res.data.data);
+    } catch {
+      setActiveFolder(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadAssistantAndModels();
-  }, [loadAssistantAndModels]);
+    loadActiveFolder();
+  }, [loadAssistantAndModels, loadActiveFolder]);
 
   useEffect(() => {
     const handleEvents = () => {
       loadAssistantAndModels();
+    };
+    const handleFolderEvents = () => {
+      loadActiveFolder();
     };
     const handleModeChange = (e: Event) => {
       const mode = (e as CustomEvent).detail?.mode;
@@ -141,13 +161,15 @@ export function NewChatPage() {
     };
     window.addEventListener("assistant-selected", handleEvents);
     window.addEventListener("refresh-models", handleEvents);
+    window.addEventListener("pending-new-chat-folder-updated", handleFolderEvents);
     window.addEventListener("ai-colab:mode-change", handleModeChange);
     return () => {
       window.removeEventListener("assistant-selected", handleEvents);
       window.removeEventListener("refresh-models", handleEvents);
+      window.removeEventListener("pending-new-chat-folder-updated", handleFolderEvents);
       window.removeEventListener("ai-colab:mode-change", handleModeChange);
     };
-  }, [loadAssistantAndModels]);
+  }, [loadAssistantAndModels, loadActiveFolder]);
 
   const handleSend = async (content: string, attachmentIds?: number[], chatType?: string, attachmentObjects?: any[]) => {
     if (isSending) return;
@@ -241,7 +263,7 @@ export function NewChatPage() {
     welcomeSubtitle = assistant.description || "How can I help you today?";
     const IconComponent = (LucideIcons as any)[assistant.icon] as React.ElementType;
     if (IconComponent) ActiveIcon = IconComponent;
-    
+
     if (assistant.suggestedPrompts && assistant.suggestedPrompts.length > 0) {
       activePrompts = assistant.suggestedPrompts.map((p: string, i: number) => ({
         text: p,
@@ -250,6 +272,12 @@ export function NewChatPage() {
         className: "w-3.5 h-3.5 inline mr-2",
       }));
     }
+  } else if (activeFolder) {
+    // Same hero treatment as an Assistant — just driven by the active project
+    // instead, so chats started here remember what the project is about.
+    welcomeTitle = activeFolder.name;
+    welcomeSubtitle = activeFolder.description || "Chats here belong to this project.";
+    ActiveIcon = Folder;
   }
 
   return (
@@ -279,8 +307,8 @@ export function NewChatPage() {
           </motion.div>
 
           <motion.div variants={fadeUp} className="flex items-center justify-center gap-3">
-            <div className={`w-10 h-10 shrink-0 ${assistant ? "bg-primary/10" : "bg-gradient-to-br from-primary/20 to-primary/5"} rounded-xl flex items-center justify-center shadow-sm`}>
-              {assistant ? (
+            <div className={`w-10 h-10 shrink-0 ${assistant || activeFolder ? "bg-primary/10" : "bg-gradient-to-br from-primary/20 to-primary/5"} rounded-xl flex items-center justify-center shadow-sm`}>
+              {assistant || activeFolder ? (
                 <ActiveIcon className="w-5 h-5 text-primary/80" />
               ) : (
                 <Image src="/icons/Colab Infinite.png" alt="" width={22} height={22} className="w-[22px] h-[22px] object-contain" />

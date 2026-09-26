@@ -59,9 +59,11 @@ export const modelResponseService = {
 };
 
 export const folderService = {
-  create: (data: { name: string }) => api.post("/folders", data),
+  create: (data: { name: string; description?: string | null }) =>
+    api.post("/folders", data),
   list: (params?: Record<string, string>) => api.get("/folders", { params }),
-  update: (id: number, data: { name: string }) =>
+  getById: (id: number) => api.get(`/folders/${id}`),
+  update: (id: number, data: { name: string; description?: string | null }) =>
     api.put(`/folders/${id}`, data),
   delete: (id: number, deleteChats: boolean) =>
     api.delete(`/folders/${id}`, {
@@ -229,6 +231,12 @@ export const videoService = {
   }) => api.post("/videos", data),
   retry: (id: number) => api.post(`/videos/${id}/retry`),
   delete: (id: number) => api.delete(`/videos/${id}`),
+};
+
+export const imageService = {
+  list: (params?: Record<string, string>) => api.get("/images", { params }),
+  getById: (id: number) => api.get(`/images/${id}`),
+  delete: (id: number) => api.delete(`/images/${id}`),
 };
 
 export const voiceService = {

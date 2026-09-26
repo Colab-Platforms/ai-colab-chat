@@ -5,6 +5,7 @@ export const createFolderSchema = Joi.object({
     "string.empty": "Folder name is required",
     "any.required": "Folder name is required",
   }),
+  description: Joi.string().trim().allow(null, "").optional(),
 });
 
 export const updateFolderSchema = Joi.object({
@@ -12,6 +13,7 @@ export const updateFolderSchema = Joi.object({
     "string.empty": "Folder name is required",
     "any.required": "Folder name is required",
   }),
+  description: Joi.string().trim().allow(null, "").optional(),
 });
 
 export const validateCreateFolderSchema = (data: unknown) => {

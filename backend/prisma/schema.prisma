@@ -66,6 +66,7 @@ model User {
   creditTransactions            CreditTransaction[]
   generatedDocuments            GeneratedDocument[]
   generatedVideos               GeneratedVideo[]
+  generatedImages               GeneratedImage[]
   payments                      Payment[]
   invoices                      Invoice[]
   supportRequests               SupportRequest[]
@@ -202,16 +203,17 @@ model CreditTransaction {
 }
 
 model Folder {
-  id        Int             @id @default(autoincrement())
-  name      String
-  userId    Int
-  isDeleted Boolean         @default(false)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  deletedAt DateTime?
-  chats     Chat[]
-  contexts  ContextMemory[]
-  user      User            @relation(fields: [userId], references: [id])
+  id          Int             @id @default(autoincrement())
+  name        String
+  description String?
+  userId      Int
+  isDeleted   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+  chats       Chat[]
+  contexts    ContextMemory[]
+  user        User            @relation(fields: [userId], references: [id])
 }
 
 model Chat {
@@ -242,6 +244,7 @@ model Chat {
   usageLogs          UsageLog[]
   generatedDocuments GeneratedDocument[]
   generatedVideos    GeneratedVideo[]
+  generatedImages    GeneratedImage[]
 
   @@index([userId])
   @@index([folderId])
@@ -386,6 +389,38 @@ model GeneratedVideo {
   @@index([externalJobId])
 }
 
+model GeneratedImage {
+  id                 Int            @id @default(autoincrement())
+  userId             Int
+  chatId             Int?
+  messageId          Int?
+  // Compare mode: one Message can own several ModelResponse rows, so this
+  // disambiguates which model's turn produced the image (same reasoning as
+  // GeneratedDocument.modelResponseId above).
+  modelResponseId    Int?
+  modelId            Int
+  prompt             String
+  fileUrl            String
+  cloudinaryPublicId String
+  fileSize           Int?
+  width              Int?
+  height             Int?
+  isDeleted          Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  deletedAt          DateTime?
+  user               User           @relation(fields: [userId], references: [id])
+  chat               Chat?          @relation(fields: [chatId], references: [id])
+  message            Message?       @relation(fields: [messageId], references: [id])
+  modelResponse      ModelResponse? @relation(fields: [modelResponseId], references: [id])
+  model              Model          @relation(fields: [modelId], references: [id])
+
+  @@index([userId])
+  @@index([chatId])
+  @@index([messageId])
+  @@index([modelResponseId])
+}
+
 model Message {
   id                 Int                 @id @default(autoincrement())
   chatId             Int
@@ -405,6 +440,7 @@ model Message {
   usageLogs          UsageLog[]
   generatedDocuments GeneratedDocument[]
   generatedVideos    GeneratedVideo[]
+  generatedImages    GeneratedImage[]
 
   @@index([chatId])
   @@index([createdAt])
@@ -429,6 +465,7 @@ model ModelResponse {
   message            Message             @relation(fields: [messageId], references: [id])
   model              Model               @relation(fields: [modelId], references: [id])
   generatedDocuments GeneratedDocument[]
+  generatedImages    GeneratedImage[]
   createdAt          DateTime            @default(now())
   completedAt        DateTime?
 
@@ -496,6 +533,7 @@ model Model {
   responses              ModelResponse[]
   usageLogs              UsageLog[]
   generatedVideos        GeneratedVideo[]
+  generatedImages        GeneratedImage[]
   allowedInPlans         PlanVideoModel[]
 
   @@unique([modelProviderId, externalId])

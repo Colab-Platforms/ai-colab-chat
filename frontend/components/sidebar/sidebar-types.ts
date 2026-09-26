@@ -26,4 +26,6 @@ export interface Chat {
 export interface FolderItem {
   id: number;
   name: string;
+  description?: string | null;
+  _count?: { chats: number };
 }

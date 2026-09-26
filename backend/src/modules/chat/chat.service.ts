@@ -11,15 +11,10 @@ import { buildPrismaQuery } from "prisma-qb";
 
 class ChatService {
   private async getDefaultContextIdsForChat(userId: number, folderId?: number | null) {
-    const globalContextsQuery = folderId
-      ? prisma.contextMemory.findMany({
-        where: { userId, type: "GLOBAL", isAutoSelected: true, isDeleted: false },
-        select: { id: true },
-      })
-      : prisma.contextMemory.findMany({
-        where: { userId, type: "GLOBAL", isDeleted: false },
-        select: { id: true },
-      });
+    const globalContextsQuery = prisma.contextMemory.findMany({
+      where: { userId, type: "GLOBAL", isAutoSelected: true, isDeleted: false },
+      select: { id: true },
+    });
 
     const folderContextsQuery = folderId
       ? prisma.contextMemory.findMany({

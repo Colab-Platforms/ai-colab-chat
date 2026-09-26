@@ -131,7 +131,7 @@ export function ContextModal({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="GLOBAL">Global (Active across all chats)</SelectItem>
-                <SelectItem value="FOLDER">Folder Specific (Active in one folder)</SelectItem>
+                <SelectItem value="FOLDER">Project Specific (Active in one project)</SelectItem>
                 <SelectItem value="CUSTOM">Chat Specific (Manually added to chats)</SelectItem>
               </SelectContent>
             </Select>
@@ -139,7 +139,7 @@ export function ContextModal({
 
           {type === "FOLDER" && (
             <div className="space-y-2 animate-in fade-in zoom-in-95 duration-200">
-              <label htmlFor="folder" className="text-sm font-medium">Apply to Folder</label>
+              <label htmlFor="folder" className="text-sm font-medium">Apply to Project</label>
               {folderList.length > 0 ? (
                 <Select
                   value={folderId}
@@ -147,10 +147,10 @@ export function ContextModal({
                   disabled={isViewOnly || isSaving}
                 >
                   <SelectTrigger id="folder">
-                    <SelectValue placeholder="Select a folder" />
+                    <SelectValue placeholder="Select a project" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">-- Select Folder --</SelectItem>
+                    <SelectItem value="none">-- Select Project --</SelectItem>
                     {folderList.map((f) => (
                       <SelectItem key={f.id} value={String(f.id)}>
                         {f.name}
@@ -161,7 +161,7 @@ export function ContextModal({
               ) : (
                 <div className="space-y-2 rounded-md border border-dashed border-border/60 bg-muted/40 p-3">
                   <p className="text-xs text-muted-foreground">
-                    You do not have any project folders yet. Create one to apply this context to a specific folder.
+                    You don&apos;t have any projects yet. Create one to apply this context to it.
                   </p>
                   {!isViewOnly && onRequestCreateFolder && (
                     <Button
@@ -180,7 +180,7 @@ export function ContextModal({
                         })
                       }
                     >
-                      Create new folder
+                      Create new project
                     </Button>
                   )}
                 </div>
