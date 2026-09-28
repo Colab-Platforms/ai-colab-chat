@@ -13,6 +13,8 @@ const ICON_OVERRIDES: Record<string, string> = {
   nvidia: "/model_icons/nvidia_logo.jpg",
   poolside: "/model_icons/poolside-ai.png",
   cohere: "/model_icons/cohere-logo.png",
+  mistral: "/model_icons/mistral-ai-icon.webp",
+  qwen: "/model_icons/Qwen_logo.svg.webp",
 };
 
 export function getModelIcon(externalId: string): string | null {
