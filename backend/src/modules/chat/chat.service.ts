@@ -191,6 +191,28 @@ class ChatService {
                   },
                   orderBy: { createdAt: "asc" },
                 },
+                // Code workspace turn → the project card + steps under the
+                // bubble (see modules/code-workspace). The file snapshot
+                // itself is fetched on demand when the panel opens.
+                codeVersions: {
+                  where: { project: { isDeleted: false } },
+                  select: {
+                    version: true,
+                    plan: true,
+                    changedPaths: true,
+                    project: {
+                      select: {
+                        id: true,
+                        title: true,
+                        framework: true,
+                        previewable: true,
+                        status: true,
+                      },
+                    },
+                  },
+                  orderBy: { version: "desc" },
+                  take: 1,
+                },
               },
             },
           },

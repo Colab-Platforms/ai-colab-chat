@@ -11,6 +11,13 @@ import { videoService } from "@/lib/services";
 import type { GeneratedVideo } from "@/components/chat/video-card";
 import { toast } from "@/lib/toast";
 import { createSmoothRevealer } from "@/lib/smoothReveal";
+import {
+  affectsCodeTurn,
+  codeWorkspace,
+  isCodeStreamEvent,
+  reduceCodeTurn,
+  useCodeWorkspace,
+} from "@/features/code-workspace";
 import * as LucideIcons from "lucide-react";
 import { Bot, Sparkles, MessageSquare } from "lucide-react";
 
@@ -82,7 +89,8 @@ export default function ChatPage() {
   const [editVersionIndices, setEditVersionIndices] = useState<Record<number, number>>({});
   const [isNotFound, setIsNotFound] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
-  const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string } | null>(null);
+  const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string; supportsCodeMode?: boolean } | null>(null);
+  const codePanelOpen = useCodeWorkspace((s) => s.isOpen);
   const [folder, setFolder] = useState<{ name: string; description?: string | null } | null>(null);
   const folderIdRef = useRef<number | null>(null);
   const firstMessageSent = useRef(false);
@@ -573,6 +581,24 @@ export default function ChatPage() {
               } else if (parsed.type === "done") {
                 // Capture final usage/meta; actual state update happens after stream ends.
                 lastDonePayload = parsed;
+              } else if (isCodeStreamEvent(parsed)) {
+                // Code workspace turn: the files go to the panel (store), the
+                // bubble only tracks the steps + project card (codeTurn).
+                codeWorkspace.applyStreamEvent(parsed, chatId);
+                if (affectsCodeTurn(parsed)) {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === currentMsgId
+                        ? {
+                            ...msg,
+                            modelResponses: msg.modelResponses?.map((mr: any) =>
+                              mr.model.id === mid ? { ...mr, codeTurn: reduceCodeTurn(mr.codeTurn, parsed) } : mr,
+                            ),
+                          }
+                        : msg,
+                    ),
+                  );
+                }
               }
             } catch { /* ignore parse errors */ }
           }
@@ -637,6 +663,8 @@ export default function ChatPage() {
       );
       } finally {
         revealer.stop();
+        // No-op unless the stream died mid-project (stop / network drop).
+        codeWorkspace.endStream();
       }
     });
   };
@@ -803,12 +831,15 @@ export default function ChatPage() {
       setIsStreaming(false);
       return;
     }
-    if (chatType) {
-      setChatCapability(chatType);
+    // "CODE" (code-workspace pill) is sent for this turn only — it is not a
+    // capability and must not be saved on the chat.
+    const capability = chatType === "CODE" ? "STANDARD" : chatType;
+    if (capability) {
+      setChatCapability(capability);
     }
     // Do not block streaming on metadata update.
     chatService
-      .update(chatId, { modelIds: targetModelIds, capability: chatType || "STANDARD" })
+      .update(chatId, { modelIds: targetModelIds, capability: capability || "STANDARD" })
       .catch(() => { /* ignore */ });
     const tempUserMsgId = Date.now();
     setMessages((prev) => [...prev.filter(m => m.id !== -1), {
@@ -1570,6 +1601,8 @@ export default function ChatPage() {
         onCapabilityChange={handleCapabilityChange}
         chatType={chatCapability}
         draftStorageKey={`chat_draft_${chatId}`}
+        supportsCodeMode={Boolean(assistant?.supportsCodeMode)}
+        placeholder={assistant?.supportsCodeMode && codePanelOpen ? "Ask AI to change the code…" : undefined}
       />
     </div>
   );

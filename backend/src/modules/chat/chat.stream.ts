@@ -25,6 +25,14 @@ import {
   maybeGenerateDocumentFromChat,
   prepareDocumentTurn,
 } from "@/modules/document/document.chat.js";
+import {
+  CODE_MAX_COMPLETION,
+  CodeSession,
+  injectCodeTurnMessages,
+  prepareCodeTurn,
+  resolveCodeChatType,
+} from "@/modules/code-workspace/code-workspace.chat.js";
+import { CODE_CONTINUE_PROMPT } from "@/modules/code-workspace/code-workspace.protocol.js";
 
 const attachmentService = new AttachmentService();
 
@@ -432,6 +440,7 @@ async function checkTokenLimitsAndSetupStream(
   assistantMessageId: number,
   messageIdPayload: Record<string, any>,
   enableFollowUpQuestions: boolean,
+  absoluteMaxCompletion = 10000,
 ): Promise<{ maxCompletionTokens: number; trimmedHistory: any[] } | null> {
   const tokenMultiplier = model.tokenMultiplier ?? 1.0;
   const maxAffordableTokens = Math.floor(
@@ -600,7 +609,9 @@ async function checkTokenLimitsAndSetupStream(
 
   // Set a hard absolute upper limit of 10,000 raw tokens for generating tokens in a single response
   // Note: For models with multipliers, this could incur up to 30k billable tokens (e.g. 3x Opus)
-  const ABSOLUTE_MAX_COMPLETION = 10000;
+  // Code-workspace turns pass a higher cap (CODE_MAX_COMPLETION) — a whole
+  // multi-file project does not fit in 10k tokens.
+  const ABSOLUTE_MAX_COMPLETION = absoluteMaxCompletion;
 
   const maxCompletionTokens = Math.min(
     Math.max(1, maxAffordableTokens - currentHistoryTokens),
@@ -711,13 +722,19 @@ function shouldRetryEmptyOpenRouterAttempt(
   return !fullContent.trim() && completionTokens === 0;
 }
 
+interface StreamPumpOptions {
+  includeImages?: boolean;
+  includeAnnotations?: boolean;
+  codeSession?: CodeSession | null;
+}
+
 async function pipeOpenRouterStreamToClient(
   stream: AsyncIterable<any>,
   chatType: string | undefined,
   res: Response,
   isClientAborted: () => boolean,
   acc: OpenRouterSseAccumulator,
-  streamOptions: { includeImages?: boolean; includeAnnotations?: boolean },
+  streamOptions: StreamPumpOptions,
   modelLabel?: string,
 ): Promise<void> {
   const includeImages = streamOptions.includeImages !== false;
@@ -761,7 +778,12 @@ async function pipeOpenRouterStreamToClient(
       }
     }
 
-    if (delta) {
+    if (delta && streamOptions.codeSession) {
+      // Code-workspace turn: the session parses the tagged output and emits
+      // token / code_file_* events itself.
+      acc.fullContent += delta;
+      streamOptions.codeSession.push(delta);
+    } else if (delta) {
       acc.fullContent += delta;
       res.write(
         `data: ${JSON.stringify({ type: "token", content: delta })}\n\n`,
@@ -808,7 +830,7 @@ async function runOpenRouterStreamWithEmptyRetry(params: {
   chatType: string | undefined;
   res: Response;
   isClientAborted: () => boolean;
-  streamOptions: { includeImages?: boolean; includeAnnotations?: boolean };
+  streamOptions: StreamPumpOptions;
   createStream: () => Promise<AsyncIterable<any>>;
   modelLabel?: string;
 }): Promise<OpenRouterSseAccumulator> {
@@ -858,12 +880,15 @@ export async function streamChat(req: Request, res: Response) {
   const {
     content,
     modelId,
-    chatType,
+    chatType: requestedChatType,
     userMessageId,
     assistantMessageId,
     attachmentIds,
     replaceModelId,
   } = req.body as SendMessageBody;
+  // The "Code" pill arrives as chatType CODE; from here on the turn is a
+  // STANDARD turn plus a forceCode flag (see code-workspace.chat.ts).
+  const { chatType, forceCode } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -1056,11 +1081,13 @@ export async function streamChat(req: Request, res: Response) {
     // -----------------------------------------------------------------------
     let assistantTemperature: number | undefined;
     let personaPrompt: string | null = null;
+    let assistantSlug: string | null = null;
     if (chat.assistantId) {
       const chatAssistant = await prisma.assistant.findFirst({
         where: { id: chat.assistantId, isActive: true, isDeleted: false },
       });
       if (chatAssistant) {
+        assistantSlug = chatAssistant.slug;
         console.log(
           `[DEBUG] Adding Assistant System Prompt for: ${chatAssistant.name}`,
         );
@@ -1185,11 +1212,27 @@ export async function streamChat(req: Request, res: Response) {
       .map((m: any) => historyContentToText(m.content))
       .find((text: string) => text.trim().length > 0);
 
-    const documentTurn = await prepareDocumentTurn({
+    // Code workspace (Software Engineer assistant only) — decided before the
+    // token budget so the protocol prompt and project files are priced in.
+    // A code turn replaces the document pipeline for this message.
+    const codeTurn = await prepareCodeTurn({
+      userId,
       chatId,
       userPrompt: content,
-      lastAssistantAnswer,
+      assistantSlug,
+      forceCode,
     });
+    if (codeTurn) {
+      injectCodeTurnMessages(conversationHistory, codeTurn, model.externalId);
+    }
+
+    const documentTurn = codeTurn
+      ? null
+      : await prepareDocumentTurn({
+          chatId,
+          userPrompt: content,
+          lastAssistantAnswer,
+        });
 
     if (documentTurn) {
       // Deliberately NOT unshifted and NOT cache_control'd, unlike the persona
@@ -1217,7 +1260,10 @@ export async function streamChat(req: Request, res: Response) {
         userMessageId: userMessage.id,
         assistantMessageId: assistantMessage.id,
       },
-      enableFollowUpQuestions,
+      // Code turns: the follow-up-questions JSON block would land after the
+      // <summary> and pollute the parsed output.
+      enableFollowUpQuestions && !codeTurn,
+      codeTurn ? CODE_MAX_COMPLETION : undefined,
     );
     if (tokenLimits === null) return;
     const { maxCompletionTokens, trimmedHistory } = tokenLimits;
@@ -1228,7 +1274,9 @@ export async function streamChat(req: Request, res: Response) {
     // -----------------------------------------------------------------------
     // Predefined response intercept – platform identity / greetings / about
     // -----------------------------------------------------------------------
-    const predefinedText = checkPredefinedResponse(content, contextStrings);
+    const predefinedText = codeTurn
+      ? null
+      : checkPredefinedResponse(content, contextStrings);
     if (predefinedText) {
       // Stream word-by-word with a small delay (same feel as OpenRouter)
       const words = predefinedText.split(" ");
@@ -1336,6 +1384,17 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
+    // Code workspace: create/reopen the project and open the panel. Null for
+    // ASK turns (plain chat answer with the files as context) and on failure.
+    let codeSession: CodeSession | null = null;
+    if (codeTurn) {
+      try {
+        codeSession = await CodeSession.start({ res, turn: codeTurn, userId, chatId });
+      } catch (error) {
+        console.error("[code-workspace] session start failed:", error);
+      }
+    }
+
     // Call OpenRouter with streaming
     let fullContent = "";
     let promptTokens = 0;
@@ -1348,7 +1407,9 @@ export async function streamChat(req: Request, res: Response) {
         chatType,
         res,
         isClientAborted,
-        streamOptions: { includeImages: true, includeAnnotations: true },
+        streamOptions: codeSession
+          ? { includeImages: false, includeAnnotations: false, codeSession }
+          : { includeImages: true, includeAnnotations: true },
         modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
@@ -1366,6 +1427,44 @@ export async function streamChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+
+      // A project cut off by max_tokens gets one continuation call; the
+      // parser keeps its state, so the second half streams straight into the
+      // file that was being written. Both calls are billed together below.
+      if (codeSession && finishReason === "length" && !isClientAborted()) {
+        const affordable = model.isFreeModel
+          ? CODE_MAX_COMPLETION
+          : Math.floor((wallet?.tokensRemaining ?? 0) / (model.tokenMultiplier ?? 1)) -
+            2 * (promptTokens + completionTokens);
+        const continueTokens = Math.min(CODE_MAX_COMPLETION, affordable);
+        if (continueTokens >= 1000) {
+          const partial = acc.fullContent;
+          const more = await runOpenRouterStreamWithEmptyRetry({
+            chatType,
+            res,
+            isClientAborted,
+            streamOptions: { includeImages: false, includeAnnotations: false, codeSession },
+            modelLabel: model.externalId,
+            createStream: () =>
+              createOpenRouterStream({
+                model: model.externalId,
+                messages: [
+                  ...trimmedHistory,
+                  { role: "assistant", content: partial },
+                  { role: "user", content: CODE_CONTINUE_PROMPT },
+                ],
+                chatType,
+                max_tokens: continueTokens,
+                temperature: assistantTemperature,
+                signal: abortController.signal,
+              }),
+          });
+          fullContent += more.fullContent;
+          promptTokens += more.promptTokens;
+          completionTokens += more.completionTokens;
+          finishReason = more.finishReason;
+        }
+      }
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -1379,8 +1478,12 @@ export async function streamChat(req: Request, res: Response) {
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
+        // Code turns keep the files written so far; the bubble shows the
+        // parsed text, never raw <file> tags.
         const stoppedContent =
-          fullContent.trim() || "Generation stopped by user.";
+          (codeSession ? await codeSession.closeStream() : fullContent.trim()) ||
+          "Generation stopped by user.";
+        let abortedResponseId: number | null = null;
         try {
           const tokenMultiplier = model.tokenMultiplier ?? 1.0;
           const billablePromptTokens = Math.ceil(
@@ -1410,7 +1513,7 @@ export async function streamChat(req: Request, res: Response) {
               data: { content: stoppedContent },
             });
 
-            await tx.modelResponse.create({
+            const abortedResponse = await tx.modelResponse.create({
               data: {
                 chatId,
                 messageId: assistantMessage.id,
@@ -1424,6 +1527,7 @@ export async function streamChat(req: Request, res: Response) {
                 completedAt: new Date(),
               },
             });
+            abortedResponseId = abortedResponse.id;
 
             if (adjusted.finalBillableTotal > 0) {
               await tx.usageLog.create({
@@ -1467,6 +1571,7 @@ export async function streamChat(req: Request, res: Response) {
             }
           });
         } catch {}
+        if (codeSession) await codeSession.complete(abortedResponseId);
         if (!res.writableEnded) {
           res.end();
         }
@@ -1480,10 +1585,12 @@ export async function streamChat(req: Request, res: Response) {
         JSON.stringify(aiError.error || aiError.response?.data, null, 2),
       );
 
+      if (codeSession) fullContent = await codeSession.closeStream();
+      let failedResponseId: number | null = null;
       // Save whatever partial content we received so it doesn't vanish from the UI
       // Even if empty, we must create a FAILED message so the assistant bubble persists
       try {
-        await prisma.modelResponse.create({
+        const failedResponse = await prisma.modelResponse.create({
           data: {
             chatId,
             messageId: assistantMessage.id,
@@ -1497,6 +1604,7 @@ export async function streamChat(req: Request, res: Response) {
             completedAt: new Date(),
           },
         });
+        failedResponseId = failedResponse.id;
         // Update assistant message content with whatever we got
         await prisma.message.update({
           where: { id: assistantMessage.id },
@@ -1506,6 +1614,7 @@ export async function streamChat(req: Request, res: Response) {
         console.error("Failed to save partial AI response to DB", dbErr);
       }
 
+      if (codeSession) await codeSession.complete(failedResponseId);
       res.write(
         `data: ${JSON.stringify({ type: "error", message: aiError.message || "AI request failed" })}\n\n`,
       );
@@ -1513,6 +1622,9 @@ export async function streamChat(req: Request, res: Response) {
       res.end();
       return;
     }
+
+    // Code turns: the chat bubble gets the plan/summary text, never raw tags.
+    if (codeSession) fullContent = await codeSession.closeStream();
 
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
       const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
@@ -1546,6 +1658,7 @@ export async function streamChat(req: Request, res: Response) {
 
     if (!fullContent.trim() && chatType !== "IMAGE_GENERATION") {
       const failureMessage = FAILED_GENERATION_USER_MESSAGE;
+      if (codeSession) await codeSession.complete(null);
       await prisma.$transaction(async (tx: any) => {
         await tx.message.update({
           where: { id: assistantMessage.id },
@@ -1716,6 +1829,10 @@ export async function streamChat(req: Request, res: Response) {
 
     await maybeEnqueueDistillation(chatId, chat.folderId);
 
+    // Code workspace: snapshot this turn as a version linked to the response
+    // (the bubble finds its project card through it) and unlock the editor.
+    if (codeSession) await codeSession.complete((res as any).modelResponseId);
+
     // Document generation — enqueue pass. Intent was already resolved before
     // the stream (see prepareDocumentTurn above) and is handed back here, so
     // the classifier is never paid for twice in one turn. The enqueue itself
@@ -1763,10 +1880,12 @@ export async function regenerateChat(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
   const messageId = Number(req.params.messageId);
-  const { modelId, chatType } = req.body as {
+  const { modelId, chatType: requestedChatType } = req.body as {
     modelId: number;
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -2426,11 +2545,13 @@ export async function regenerateChat(req: Request, res: Response) {
 export async function prepareMulti(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
-  const { content, attachmentIds, chatType } = req.body as {
+  const { content, attachmentIds, chatType: requestedChatType } = req.body as {
     content: string;
     attachmentIds?: number[];
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
 
   try {
     if (!content?.trim()) {
@@ -2501,11 +2622,13 @@ export async function editAndResend(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
   const originalMessageId = Number(req.params.messageId);
-  const { content, modelId, chatType } = req.body as {
+  const { content, modelId, chatType: requestedChatType } = req.body as {
     content: string;
     modelId: number;
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -3079,10 +3202,12 @@ export async function prepareEditMulti(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
   const messageId = Number(req.params.messageId);
-  const { content, chatType } = req.body as {
+  const { content, chatType: requestedChatType } = req.body as {
     content: string;
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
 
   try {
     if (!content?.trim()) {

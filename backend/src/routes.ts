@@ -24,6 +24,7 @@ import videoRoutes from "@/modules/video/video.route.js";
 import imageRoutes from "@/modules/image/image.route.js";
 import voiceRoutes from "@/modules/voice/voice.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
+import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.js";
 
 
 
@@ -63,5 +64,6 @@ router.use("/videos", videoRoutes);
 router.use("/images", imageRoutes);
 router.use("/voice", voiceRoutes);
 router.use("/admin", adminRoutes);
+router.use("/code-projects", codeWorkspaceRoutes);
 
 export default router;

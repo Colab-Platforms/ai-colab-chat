@@ -29,6 +29,7 @@ export function ChatRootShell({ children }: { children: ReactNode }) {
     pathname.startsWith("/register") ||
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/share/") ||
+    pathname.startsWith("/code-preview/") ||
     pathname.startsWith("/admin");
 
   if (bareShell) {

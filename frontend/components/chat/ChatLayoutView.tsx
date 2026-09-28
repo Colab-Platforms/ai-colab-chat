@@ -39,6 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { StartupGuide } from "./startup-guide";
 import { DocumentPanel } from "./document-panel";
+import { CodePanel, useCodeWorkspace } from "@/features/code-workspace";
 
 interface Chat {
   id: number;
@@ -137,6 +138,23 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  // The code workspace needs the room: collapse the sidebar to icons while it
+  // is open (without touching the saved preference) and give it back after.
+  const codePanelOpen = useCodeWorkspace((s) => s.isOpen);
+  const [collapsedForCode, setCollapsedForCode] = useState(false);
+  useEffect(() => {
+    setCollapsedForCode(codePanelOpen);
+  }, [codePanelOpen]);
+  const effectiveSidebarCollapsed = sidebarCollapsed || collapsedForCode;
+  const handleToggleSidebar = useCallback(() => {
+    if (collapsedForCode) {
+      setCollapsedForCode(false);
+      if (sidebarCollapsed) toggleSidebarCollapsed();
+      return;
+    }
+    toggleSidebarCollapsed();
+  }, [collapsedForCode, sidebarCollapsed, toggleSidebarCollapsed]);
 
   const isProfileRoute = pathname.startsWith("/profile");
 
@@ -606,8 +624,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       onSearchChange={setChatSearch}
       assistantsHasMore={assistantsHasMore}
       onLoadMoreAssistants={handleLoadMoreAssistants}
-      collapsed={isMobile ? false : sidebarCollapsed}
-      onToggleCollapse={toggleSidebarCollapsed}
+      collapsed={isMobile ? false : effectiveSidebarCollapsed}
+      onToggleCollapse={handleToggleSidebar}
     />
   );
 
@@ -691,7 +709,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       >
         <aside
           className={`hidden md:flex shrink-0 border-r border-border/50 transition-[width] duration-300 ease-in-out ${
-            sidebarCollapsed ? "w-16" : "w-70"
+            effectiveSidebarCollapsed ? "w-16" : "w-70"
           }`}
           style={{ contain: "layout style paint", willChange: "transform" }}
           data-guide="sidebar"
@@ -806,6 +824,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
         </main>
 
         <DocumentPanel />
+        <CodePanel />
 
         <StartupGuide
           userId={typeof user?.id === "number" ? user.id : undefined}

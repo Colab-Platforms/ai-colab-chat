@@ -184,7 +184,8 @@ export function NewChatPage() {
       const payload: any = { 
         title: content.substring(0, 50),
         modelIds: selectedModels,
-        capability: chatType || "STANDARD",
+        // "CODE" (code-workspace pill) is a one-turn flag, not a capability.
+        capability: chatType === "CODE" ? "STANDARD" : chatType || "STANDARD",
       };
       if (validPendingFolderId) {
         payload.folderId = validPendingFolderId;
@@ -359,6 +360,7 @@ export function NewChatPage() {
             onGenerateVideoClick={() => setVideoDialogOpen(true)}
             onEnhancePrompt={handleEnhancePrompt}
             isSending={isSending}
+            supportsCodeMode={Boolean(assistant?.supportsCodeMode)}
             forceReset={true}
             initialPrompt={initialPrompt}
             onPromptClear={() => setInitialPrompt(undefined)}

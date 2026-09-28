@@ -9,6 +9,13 @@ import {
 } from "lucide-react";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { DocumentCard, type GeneratedDocument } from "./document-card";
+import {
+  CodeProjectCard,
+  GenerationSteps,
+  codeTurnFromResponse,
+  type CodeTurnInfo,
+  type CodeVersionOnResponse,
+} from "@/features/code-workspace";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import useEmblaCarousel from "embla-carousel-react";
@@ -27,6 +34,9 @@ interface ModelResponse {
   // Attached per response, not per message: in compare mode each model's
   // answer produces its own document.
   generatedDocuments?: GeneratedDocument[];
+  /** Code workspace turn — live while streaming (codeTurn), from the API after (codeVersions). */
+  codeTurn?: CodeTurnInfo;
+  codeVersions?: CodeVersionOnResponse[];
   insufficientBalance?: boolean;
 }
 
@@ -344,6 +354,7 @@ export const MessageBubble = React.memo(function MessageBubble({
   const singleVerIdx = !isMultiModel && uniqueModels[0] ? (versionIndices[uniqueModels[0].id] ?? (singleResps.length - 1)) : 0;
   const singleResp = singleResps[singleVerIdx] || singleResps[0];
   const parsedSingle = parseFollowUpQuestions(singleResp?.content || "", singleResp?.status === "STREAMING");
+  const singleCodeTurn = singleResp ? codeTurnFromResponse(singleResp) : null;
 
   // Version info
   const hasVersions = editVersions && editVersions.length > 1;
@@ -474,6 +485,7 @@ export const MessageBubble = React.memo(function MessageBubble({
 
           {/* break-words and overflow-hidden prevent horizontal scrolling on long continuous strings */}
           <div className=" rounded-2xl rounded-tl-md px-4 py-2.5 break-words overflow-hidden w-full">
+            {singleCodeTurn && !sharedView && <GenerationSteps turn={singleCodeTurn} />}
             {singleResp ? (
               singleResp.status === "FAILED" && !isStoppedByUser(singleResp) ? (
                 isInsufficientBalanceFailure(singleResp) ? (
@@ -522,7 +534,7 @@ export const MessageBubble = React.memo(function MessageBubble({
                   <MarkdownRenderer content={parsedSingle.cleanText} />
                   {singleResp.status === "STREAMING" && <span className="inline-block w-1.5 h-4 bg-foreground/70 ml-0.5 animate-pulse" />}
                 </div>
-              ) : (
+              ) : singleCodeTurn ? null : (
                 <TypingIndicator isImageMode={message.chatType === "IMAGE_GENERATION" || (typeof window !== "undefined" && localStorage.getItem("preferredChatType") === "IMAGE_GENERATION")} />
               )
             ) : (
@@ -533,6 +545,12 @@ export const MessageBubble = React.memo(function MessageBubble({
           {singleResp?.generatedDocuments?.map((generatedDocument) => (
             <DocumentCard key={generatedDocument.id} document={generatedDocument} />
           ))}
+
+          {singleCodeTurn && !sharedView && (
+            <div className="px-4">
+              <CodeProjectCard turn={singleCodeTurn} />
+            </div>
+          )}
 
           {isLastMessage && singleResp?.status === "COMPLETED" && parsedSingle.questions.length > 0 && onFollowUpClick && (
             <FollowUpTabs questions={parsedSingle.questions} onClick={onFollowUpClick} />

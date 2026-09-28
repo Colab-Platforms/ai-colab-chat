@@ -65,6 +65,7 @@ model User {
   generatedDocuments            GeneratedDocument[]
   generatedVideos               GeneratedVideo[]
   generatedImages               GeneratedImage[]
+  codeProjects                  CodeProject[]
   payments                      Payment[]
   invoices                      Invoice[]
   supportRequests               SupportRequest[]
@@ -203,6 +204,7 @@ model Chat {
   generatedDocuments GeneratedDocument[]
   generatedVideos    GeneratedVideo[]
   generatedImages    GeneratedImage[]
+  codeProjects       CodeProject[]
 
   @@index([userId])
   @@index([folderId])
@@ -388,6 +390,80 @@ model GeneratedImage {
   @@index([modelResponseId])
 }
 
+// ---------------------------------------------------------------------------
+// Code workspace (AI coding assistant — Software Engineer assistant only).
+// A generated multi-file project lives in a chat; every AI turn that touches
+// it records a version snapshot so edits can be reverted. See
+// src/modules/code-workspace/README.md for the full flow.
+// ---------------------------------------------------------------------------
+enum CodeProjectStatus {
+  GENERATING
+  READY
+  FAILED
+}
+
+model CodeProject {
+  id                 Int                  @id @default(autoincrement())
+  userId             Int
+  chatId             Int
+  title              String
+  // react | vue | vanilla | static | node | python | other
+  framework          String               @default("react")
+  // Whether the Sandpack preview can run it (browser-only web projects).
+  previewable        Boolean              @default(false)
+  // Latest snapshot number in CodeProjectVersion; 0 until the first AI turn ends.
+  currentVersion     Int                  @default(0)
+  // Set by manual edits from the editor; cleared whenever a snapshot is taken,
+  // so an AI edit or a restore can first preserve the user's own changes.
+  dirtySinceSnapshot Boolean              @default(false)
+  status             CodeProjectStatus    @default(GENERATING)
+  isDeleted          Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  user               User                 @relation(fields: [userId], references: [id])
+  chat               Chat                 @relation(fields: [chatId], references: [id])
+  files              CodeFile[]
+  versions           CodeProjectVersion[]
+
+  @@index([userId])
+  @@index([chatId])
+}
+
+model CodeFile {
+  id        Int         @id @default(autoincrement())
+  projectId Int
+  path      String
+  language  String      @default("plaintext")
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  project   CodeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+}
+
+model CodeProjectVersion {
+  id              Int            @id @default(autoincrement())
+  projectId       Int
+  version         Int
+  // AI (end of an AI turn) | USER (manual edits preserved before an AI edit/restore) | RESTORE
+  source          String
+  // The AI turn that produced this version — how a chat bubble finds its project card.
+  modelResponseId Int?
+  // The model's <plan> for this turn, shown again in the chat after a reload.
+  plan            String?
+  // Paths this turn wrote or deleted (the steps list in the chat bubble).
+  changedPaths    String[]       @default([])
+  // [{ path, language, content }]
+  filesSnapshot   Json
+  createdAt       DateTime       @default(now())
+  project         CodeProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  modelResponse   ModelResponse? @relation(fields: [modelResponseId], references: [id])
+
+  @@unique([projectId, version])
+  @@index([modelResponseId])
+}
+
 model Message {
   id                 Int                 @id @default(autoincrement())
   chatId             Int
@@ -433,6 +509,7 @@ model ModelResponse {
   model              Model               @relation(fields: [modelId], references: [id])
   generatedDocuments GeneratedDocument[]
   generatedImages    GeneratedImage[]
+  codeVersions       CodeProjectVersion[]
   createdAt          DateTime            @default(now())
   completedAt        DateTime?
 

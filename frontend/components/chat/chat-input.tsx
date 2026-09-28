@@ -25,6 +25,7 @@ import {
   Minimize2,
   AudioLines,
   Film,
+  Code2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -86,7 +87,7 @@ interface ChatInputProps {
   onSend: (
     content: string,
     attachmentIds?: number[],
-    chatType?: ChatType,
+    chatType?: SendChatType,
     attachmentObjects?: UploadedAttachment[],
   ) => void;
   onEnhancePrompt?: (content: string) => Promise<{
@@ -108,7 +109,19 @@ interface ChatInputProps {
    * touches chatType/handleChatTypeChange.
    */
   onGenerateVideoClick?: () => void;
+  /**
+   * Software Engineer assistant only: shows the "Code" pill, which forces the
+   * AI to build/edit a project in the code workspace panel. Like video, it is
+   * not a ChatType — it is sent as chatType "CODE" for one turn and never
+   * persisted as the chat's capability (the backend enum has no CODE).
+   */
+  supportsCodeMode?: boolean;
+  /** Overrides the textarea placeholder (e.g. while the code panel is open). */
+  placeholder?: string;
 }
+
+/** What onSend may receive: a real ChatType, or the code-workspace pill. */
+export type SendChatType = ChatType | "CODE";
 
 type ChatType =
   | "STANDARD"
@@ -338,6 +351,8 @@ export function ChatInput({
   onCapabilityChange,
   chatType: propChatType,
   onGenerateVideoClick,
+  supportsCodeMode = false,
+  placeholder,
 }: ChatInputProps) {
   const [content, setContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
@@ -345,6 +360,8 @@ export function ChatInput({
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [chatType, setChatType] = useState<ChatType>("STANDARD");
+  const [codeMode, setCodeMode] = useState(false);
+  const codeModeActive = supportsCodeMode && codeMode;
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedPrompt, setEnhancedPrompt] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
@@ -445,7 +462,21 @@ export function ChatInput({
   };
 
   const handleChatTypeChange = (type: ChatType) => {
+    setCodeMode(false);
     applyChatType(type, true);
+  };
+
+  // The Code pill: back to STANDARD, and one model — a project is written by
+  // a single model (the backend also refuses multi-model code turns).
+  const toggleCodeMode = () => {
+    if (codeMode) {
+      setCodeMode(false);
+      return;
+    }
+    if (chatType !== "STANDARD") applyChatType("STANDARD", true);
+    if (maxModels !== 1) handleModeToggle("single");
+    else if (selectedModels.length > 1) onModelChange([selectedModels[0]]);
+    setCodeMode(true);
   };
 
   // Auto-capability detection disabled as per user request to use manual selection.
@@ -583,7 +614,7 @@ export function ChatInput({
       .map((a) => a.id);
 
     // Auto-capability detection disabled as per user request to be fully manual.
-    let outgoingChatType = chatType;
+    const outgoingChatType: SendChatType = codeModeActive ? "CODE" : chatType;
     /*
     if (chatType === "STANDARD") {
       const inferred = inferChatTypeFromPrompt(content.trim());
@@ -1122,7 +1153,10 @@ export function ChatInput({
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask anything..."
+                  placeholder={
+                    placeholder ??
+                    (codeModeActive ? "Describe the app or change you want…" : "Ask anything...")
+                  }
                   maxLength={50000}
                   rows={1}
                   className={`border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent dark:bg-transparent resize-none p-0 flex-1 min-w-0 min-h-[40px] leading-relaxed py-2.5 text-[15px] overflow-y-auto ${isExpanded
@@ -1333,7 +1367,7 @@ export function ChatInput({
                   { type: "IMAGE_GENERATION" as const, label: "Image Gen", icon: ImageIcon },
                 ]
               ).map(({ type, label, icon: Icon }) => {
-                const active = chatType === type;
+                const active = chatType === type && !codeModeActive;
                 return (
                   <motion.button
                     key={type}
@@ -1357,6 +1391,24 @@ export function ChatInput({
                   </motion.button>
                 );
               })}
+              {supportsCodeMode && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={toggleCodeMode}
+                  aria-pressed={codeModeActive}
+                  title="Build or edit a project in the code workspace"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                    codeModeActive
+                      ? "bg-violet-200/70 text-violet-900 border-violet-200 dark:bg-violet-500/20 dark:text-violet-200 dark:border-violet-500/30 shadow-sm"
+                      : "bg-background/70 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                  Code
+                </motion.button>
+              )}
               {onGenerateVideoClick && (
                 <motion.button
                   type="button"

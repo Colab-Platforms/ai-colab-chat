@@ -8,6 +8,8 @@ import { Toaster } from "@/components/ui/toast";
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
 import { PwaInstallPrompt } from "@/components/pwa/install-prompt";
 import Script from "next/script";
+// Imported directly (not via the feature index) so it stays a plain string in this server component.
+import { NODEBOX_ERROR_FILTER_SCRIPT } from "@/features/code-workspace/lib/nodeboxErrorFilter";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -81,6 +83,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Must run before hydration — see features/code-workspace/lib/nodeboxErrorFilter.ts */}
+        <Script
+          id="code-workspace-nodebox-error-filter"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: NODEBOX_ERROR_FILTER_SCRIPT }}
+        />
         <Script
           id="ms-clarity"
           strategy="afterInteractive"
