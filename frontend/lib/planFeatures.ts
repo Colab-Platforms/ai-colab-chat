@@ -31,12 +31,10 @@ export function getPlanFeatureLines(plan: any): PlanFeatureLines {
     included.push(formatTokenLimit(Number(plan.tokenLimit)));
   }
 
-  if (plan.restrictToFreeModels) {
-    included.push("Free AI models only");
-    excluded.push("Paid AI models");
-  } else {
-    included.push("All AI models, including paid");
-  }
+  // Model choice isn't plan-restricted on any tier — every plan can use any
+  // model, gated purely by wallet balance (paid models bill real cost against
+  // the token wallet; once it's exhausted, only free models keep working).
+  included.push("All AI models, including paid");
 
   if (plan.documentGenEnabled) {
     included.push("Document generation");

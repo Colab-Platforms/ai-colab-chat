@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
-import { getUserPlanContext, assertCanUseModel, assertCanGenerateImage } from "@/modules/plan-access/planAccess.service.js";
+import { getUserPlanContext, assertCanGenerateImage } from "@/modules/plan-access/planAccess.service.js";
 import { createOpenRouterStream } from "@/utils/openrouter.js";
 import { estimateMessageTokens } from "@/utils/tokenCounter.js";
 import { checkPredefinedResponse } from "@/utils/predefinedResponses.js";
@@ -908,11 +908,13 @@ export async function streamChat(req: Request, res: Response) {
 
     const isfreeModel = model.isFreeModel
 
-    // Plan-based access control: Free-tier accounts may only use free models,
-    // and image generation is a paid-plan-only capability.
+    // Model choice itself isn't plan-restricted — any plan (including Free)
+    // may pick any model, gated purely by wallet balance: a paid model bills
+    // real cost against tokensRemaining like normal, and once that hits zero
+    // only free models (which bill $0) keep working. Image generation is
+    // still a genuine plan capability, so that gate stays.
     const planContext = await getUserPlanContext(userId);
     try {
-      assertCanUseModel(planContext, model);
       if (chatType === "IMAGE_GENERATION") {
         assertCanGenerateImage(planContext);
       }

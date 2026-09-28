@@ -38,15 +38,6 @@ export async function getUserPlanContext(userId: number): Promise<PlanContext> {
   return { plan: freePlan, subscriptionId: null };
 }
 
-export function assertCanUseModel(ctx: PlanContext, model: Pick<Model, "isFreeModel" | "name">) {
-  if (ctx.plan.restrictToFreeModels && !model.isFreeModel) {
-    throw new ApiError(
-      `Your plan only includes free models — ${model.name} requires an upgrade.`,
-      STATUS_CODES.FORBIDDEN,
-    );
-  }
-}
-
 export function assertCanGenerateImage(ctx: PlanContext) {
   if (!ctx.plan.imageGenEnabled) {
     throw new ApiError(
