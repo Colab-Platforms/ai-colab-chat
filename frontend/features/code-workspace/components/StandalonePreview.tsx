@@ -48,7 +48,10 @@ export function StandalonePreview({ projectId }: { projectId: number }) {
   }, [projectId]);
 
   const project = state.kind === "ready" ? state.project : null;
-  const setup = useMemo(() => (project ? toSandpackSetup(project.files, project.framework) : null), [project]);
+  const setup = useMemo(
+    () => (project ? toSandpackSetup(project.files, project.framework, { forceVite: project.forceVite }) : null),
+    [project],
+  );
 
   useEffect(() => {
     if (project) document.title = `${project.title} · Preview`;
@@ -86,6 +89,7 @@ export function StandalonePreview({ projectId }: { projectId: number }) {
           template={setup.template}
           files={setup.files}
           theme={theme === "dark" ? "dark" : "light"}
+          options={{ externalResources: setup.externalResources }}
           style={{ height: "100%" }}
         >
           <SandpackLayout style={{ height: "100%", border: 0, borderRadius: 0 }}>

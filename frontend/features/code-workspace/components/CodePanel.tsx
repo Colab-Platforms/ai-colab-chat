@@ -137,11 +137,16 @@ function PanelBody({ onClose }: { onClose: () => void }) {
   // bumps this key to fully unmount and recreate the bundler from scratch.
   const [previewRetryKey, setPreviewRetryKey] = useState(0);
   const reloadPreview = useCallback(() => setPreviewRetryKey((k) => k + 1), []);
+  // "Run with Vite" override, per project: a different project starts on the
+  // fast engine again.
+  const [forceViteFor, setForceViteFor] = useState<number | null>(null);
+  const forceVite = projectId !== null && forceViteFor === projectId;
+  const setForceVite = useCallback((on: boolean) => setForceViteFor(on ? projectId : null), [projectId]);
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
       {hasProject ? (
-        <CodePanelHeader onClose={onClose} onReloadPreview={reloadPreview} />
+        <CodePanelHeader onClose={onClose} onReloadPreview={reloadPreview} forceVite={forceVite} />
       ) : (
         <div className="h-12 shrink-0 border-b border-border/50" />
       )}
@@ -166,7 +171,7 @@ function PanelBody({ onClose }: { onClose: () => void }) {
                 // Keyed on retryKey: "Reload preview" must clear a caught
                 // crash too, not just remount Sandpack underneath it.
                 <PreviewErrorBoundary key={previewRetryKey} onReload={reloadPreview}>
-                  <PreviewPane retryKey={previewRetryKey} />
+                  <PreviewPane retryKey={previewRetryKey} forceVite={forceVite} onForceViteChange={setForceVite} />
                 </PreviewErrorBoundary>
               ) : null}
             </div>
@@ -195,8 +200,10 @@ export function CodePanel() {
   const widthRef = useRef(width);
   widthRef.current = width;
 
-  // The panel belongs to one chat: leaving it closes the panel, coming back
-  // after a reload reopens it.
+  // The panel belongs to one chat: leaving it closes the panel (and tears
+  // down its preview bundler — keeping that alive in the background across
+  // unrelated chats is expensive and made the whole app feel sluggish).
+  // Coming back after a reload reopens it (see restoreForChat).
   useEffect(() => {
     const { isOpen: open, project } = codeWorkspace.getState();
     if (open && project && project.chatId !== activeChatId) codeWorkspace.close();

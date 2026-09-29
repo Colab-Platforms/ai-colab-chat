@@ -100,10 +100,13 @@ function VersionsMenu() {
 export function CodePanelHeader({
   onClose,
   onReloadPreview,
+  forceVite,
 }: {
   onClose: () => void;
   /** Fully recreates the Sandpack bundler — the only recovery from a failed preview handshake. */
   onReloadPreview: () => void;
+  /** The panel's "Run with Vite" choice, carried over to the new tab. */
+  forceVite: boolean;
 }) {
   const project = useCodeWorkspace((s) => s.project);
   const view = useCodeWorkspace((s) => s.view);
@@ -197,6 +200,7 @@ export function CodePanelHeader({
                     title: project.title,
                     framework: project.framework,
                     files: codeWorkspace.getAllFiles(),
+                    forceVite,
                   })
                 }
               >

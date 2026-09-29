@@ -12,6 +12,7 @@ export interface PreviewHandoff {
   title: string;
   framework: string;
   files: { path: string; content: string }[];
+  forceVite?: boolean;
 }
 
 const key = (projectId: number) => `code-workspace:preview:${projectId}`;
