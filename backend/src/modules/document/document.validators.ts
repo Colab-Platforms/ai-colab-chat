@@ -4,6 +4,7 @@ import {
   COLUMN_TYPES,
   DOCUMENT_FORMATS,
   DOCUMENT_THEMES,
+  PPTX_TEMPLATES,
   MAX_BLOCKS,
   MAX_SHEET_COLUMNS,
   MAX_SHEET_NAME_CHARS,
@@ -40,8 +41,11 @@ export const createDocumentSchema = Joi.object({
   format: Joi.string()
     .valid(...DOCUMENT_FORMATS)
     .optional(),
+  // Shared with PPTX-only template keys: the `theme` field is reused for
+  // both, since which set applies is decided by the document's format, not
+  // by the schema (see document.types.ts:PptxTemplate).
   theme: Joi.string()
-    .valid(...DOCUMENT_THEMES)
+    .valid(...DOCUMENT_THEMES, ...PPTX_TEMPLATES)
     .optional(),
   sourceText: Joi.string()
     .trim()
@@ -62,7 +66,7 @@ export const validateCreateDocumentSchema = (data: unknown) => {
 export const updateDocumentStyleSchema = Joi.object({
   title: Joi.string().trim().min(1).max(MAX_TITLE_CHARS).optional(),
   theme: Joi.string()
-    .valid(...DOCUMENT_THEMES)
+    .valid(...DOCUMENT_THEMES, ...PPTX_TEMPLATES)
     .optional(),
 })
   .min(1)

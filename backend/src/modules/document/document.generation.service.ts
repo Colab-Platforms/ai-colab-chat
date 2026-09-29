@@ -2,6 +2,7 @@ import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
 import { debitTokens } from "@/utils/walletUtils.js";
 import { dlog, dlogBlock, dlogError, dtime } from "./document.logger.js";
+import { enrichPresentationImages } from "./document.pptxImages.js";
 import { getRenderer } from "./document.renderers.js";
 import { generateSpec } from "./document.spec.service.js";
 import {
@@ -9,6 +10,7 @@ import {
   FORMAT_SPEC_KIND,
   specKindOf,
   type AnySpec,
+  type AnyTheme,
   type DocumentFormat,
   type DocumentSpec,
   type DocumentTheme,
@@ -135,6 +137,12 @@ export const processDocument = async (id: number): Promise<void> => {
       promptTokens = generated.promptTokens;
       completionTokens = generated.completionTokens;
 
+      if (format === "PPTX") {
+        spec = await dtime("worker", `job=${id} stock photo enrichment`, () =>
+          enrichPresentationImages(spec as PresentationSpec, document.theme),
+        );
+      }
+
       await prisma.generatedDocument.update({
         where: { id },
         data: {
@@ -191,15 +199,15 @@ export const processDocument = async (id: number): Promise<void> => {
       );
     }
 
-    const theme = document.theme as DocumentTheme;
+    const theme = document.theme;
     const fileBuffer = await dtime("worker", `job=${id} ${format} render`, () => {
       switch (renderer.kind) {
         case "presentation":
-          return renderer.render(spec as PresentationSpec, theme);
+          return renderer.render(spec as PresentationSpec, theme as AnyTheme);
         case "workbook":
-          return renderer.render(spec as WorkbookSpec, theme);
+          return renderer.render(spec as WorkbookSpec, theme as DocumentTheme);
         default:
-          return renderer.render(spec as DocumentSpec, theme);
+          return renderer.render(spec as DocumentSpec, theme as DocumentTheme);
       }
     });
 

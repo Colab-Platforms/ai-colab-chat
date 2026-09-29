@@ -9,6 +9,7 @@ import {
   isFormatSupported,
 } from "./document.renderers.js";
 import { getThemeTokens } from "./document.theme.js";
+import { getPptxTemplateTokens } from "./document.pptxTemplates.js";
 import {
   FORMAT_SPEC_KIND,
   MAX_TITLE_CHARS,
@@ -80,7 +81,7 @@ class DocumentService {
         ),
         prompt: input.prompt.trim(),
         sourceText: input.sourceText?.trim() || null,
-        theme: input.theme ?? "professional",
+        theme: input.theme ?? (format === "PPTX" ? "corporate" : "professional"),
       },
     });
 
@@ -166,8 +167,14 @@ class DocumentService {
       format,
       specKind: FORMAT_SPEC_KIND[format],
       spec: document.spec as unknown as AnySpec,
-      theme: document.theme as DocumentTheme,
-      themeTokens: getThemeTokens(document.theme as DocumentTheme),
+      theme: document.theme,
+      // PPTX gets its own richer token shape (fonts/layout/photos); every
+      // other format keeps the flat document theme tokens. Both are returned
+      // under `themeTokens` so the frontend only branches on `specKind`.
+      themeTokens:
+        format === "PPTX"
+          ? getPptxTemplateTokens(document.theme)
+          : getThemeTokens(document.theme as DocumentTheme),
     };
   }
 
