@@ -4,6 +4,7 @@ import STATUS_CODES from "@/utils/statusCodes.js";
 import { BillingCycle } from "./subscription.types.js";
 import {
   CashfreePlanSource,
+  applyGst,
   getCashfreePlanId,
   getCashfreePlanIntervalType,
   getCashfreePlanIntervals,
@@ -278,14 +279,22 @@ class SubscriptionCashfreeService {
     billingCycle: BillingCycle,
     subscriptionIdOverride?: string,
     returnUrlOverride?: string,
+    gstPercent: number = 0,
   ) {
-    const recurringAmount = Number(
+    const baseAmount = Number(
       billingCycle === "MONTHLY"
         ? plan.monthlyPrice
         : billingCycle === "QUARTERLY"
           ? plan.quarterlyPrice
           : plan.yearlyPrice,
     );
+
+    // Plan.monthlyPrice/quarterlyPrice/yearlyPrice are stored tax-exclusive —
+    // this is the actual amount Cashfree charges the customer, so GST goes
+    // on top here, not into the stored plan price. Defaults to 0 (no GST
+    // added) only if a caller genuinely has no rate to pass — every real
+    // call site should be passing the live CreditPricingConfig.gstPercent.
+    const recurringAmount = applyGst(baseAmount, gstPercent);
 
     if (!Number.isFinite(recurringAmount) || recurringAmount <= 0) {
       throw new ApiError(
@@ -542,14 +551,14 @@ class SubscriptionCashfreeService {
     return null;
   }
 
-  async syncPlan(plan: CashfreePlanSource, billingCycle: BillingCycle) {
-    const recurringAmountPaise = getCashfreePlanRecurringAmountPaise(plan, billingCycle);
+  async syncPlan(plan: CashfreePlanSource, billingCycle: BillingCycle, gstPercent: number) {
+    const recurringAmountPaise = getCashfreePlanRecurringAmountPaise(plan, billingCycle, gstPercent);
     if (!Number.isFinite(recurringAmountPaise) || recurringAmountPaise <= 0) {
       // Skip syncing zero/free cycle prices.
       return;
     }
 
-    const planId = getCashfreePlanId(plan, billingCycle);
+    const planId = getCashfreePlanId(plan, billingCycle, gstPercent);
     const payload = {
       plan_id: planId,
       plan_name: `${plan.name}_${billingCycle}`.slice(0, 40),
@@ -617,10 +626,10 @@ class SubscriptionCashfreeService {
     );
   }
 
-  async syncAllPlanCycles(plan: CashfreePlanSource) {
-    await this.syncPlan(plan, "MONTHLY");
-    await this.syncPlan(plan, "QUARTERLY");
-    await this.syncPlan(plan, "YEARLY");
+  async syncAllPlanCycles(plan: CashfreePlanSource, gstPercent: number) {
+    await this.syncPlan(plan, "MONTHLY", gstPercent);
+    await this.syncPlan(plan, "QUARTERLY", gstPercent);
+    await this.syncPlan(plan, "YEARLY", gstPercent);
   }
 
   async cancelSubscription(subscriptionId: string) {

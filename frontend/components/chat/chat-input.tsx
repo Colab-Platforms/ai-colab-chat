@@ -32,12 +32,14 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { getModelIcon } from "@/lib/model-icons";
 import { attachmentService } from "@/lib/services";
 import { toast } from "@/lib/toast";
+import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { ModelsModal } from "@/components/chat/models-modal";
 
 // Dynamically imported so react-speech-recognition never runs on the server
@@ -368,6 +370,7 @@ export function ChatInput({
   const [isMobile, setIsMobile] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const dragCounterRef = useRef(0);
+  const { imageGenEnabled, videoGenEnabled } = usePlanCapabilities();
 
   // Speech-to-text: track the text that existed before mic was started
   const preExistingTextRef = useRef("");
@@ -1235,6 +1238,7 @@ export function ChatInput({
                       </div>
                       <span>Upload a File</span>
                     </DropdownMenuItem>
+
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -1362,9 +1366,9 @@ export function ChatInput({
             <div className="flex flex-wrap items-center justify-center gap-2 pt-3">
               {(
                 [
-                  { type: "STANDARD" as const, label: "Chat", icon: MessageSquare },
-                  { type: "WEB_SEARCH" as const, label: "Web Search", icon: Search },
-                  { type: "IMAGE_GENERATION" as const, label: "Image Gen", icon: ImageIcon },
+                  { type: "STANDARD" as const, label: "Chat", icon: MessageSquare, locked: false },
+                  { type: "WEB_SEARCH" as const, label: "Web Search", icon: Search, locked: false },
+                  { type: "IMAGE_GENERATION" as const, label: "Image Gen", icon: ImageIcon, locked: !imageGenEnabled },
                 ]
               ).map(({ type, label, icon: Icon }) => {
                 const active = chatType === type && !codeModeActive;
@@ -1372,21 +1376,25 @@ export function ChatInput({
                   <motion.button
                     key={type}
                     type="button"
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
+                    whileHover={{ scale: locked ? 1 : 1.03 }}
+                    whileTap={{ scale: locked ? 1 : 0.97 }}
                     onClick={() => {
+                      if (locked) return;
                       handleChatTypeChange(type);
                       window.dispatchEvent(
                         new Event("ai-colab:capability-selected"),
                       );
                     }}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
-                      active
-                        ? "bg-violet-200/70 text-violet-900 border-violet-200 dark:bg-violet-500/20 dark:text-violet-200 dark:border-violet-500/30 shadow-sm"
-                        : "bg-background/70 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground"
+                    title={locked ? "Upgrade your plan to unlock this" : undefined}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      locked
+                        ? "bg-background/40 text-muted-foreground/50 border-border/30 cursor-not-allowed"
+                        : active
+                          ? "bg-violet-200/70 text-violet-900 border-violet-200 dark:bg-violet-500/20 dark:text-violet-200 dark:border-violet-500/30 shadow-sm cursor-pointer"
+                          : "bg-background/70 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground cursor-pointer"
                     }`}
                   >
-                    <Icon className="w-3.5 h-3.5" />
+                    {locked ? <Lock className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
                     {label}
                   </motion.button>
                 );
@@ -1417,7 +1425,7 @@ export function ChatInput({
                   onClick={onGenerateVideoClick}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors cursor-pointer bg-background/70 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground"
                 >
-                  <Film className="w-3.5 h-3.5" />
+                  {videoGenEnabled ? <Film className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                   Video Gen
                 </motion.button>
               )}

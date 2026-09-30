@@ -10,6 +10,7 @@ export interface CreateModelBody {
   defaultForCapabilities?: ModelCapability[];
   tokenMultiplier?: number;
   videoCostPerSecond?: number;
+  creditCostPerSecond?: number;
 }
 
 export interface UpdateModelBody {
@@ -22,4 +23,5 @@ export interface UpdateModelBody {
   defaultForCapabilities?: ModelCapability[];
   tokenMultiplier?: number;
   videoCostPerSecond?: number;
+  creditCostPerSecond?: number;
 }

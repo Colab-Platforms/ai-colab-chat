@@ -1,4 +1,5 @@
 import * as express from "express";
+import type { PlanContext } from "@/modules/plan-access/planAccess.service.js";
 
 declare global {
     namespace Express {
@@ -10,6 +11,7 @@ declare global {
 
         interface Request {
             user?: User;
+            planContext?: PlanContext;
         }
     }
 }

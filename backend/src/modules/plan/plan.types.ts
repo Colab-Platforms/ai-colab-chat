@@ -6,6 +6,12 @@ export interface CreatePlanBody {
     tokenLimit: number;
     features: any;
     isActive?: boolean;
+    restrictToFreeModels?: boolean;
+    documentGenEnabled?: boolean;
+    imageGenEnabled?: boolean;
+    videoGenEnabled?: boolean;
+    monthlyVideoCredits?: number;
+    allowedVideoModelIds?: number[];
 }
 
 export interface UpdatePlanBody {
@@ -16,4 +22,10 @@ export interface UpdatePlanBody {
     tokenLimit?: number;
     features?: any;
     isActive?: boolean;
+    restrictToFreeModels?: boolean;
+    documentGenEnabled?: boolean;
+    imageGenEnabled?: boolean;
+    videoGenEnabled?: boolean;
+    monthlyVideoCredits?: number;
+    allowedVideoModelIds?: number[];
 }

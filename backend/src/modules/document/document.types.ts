@@ -15,6 +15,34 @@ export const DOCUMENT_THEMES: DocumentTheme[] = [
   "report",
 ];
 
+/**
+ * PPTX-only visual templates. Kept out of `DocumentTheme` — a deck earns a
+ * richer set of design decisions (fonts, decorative layout, photo placement)
+ * than the flat PDF/DOCX theme tokens express, so it gets its own type rather
+ * than stretching `ThemeTokens` to cover both.
+ *
+ * These values live in the same `theme` column/field as `DocumentTheme` (see
+ * document.pptxTemplates.ts) — a document's format is what disambiguates
+ * which table a given theme string is looked up in.
+ */
+export type PptxTemplate =
+  | "corporate"
+  | "aurora"
+  | "sunset"
+  | "emerald"
+  | "mono";
+
+export const PPTX_TEMPLATES: PptxTemplate[] = [
+  "corporate",
+  "aurora",
+  "sunset",
+  "emerald",
+  "mono",
+];
+
+/** Whatever a `theme` field/column may hold, across every document format. */
+export type AnyTheme = DocumentTheme | PptxTemplate;
+
 /** Mirrors `GeneratedDocumentFormat` in schema.prisma. */
 export type DocumentFormat = "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
 
@@ -145,6 +173,16 @@ export interface SlideSpec {
   blocks: SlideBlock[];
   /** Speaker notes — the one thing a deck has that a document does not. */
   notes?: string;
+  /**
+   * A topic-relevant stock photo, already re-hosted on Cloudinary.
+   *
+   * Populated by document.pptxImages.ts *after* the spec is validated — the
+   * model never sees or sets this field, since it is forbidden from
+   * inventing image URLs. Absent whenever the lookup found nothing or the
+   * template's layout has no place for one; renderers must treat it as
+   * optional and fall back cleanly.
+   */
+  photoUrl?: string;
 }
 
 export interface PresentationSpec {
@@ -152,6 +190,8 @@ export interface PresentationSpec {
   subtitle?: string;
   author?: string;
   slides: SlideSpec[];
+  /** Same enrichment as `SlideSpec.photoUrl`, for the title slide. */
+  coverPhotoUrl?: string;
 }
 
 /* ------------------------------------------------------------------ *
@@ -268,13 +308,13 @@ export interface CreateDocumentInput {
   messageId?: number;
   title?: string;
   format?: DocumentFormat;
-  theme?: DocumentTheme;
+  theme?: AnyTheme;
   sourceText?: string;
 }
 
 export interface UpdateDocumentStyleInput {
   title?: string;
-  theme?: DocumentTheme;
+  theme?: AnyTheme;
 }
 
 export interface ListDocumentsQuery {
