@@ -10,4 +10,5 @@ export { CodeProjectCard } from "./components/CodeProjectCard";
 export { codeWorkspace, useCodeWorkspace } from "./store/codeWorkspaceStore";
 export { reduceCodeTurn, affectsCodeTurn, codeTurnFromResponse } from "./lib/codeTurn";
 export { isCodeStreamEvent } from "./types";
+export { GithubMenu } from "./github/GithubMenu";
 export type { CodeStreamEvent, CodeTurnInfo, CodeVersionOnResponse } from "./types";

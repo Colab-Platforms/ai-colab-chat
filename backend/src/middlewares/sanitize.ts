@@ -27,6 +27,8 @@ function sanitizeObject(obj: Record<string, any>): Record<string, any> {
 function isCodeWorkspaceBody(req: Request): boolean {
     const url = req.originalUrl || req.url;
     if (url.startsWith("/api/code-projects/")) return true;
+    // Repo descriptions and pulled file names must not be HTML-escaped either.
+    if (url.startsWith("/api/github/")) return true;
     return (
         req.method === "POST" &&
         /^\/api\/chats\/\d+\/send(?:\?|$)/.test(url) &&

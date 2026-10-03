@@ -107,7 +107,7 @@ export async function readFiles(projectId: number): Promise<CodeFileSnapshot[]> 
  */
 export async function snapshotVersion(
   projectId: number,
-  source: "AI" | "USER" | "RESTORE",
+  source: "AI" | "USER" | "RESTORE" | "GITHUB",
   extra: { modelResponseId?: number | null; plan?: string | null; changedPaths?: string[] } = {},
 ) {
   const files = await readFiles(projectId);

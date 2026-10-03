@@ -25,6 +25,7 @@ import imageRoutes from "@/modules/image/image.route.js";
 import voiceRoutes from "@/modules/voice/voice.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
 import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.js";
+import githubRoutes from "@/modules/github/github.route.js";
 
 
 
@@ -65,5 +66,6 @@ router.use("/images", imageRoutes);
 router.use("/voice", voiceRoutes);
 router.use("/admin", adminRoutes);
 router.use("/code-projects", codeWorkspaceRoutes);
+router.use("/github", githubRoutes);
 
 export default router;

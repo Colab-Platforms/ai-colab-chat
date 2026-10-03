@@ -1,6 +1,7 @@
 import type { Response } from "express";
 import { buildSystemMessage } from "@/utils/systemPrompt.js";
 import { detectCodeIntent } from "./code-workspace.intent.js";
+import { pushAfterAiTurn } from "@/modules/github/github.sync.js";
 import { CodeStreamParser } from "./code-workspace.parser.js";
 import { buildCodeTurnNote, CODE_SYSTEM_PROMPT } from "./code-workspace.protocol.js";
 import {
@@ -267,5 +268,11 @@ export class CodeSession {
       truncatedPaths: [...this.truncatedPaths],
       failed: this.isNew && touched === 0,
     });
+
+    // Mirror the new version to GitHub. Deliberately after code_done and not
+    // awaited: a slow or failing GitHub call must never hold up the chat stream.
+    // A no-op for projects without a linked repo, and for servers without
+    // GitHub credentials (pushAfterAiTurn checks both and never throws).
+    if (version !== null) void pushAfterAiTurn(this.projectId);
   }
 }

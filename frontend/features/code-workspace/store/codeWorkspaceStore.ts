@@ -367,6 +367,18 @@ export const codeWorkspace = {
     }
   },
 
+  /** Re-fetches the project after the server rewrote its files (e.g. a GitHub pull). */
+  async reloadFromServer() {
+    const project = state.project;
+    if (!project) return;
+    flushSaves();
+    try {
+      applyProject(await codeWorkspaceApi.getProject(project.id), { keepActive: true });
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not refresh the project"));
+    }
+  },
+
   async renameProject(title: string) {
     const project = state.project;
     const next = title.trim();

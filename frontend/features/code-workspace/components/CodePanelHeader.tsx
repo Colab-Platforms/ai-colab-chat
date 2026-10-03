@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { codeWorkspaceApi } from "../api";
+import { GithubMenu } from "../github/GithubMenu";
 import { downloadFile, downloadProjectZip } from "../lib/download";
 import { writePreviewHandoff } from "../lib/previewHandoff";
 import { codeWorkspace, useCodeWorkspace } from "../store/codeWorkspaceStore";
@@ -23,6 +24,7 @@ const SOURCE_LABEL: Record<CodeVersionDto["source"], string> = {
   AI: "AI",
   USER: "Your edits",
   RESTORE: "Restored",
+  GITHUB: "From GitHub",
 };
 
 function timeAgo(iso: string) {
@@ -221,6 +223,8 @@ export function CodePanelHeader({
       )}
 
       <VersionsMenu />
+
+      <GithubMenu />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

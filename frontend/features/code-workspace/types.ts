@@ -26,7 +26,7 @@ export interface CodeProjectDto extends CodeProjectInfo {
 
 export interface CodeVersionDto {
   version: number;
-  source: "AI" | "USER" | "RESTORE";
+  source: "AI" | "USER" | "RESTORE" | "GITHUB";
   modelResponseId: number | null;
   createdAt: string;
   fileCount: number;
