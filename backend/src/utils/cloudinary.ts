@@ -29,14 +29,31 @@ export interface UploadOptions {
   publicId?: string;
 }
 
+// Cloudinary's aws_rek rejects on its own default policy and ignores per-category
+// options, so a rejection caused only by these labels (e.g. a game banner with a
+// weapon) is downgraded to "approved". Any other flagged label still blocks.
+const IGNORED_MODERATION_LABELS = new Set(["violence", "weapons"]);
+
+const isOnlyIgnoredLabels = (entry: any): boolean => {
+  const labels = entry?.response?.moderation_labels;
+  if (!Array.isArray(labels) || labels.length === 0) return false;
+  return labels.every((label: any) =>
+    IGNORED_MODERATION_LABELS.has(String(label?.name || "").toLowerCase()),
+  );
+};
+
 const normalizeModerationStatuses = (
   moderationData: unknown,
 ): string[] | undefined => {
   if (!Array.isArray(moderationData)) return undefined;
   const statuses = moderationData
-    .map((entry: any) =>
-      typeof entry?.status === "string" ? entry.status.toLowerCase() : null,
-    )
+    .map((entry: any) => {
+      if (typeof entry?.status !== "string") return null;
+      const status = entry.status.toLowerCase();
+      return status === "rejected" && isOnlyIgnoredLabels(entry)
+        ? "approved"
+        : status;
+    })
     .filter((status: string | null): status is string => Boolean(status));
   return statuses.length > 0 ? statuses : undefined;
 };
