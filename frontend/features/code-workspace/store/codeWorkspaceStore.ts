@@ -379,6 +379,22 @@ export const codeWorkspace = {
     }
   },
 
+  /**
+   * Re-reads only the project's metadata — e.g. currentVersion after the server
+   * snapshotted the user's edits for a Vercel publish. File contents are left
+   * alone, so it is safe while the user is still typing.
+   */
+  async refreshProjectInfo() {
+    const project = state.project;
+    if (!project || state.isGenerating) return;
+    try {
+      const dto = await codeWorkspaceApi.getProject(project.id);
+      if (state.project?.id === dto.id && !state.isGenerating) set({ project: toInfo(dto) });
+    } catch {
+      // Decoration only — the version chip catches up on the next load.
+    }
+  },
+
   async renameProject(title: string) {
     const project = state.project;
     const next = title.trim();

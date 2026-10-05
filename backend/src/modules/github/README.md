@@ -2,6 +2,8 @@
 
 Mirrors a `CodeProject` to a GitHub repository. **One `CodeProjectVersion` == one commit**, so the in-app version history and the repo's git history line up 1:1.
 
+Publishing a project to a live URL is a separate module — see `../vercel/README.md`, which can deploy either from a repo linked here or straight from the `CodeFile` rows.
+
 GitHub is a *mirror, never the source of truth*: `CodeFile` rows stay authoritative, and the whole feature is optional. A server without credentials, a user without a connection, and a project without a link all behave exactly as they did before this module existed.
 
 ## Runs with an empty `.env`

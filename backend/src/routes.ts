@@ -26,6 +26,7 @@ import voiceRoutes from "@/modules/voice/voice.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
 import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.js";
 import githubRoutes from "@/modules/github/github.route.js";
+import vercelRoutes from "@/modules/vercel/vercel.route.js";
 
 
 
@@ -67,5 +68,6 @@ router.use("/voice", voiceRoutes);
 router.use("/admin", adminRoutes);
 router.use("/code-projects", codeWorkspaceRoutes);
 router.use("/github", githubRoutes);
+router.use("/vercel", vercelRoutes);
 
 export default router;

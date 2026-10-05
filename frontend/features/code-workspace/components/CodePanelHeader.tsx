@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { codeWorkspaceApi } from "../api";
 import { GithubMenu } from "../github/GithubMenu";
+import { VercelMenu } from "../vercel/VercelMenu";
 import { downloadFile, downloadProjectZip } from "../lib/download";
 import { writePreviewHandoff } from "../lib/previewHandoff";
 import { codeWorkspace, useCodeWorkspace } from "../store/codeWorkspaceStore";
@@ -225,6 +226,8 @@ export function CodePanelHeader({
       <VersionsMenu />
 
       <GithubMenu />
+
+      <VercelMenu />
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
