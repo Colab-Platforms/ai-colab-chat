@@ -144,6 +144,40 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    if (sidebarCollapsed) return;
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const next = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, startWidth + (moveEvent.clientX - startX)),
+      );
+      setSidebarWidth(next);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setSidebarWidth((current) => {
+        localStorage.setItem("sidebarWidth", String(current));
+        return current;
+      });
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [sidebarCollapsed, sidebarWidth]);
+
   const toggleSidebarCollapsed = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;

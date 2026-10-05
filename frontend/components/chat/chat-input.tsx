@@ -26,6 +26,7 @@ import {
   AudioLines,
   Film,
   Code2,
+  Lock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1370,7 +1371,7 @@ export function ChatInput({
                   { type: "WEB_SEARCH" as const, label: "Web Search", icon: Search, locked: false },
                   { type: "IMAGE_GENERATION" as const, label: "Image Gen", icon: ImageIcon, locked: !imageGenEnabled },
                 ]
-              ).map(({ type, label, icon: Icon }) => {
+              ).map(({ type, label, icon: Icon, locked }) => {
                 const active = chatType === type && !codeModeActive;
                 return (
                   <motion.button
