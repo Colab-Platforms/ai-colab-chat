@@ -738,6 +738,26 @@ export function ChatInput({
     [attachments.length, isSending],
   );
 
+  
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.items || [])
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => !!f)
+      .map((f) =>
+        f.name && f.name !== "image.png"
+          ? f
+          : new globalThis.File(
+              [f],
+              `pasted-${Date.now()}.${(f.type.split("/")[1] || "png").split("+")[0]}`,
+              { type: f.type },
+            ),
+      );
+    if (files.length === 0) return;
+    e.preventDefault();
+    void uploadFiles(files);
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const newFiles = Array.from(e.target.files);
@@ -1128,6 +1148,7 @@ export function ChatInput({
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
                   placeholder="Ask anything..."
                   maxLength={50000}
                   rows={1}
