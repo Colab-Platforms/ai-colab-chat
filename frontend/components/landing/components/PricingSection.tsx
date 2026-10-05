@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { planService } from "@/lib/services";
+import { getPlanFeatureLines } from "@/lib/planFeatures";
 import { ScrollReveal } from "./ScrollReveal";
 
 // ─────────────────────────────────────────────────────
@@ -182,47 +183,26 @@ export function PricingSection() {
           ? outer.data
           : outer?.records ?? [];
 
-        const parsed = planList
-          .filter((plan: any) => plan.isActive && !plan.isDeleted)
+        const activePlans = planList.filter((plan: any) => plan.isActive && !plan.isDeleted);
+        // The entry-level PAID plan is "Most Popular", whatever it happens to
+        // be named — matching on the literal name "pro" broke the moment a
+        // plan got renamed (see the identical fix in NewLanding/Pricing.tsx).
+        const cheapestPaidPrice = Math.min(
+          ...activePlans
+            .map((plan: any) => Number(plan.monthlyPrice))
+            .filter((price: number) => price > 0),
+        );
+
+        const parsed = activePlans
           .sort(
             (a: any, b: any) =>
               Number(a.monthlyPrice) - Number(b.monthlyPrice)
           )
           .map((plan: any) => {
-            const features: string[] = [];
-
-            if (
-              plan.features &&
-              typeof plan.features === "object" &&
-              !Array.isArray(plan.features)
-            ) {
-              if (plan.features.maxModels === -1)
-                features.push("Unlimited AI Models");
-              else if (plan.features.maxModels)
-                features.push(`${plan.features.maxModels} AI Models`);
-
-              if (plan.features.attachments)
-                features.push("File Uploads & Attachments");
-
-              if (plan.features.support) {
-                const raw = plan.features.support as string;
-                // "priority_plus" → "Priority Plus Support"
-                const label = raw
-                  .split("_")
-                  .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(" ");
-                features.push(`${label} Support`);
-              }
-            } else if (Array.isArray(plan.features)) {
-              features.push(...plan.features);
-            }
-
-            if (plan.tokenLimit)
-              features.push(
-                `${Number(plan.tokenLimit).toLocaleString("en-IN")} monthly tokens`
-              );
-
-            if (features.length === 0) features.push(`Everything in ${plan.name}`);
+            // Shared parser (lib/planFeatures.ts) — also used by the real
+            // subscription page, so marketing copy stays in sync with what a
+            // subscriber actually gets.
+            const features = getPlanFeatureLines(plan).included;
 
             const isFree = Number(plan.monthlyPrice) === 0;
 
@@ -236,7 +216,7 @@ export function PricingSection() {
                   ? "Get started at no cost for your first month."
                   : `Ideal for ${plan.name} users.`),
               features,
-              isPopular: plan.name.toLowerCase() === "pro",
+              isPopular: !isFree && Number(plan.monthlyPrice) === cheapestPaidPrice,
               isFree,
             };
           });
@@ -262,7 +242,7 @@ export function PricingSection() {
 
   const formatPrice = (price: number): string => {
     if (price === 0) return "Free";
-    return `₹${price.toLocaleString("en-IN")}/mo`;
+    return `₹${price.toLocaleString("en-IN")}/mo + GST`;
   };
 
   const getPlanHref = (planId: number) => {

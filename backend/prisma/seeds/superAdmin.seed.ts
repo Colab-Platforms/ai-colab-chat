@@ -22,7 +22,7 @@ const USERS = [
 export async function seedSuperAdmin() {
     console.log("👑 Seeding admin users...");
 
-    // Find Pro plan (better plan for admins), fall back to Free
+    // Find Pro plan (top tier, ₹3699 — better plan for admins), fall back to Free
     const plan =
         (await prisma.plan.findFirst({ where: { name: "Pro" } })) ||
         (await prisma.plan.findFirst({ where: { name: "Free" } }));

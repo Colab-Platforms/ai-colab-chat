@@ -1,6 +1,6 @@
 import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
-import { createWalletTransaction } from "@/utils/walletUtils.js";
+import { refundCreditsToSource, debitCredits, creditsToCostBreakdown, USD_PER_CREDIT } from "@/utils/walletUtils.js";
 import {
   downloadVideoContent,
   pollVideoJob,
@@ -24,6 +24,12 @@ const slugify = (text: string): string =>
 
 const buildPublicId = (id: number): string => `video-${id}-${slugify(String(Date.now()))}`;
 
+/** INR value of 1 credit, for cost logging — falls back to the seeded default if pricing isn't configured yet. */
+const getCostPerCreditInr = async (): Promise<number> => {
+  const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
+  return pricing ? Number(pricing.costPerCreditInr) : 2.85;
+};
+
 /** Atomically claims a PENDING row so exactly one worker submits it. */
 const claimPending = async (id: number): Promise<boolean> => {
   const { count } = await prisma.generatedVideo.updateMany({
@@ -33,37 +39,40 @@ const claimPending = async (id: number): Promise<boolean> => {
   return count === 1;
 };
 
-/** Refunds this video's full reservation — used on any terminal failure. */
+/**
+ * Refunds this video's full reservation — used on any terminal failure.
+ * Video now spends from CreditWallet, not UserWallet — see video.service.ts
+ * for why (video credits are a separate, top-up-able currency from chat
+ * tokens). The `reservedTokens` field name on GeneratedVideo is unchanged to
+ * avoid a wider rename, but it holds a credit amount, not wallet tokens.
+ */
 const refundReservation = async (video: {
   id: number;
   userId: number;
   reservedTokens: number;
+  reservedFromBundled: number;
 }): Promise<void> => {
+  const costPerCreditInr = await getCostPerCreditInr();
+  const refundCost = creditsToCostBreakdown(video.reservedTokens, costPerCreditInr);
+
   await prisma.$transaction(async (tx) => {
-    const wallet = await tx.userWallet.findUnique({ where: { userId: video.userId } });
-    if (!wallet) {
-      vlogError("refund", `job=${video.id} user=${video.userId} has no wallet — cannot refund`, null);
-      return;
-    }
-
-    await tx.userWallet.update({
-      where: { userId: video.userId },
-      data: {
-        tokensRemaining: { increment: video.reservedTokens },
-        tokensUsed: { decrement: video.reservedTokens },
-      },
-    });
-
-    await createWalletTransaction(tx, {
+    // Refund into the SAME pools the reservation was taken from — nothing
+    // was actually spent (job never ran / failed outright), so this should
+    // put bundledCredits back exactly as it was, not convert it into
+    // topupCredits.
+    await refundCreditsToSource(tx, {
       userId: video.userId,
-      walletId: wallet.id,
       amount: video.reservedTokens,
-      type: "CREDIT",
+      bundledPortion: video.reservedFromBundled,
       referenceId: `video_refund_${video.id}`,
-      meta: { reason: "VIDEO_GENERATION_REFUND", videoId: video.id },
+      meta: { reason: "VIDEO_GENERATION_REFUND", videoId: video.id, refundedUsd: refundCost.usd, refundedInr: refundCost.inr },
     });
   });
-  vlog("refund", `job=${video.id} refunded ${video.reservedTokens} tokens to user=${video.userId}`);
+  vlogBlock("refund", `job=${video.id} refunded to user=${video.userId}`, {
+    refundedCredits: video.reservedTokens,
+    refundedUsd: `$${refundCost.usd}`,
+    refundedInr: `₹${refundCost.inr}`,
+  });
 };
 
 /**
@@ -240,12 +249,80 @@ export const applyTerminalStatus = async (
         }),
       ]);
 
+      // Real cost as metered by OpenRouter (poll.costUsd) is the source of
+      // truth for what actually gets charged — video.reservedTokens was only
+      // ever an upfront estimate to gate on balance. Reconcile the
+      // difference now: refund the user if we over-reserved, or collect the
+      // shortfall if we under-reserved (best-effort — a completed video is
+      // never un-delivered over a shortfall we couldn't collect).
+      const costPerCreditInr = await getCostPerCreditInr();
+      const estimatedCost = creditsToCostBreakdown(video.reservedTokens, costPerCreditInr);
+      const actualUsd = poll.costUsd;
+      const actualInr = actualUsd != null ? Number((actualUsd * (costPerCreditInr / USD_PER_CREDIT)).toFixed(2)) : null;
+
+      let finalCredits = video.reservedTokens;
+      let reconcileNote = "OpenRouter didn't report a cost — kept the original reservation as the final charge.";
+
+      if (actualUsd != null) {
+        const actualCredits = Math.max(1, Math.ceil(actualUsd / USD_PER_CREDIT));
+        const delta = actualCredits - video.reservedTokens;
+
+        if (delta < 0) {
+          const refundAmount = -delta;
+          // Refund into the same pools the reservation was debited from
+          // (bundled first, since that's the order debitCredits spends it) —
+          // not straight into topupCredits, which would silently convert
+          // unused monthly allowance into permanent top-up balance.
+          await prisma.$transaction((tx) =>
+            refundCreditsToSource(tx, {
+              userId: video.userId,
+              amount: refundAmount,
+              bundledPortion: video.reservedFromBundled,
+              referenceId: `video_reconcile_refund_${video.id}`,
+              meta: { reason: "VIDEO_COST_RECONCILE_REFUND", videoId: video.id, reservedCredits: video.reservedTokens, actualCredits },
+            }),
+          );
+          finalCredits = actualCredits;
+          reconcileNote = `Refunded ${refundAmount} credits — actual cost came in under the reservation.`;
+        } else if (delta > 0) {
+          try {
+            await prisma.$transaction((tx) =>
+              debitCredits(tx, {
+                userId: video.userId,
+                amount: delta,
+                referenceId: `video_reconcile_debit_${video.id}`,
+                meta: { reason: "VIDEO_COST_RECONCILE_DEBIT", videoId: video.id, reservedCredits: video.reservedTokens, actualCredits },
+              }),
+            );
+            finalCredits = actualCredits;
+            reconcileNote = `Collected ${delta} additional credits — actual cost exceeded the reservation.`;
+          } catch (reconcileError) {
+            reconcileNote = `Actual cost exceeded the reservation by ${delta} credits, but the user's balance couldn't cover it — shortfall absorbed, reservation left as the final charge.`;
+            vlogError("terminal", `job=${video.id} could not collect ${delta}-credit shortfall`, reconcileError);
+          }
+        } else {
+          reconcileNote = "Actual cost matched the reservation exactly — no adjustment needed.";
+        }
+
+        if (finalCredits !== video.reservedTokens) {
+          await prisma.generatedVideo.update({
+            where: { id: video.id },
+            data: { reservedTokens: finalCredits },
+          });
+        }
+      }
+
       vlogBlock("terminal", `job=${video.id} COMPLETED`, {
         videoId: video.id,
         fileUrl: uploaded.url,
         fileSize: buffer.length,
-        reservedTokens: video.reservedTokens,
-        actualCostUsd: poll.costUsd,
+        reservedCreditsAtCreate: video.reservedTokens,
+        finalCreditsCharged: finalCredits,
+        estimatedCostUsd: `$${estimatedCost.usd}`,
+        estimatedCostInr: `₹${estimatedCost.inr}`,
+        actualCostUsd: actualUsd != null ? `$${actualUsd}` : "not reported by OpenRouter",
+        actualCostInr: actualInr != null ? `₹${actualInr}` : "n/a",
+        reconcile: reconcileNote,
       });
     } catch (error) {
       // Generation succeeded on the provider's side but our download/upload

@@ -9,10 +9,30 @@ import SubscriptionCashfreeService from "@/modules/subscription/subscription.cas
 class PlanService {
     private cashfreeService = new SubscriptionCashfreeService();
 
+    /** Live GST rate — same CreditPricingConfig row credit top-ups already use. Falls back to 18% if unset. */
+    private async getGstPercent(): Promise<number> {
+        const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
+        return pricing ? Number(pricing.gstPercent) : 18;
+    }
+
+    /** allowedVideoModelIds isn't a Plan column — it backs the PlanVideoModel join table. */
+    private async setAllowedVideoModels(planId: number, modelIds?: number[]) {
+        if (!modelIds) return;
+        await prisma.planVideoModel.deleteMany({ where: { planId } });
+        if (modelIds.length > 0) {
+            await prisma.planVideoModel.createMany({
+                data: modelIds.map((modelId) => ({ planId, modelId })),
+                skipDuplicates: true,
+            });
+        }
+    }
+
     async create(data: CreatePlanBody) {
-        const plan = await prisma.plan.create({ data });
+        const { allowedVideoModelIds, ...planData } = data;
+        const plan = await prisma.plan.create({ data: planData });
         try {
-            await this.cashfreeService.syncAllPlanCycles(plan as any);
+            await this.setAllowedVideoModels(plan.id, allowedVideoModelIds);
+            await this.cashfreeService.syncAllPlanCycles(plan as any, await this.getGstPercent());
             return plan;
         } catch (error) {
             await prisma.plan.delete({ where: { id: plan.id } });
@@ -43,7 +63,13 @@ class PlanService {
         });
 
         const [plans, totalRecords] = await Promise.all([
-            prisma.plan.findMany({ where, skip, take, orderBy }),
+            prisma.plan.findMany({
+                where,
+                skip,
+                take,
+                orderBy,
+                include: { allowedVideoModels: { select: { modelId: true } } },
+            }),
             prisma.plan.count({ where }),
         ]);
 
@@ -53,6 +79,7 @@ class PlanService {
     async getById(planId: number) {
         const plan = await prisma.plan.findFirst({
             where: { id: planId, isDeleted: false },
+            include: { allowedVideoModels: { select: { modelId: true } } },
         });
         if (!plan) throw new ApiError("Plan not found", STATUS_CODES.NOT_FOUND);
         return plan;
@@ -64,13 +91,15 @@ class PlanService {
         });
         if (!plan) throw new ApiError("Plan not found", STATUS_CODES.NOT_FOUND);
 
+        const { allowedVideoModelIds, ...planData } = data;
         const updated = await prisma.plan.update({
             where: { id: planId },
-            data,
+            data: planData,
         });
+        await this.setAllowedVideoModels(planId, allowedVideoModelIds);
 
         try {
-            await this.cashfreeService.syncAllPlanCycles(updated as any);
+            await this.cashfreeService.syncAllPlanCycles(updated as any, await this.getGstPercent());
         } catch (error) {
             // Roll back local update if Cashfree sync fails.
             await prisma.plan.update({

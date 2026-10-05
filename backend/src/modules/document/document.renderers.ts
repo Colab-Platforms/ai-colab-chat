@@ -5,6 +5,7 @@ import { renderSpecToXlsx } from "./document.xlsx.js";
 import { renderSpecToCsv } from "./document.csv.js";
 import {
   DOCUMENT_FORMATS,
+  type AnyTheme,
   type DocumentFormat,
   type DocumentSpec,
   type DocumentTheme,
@@ -33,7 +34,7 @@ export type RendererEntry =
     }
   | {
       kind: "presentation";
-      render: (spec: PresentationSpec, theme: DocumentTheme) => Promise<Buffer>;
+      render: (spec: PresentationSpec, theme: AnyTheme) => Promise<Buffer>;
     }
   | {
       kind: "workbook";

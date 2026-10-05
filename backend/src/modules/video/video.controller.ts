@@ -21,9 +21,9 @@ export const createVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
-export const listVideoModels = async (_req: Request, res: Response): Promise<void> => {
+export const listVideoModels = async (req: Request, res: Response): Promise<void> => {
   try {
-    const result = await videoService.listAvailableModels();
+    const result = await videoService.listAvailableModels(req.user!.id);
     sendResponse(res, true, result, "Video models fetched successfully", STATUS_CODES.OK);
   } catch (error: any) {
     console.error("List video models error", error);

@@ -529,6 +529,7 @@ export default function ChatPage() {
                 revealer.stop();
                 const errorMessage = parsed.message || FAILED_GENERATION_COPY;
                 const insufficientBalance = parsed.code === "INSUFFICIENT_BALANCE";
+                const planRestricted = parsed.code === "PLAN_RESTRICTED";
                 accumulated = errorMessage;
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -537,7 +538,7 @@ export default function ChatPage() {
                           ...msg,
                           modelResponses: msg.modelResponses?.map((mr: any) =>
                             mr.model.id === mid
-                              ? { ...mr, content: errorMessage, status: "FAILED", insufficientBalance }
+                              ? { ...mr, content: errorMessage, status: "FAILED", insufficientBalance, planRestricted }
                               : mr
                           ),
                         }
@@ -707,6 +708,7 @@ export default function ChatPage() {
                       status: "STREAMING",
                       tokensUsed: null,
                       insufficientBalance: false,
+                      planRestricted: false,
                       unpersisted: false,
                     }
                   : mr
@@ -766,7 +768,7 @@ export default function ChatPage() {
     } catch (err: any) {
       if (isAbortError(err) || stopRequestedRef.current) {
         syncChatAfterStop();
-      } else if (err.code === "INSUFFICIENT_BALANCE") {
+      } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -778,7 +780,8 @@ export default function ChatPage() {
                           ...mr,
                           status: "FAILED",
                           content: err.message || "Insufficient balance.",
-                          insufficientBalance: true,
+                          insufficientBalance: err.code === "INSUFFICIENT_BALANCE",
+                          planRestricted: err.code === "PLAN_RESTRICTED",
                           unpersisted: isUnpersisted,
                         }
                       : mr
@@ -936,6 +939,7 @@ export default function ChatPage() {
                             status: "FAILED",
                             content: result.reason?.message || "Failed",
                             insufficientBalance: result.reason?.code === "INSUFFICIENT_BALANCE",
+                            planRestricted: result.reason?.code === "PLAN_RESTRICTED",
                           }
                         : mr
                     ),
@@ -972,10 +976,10 @@ export default function ChatPage() {
         );
         isStreamingRef.current = false;
         syncChatAfterStop();
-      } else if (err.code === "INSUFFICIENT_BALANCE") {
+      } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
         // Nothing was persisted server-side yet (the balance check runs
         // before the turn's messages are created) — keep the local bubble
-        // so the user can still choose to switch to a free model.
+        // so the user can still choose to switch to a free model or upgrade.
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === streamingMsgId
@@ -985,7 +989,8 @@ export default function ChatPage() {
                     ...mr,
                     status: "FAILED",
                     content: err.message || "Insufficient balance.",
-                    insufficientBalance: true,
+                    insufficientBalance: err.code === "INSUFFICIENT_BALANCE",
+                    planRestricted: err.code === "PLAN_RESTRICTED",
                     unpersisted: true,
                   })),
                 }
@@ -1128,6 +1133,7 @@ export default function ChatPage() {
                                   content: errorMessage,
                                   status: "FAILED",
                                   insufficientBalance: parsed.code === "INSUFFICIENT_BALANCE",
+                                  planRestricted: parsed.code === "PLAN_RESTRICTED",
                                 }
                               : mr
                           ),
@@ -1340,6 +1346,7 @@ export default function ChatPage() {
                             content: res.reason.message || "Failed",
                             status: "FAILED",
                             insufficientBalance: res.reason?.code === "INSUFFICIENT_BALANCE",
+                            planRestricted: res.reason?.code === "PLAN_RESTRICTED",
                           }
                         : mr
                     ),
@@ -1481,6 +1488,7 @@ export default function ChatPage() {
                                   content: existingContent + accumulated,
                                   status: "FAILED",
                                   insufficientBalance: parsed.code === "INSUFFICIENT_BALANCE",
+                                  planRestricted: parsed.code === "PLAN_RESTRICTED",
                                 }
                               : r
                           ),
@@ -1529,13 +1537,14 @@ export default function ChatPage() {
       } else {
         toast.error(err.message || "Failed to continue message");
         const insufficientBalance = err.code === "INSUFFICIENT_BALANCE";
+        const planRestricted = err.code === "PLAN_RESTRICTED";
         setMessages((prev) => prev.map(msg => {
           if (msg.id === messageId) {
              return {
                ...msg,
                modelResponses: msg.modelResponses?.map((r: any) =>
                  r.model.id === modelId
-                   ? { ...r, status: "FAILED", content: insufficientBalance ? err.message : r.content, insufficientBalance }
+                   ? { ...r, status: "FAILED", content: (insufficientBalance || planRestricted) ? err.message : r.content, insufficientBalance, planRestricted }
                    : r
                ),
              };

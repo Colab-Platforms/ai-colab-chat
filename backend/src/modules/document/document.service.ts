@@ -3,11 +3,13 @@ import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import { deleteFromCloudinary } from "@/utils/cloudinary.js";
 import { runPendingDocumentJobs } from "./document.generation.service.js";
+import { getUserPlanContext, assertCanGenerateDocument } from "@/modules/plan-access/planAccess.service.js";
 import {
   getSupportedFormats,
   isFormatSupported,
 } from "./document.renderers.js";
 import { getThemeTokens } from "./document.theme.js";
+import { getPptxTemplateTokens } from "./document.pptxTemplates.js";
 import {
   FORMAT_SPEC_KIND,
   MAX_TITLE_CHARS,
@@ -28,6 +30,21 @@ class DocumentService {
    * background job — a large PDF takes far longer than a request should.
    */
   async create(userId: number, input: CreateDocumentInput) {
+    const planContext = await getUserPlanContext(userId);
+    assertCanGenerateDocument(planContext);
+
+    // Document generation is now metered against the token wallet (real
+    // OpenRouter cost, deducted once actual usage is known in the background
+    // worker — see document.generation.service.ts). Reject up front if the
+    // wallet is already empty rather than letting the job fail asynchronously.
+    const wallet = await prisma.userWallet.findUnique({ where: { userId } });
+    if (!wallet || wallet.tokensRemaining <= 0) {
+      throw new ApiError(
+        "You're out of tokens — upgrade your plan or wait for your next renewal to generate documents.",
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
     if (input.chatId) {
       const chat = await prisma.chat.findFirst({
         where: { id: input.chatId, userId, isDeleted: false },
@@ -64,7 +81,7 @@ class DocumentService {
         ),
         prompt: input.prompt.trim(),
         sourceText: input.sourceText?.trim() || null,
-        theme: input.theme ?? "professional",
+        theme: input.theme ?? (format === "PPTX" ? "corporate" : "professional"),
       },
     });
 
@@ -150,8 +167,14 @@ class DocumentService {
       format,
       specKind: FORMAT_SPEC_KIND[format],
       spec: document.spec as unknown as AnySpec,
-      theme: document.theme as DocumentTheme,
-      themeTokens: getThemeTokens(document.theme as DocumentTheme),
+      theme: document.theme,
+      // PPTX gets its own richer token shape (fonts/layout/photos); every
+      // other format keeps the flat document theme tokens. Both are returned
+      // under `themeTokens` so the frontend only branches on `specKind`.
+      themeTokens:
+        format === "PPTX"
+          ? getPptxTemplateTokens(document.theme)
+          : getThemeTokens(document.theme as DocumentTheme),
     };
   }
 

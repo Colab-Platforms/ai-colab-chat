@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/context/theme-context";
 import { AuthProvider } from "@/context/auth-context";
+import { PlanCapabilitiesProvider } from "@/context/plan-capabilities-context";
 import { ChatRootShell } from "@/components/chat/chat-root-shell";
 import { Toaster } from "@/components/ui/toast";
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
@@ -57,7 +58,11 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://cdn.shopify.com/s/files/1/0636/5226/6115/files/CP_white_logo_new.png?v=1762234933",
+        // A dedicated opaque social-share card, not the transparent white
+        // logo mark: WhatsApp/Facebook flatten transparent PNGs onto a white
+        // canvas, so a white-on-transparent logo rendered as a blank white
+        // box in link previews.
+        url: "https://res.cloudinary.com/dlmcpmdpn/image/upload/v1790661491/ai-colab-chat/marketing/og-share-image.png",
         width: 1200,
         height: 630,
         alt: "ColabPlatforms AI - Multi-Model LLM Chat Platform",
@@ -70,7 +75,7 @@ export const metadata: Metadata = {
     description:
       "Advanced AI chatbot platform by ColabPlatforms. Chat with multiple LLM models simultaneously.",
     images: [
-      "https://cdn.shopify.com/s/files/1/0636/5226/6115/files/CP_white_logo_new.png?v=1762234933",
+      "https://res.cloudinary.com/dlmcpmdpn/image/upload/v1790661491/ai-colab-chat/marketing/og-share-image.png",
     ],
   },
 };
@@ -130,8 +135,10 @@ fbq('track', 'PageView');`,
         <Toaster />
         <ThemeProvider>
           <AuthProvider>
-            <ChatRootShell>{children}</ChatRootShell>
-            <PwaInstallPrompt />
+            <PlanCapabilitiesProvider>
+              <ChatRootShell>{children}</ChatRootShell>
+              <PwaInstallPrompt />
+            </PlanCapabilitiesProvider>
           </AuthProvider>
         </ThemeProvider>
         <ServiceWorkerRegister />

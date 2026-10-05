@@ -18,12 +18,24 @@ import {
   type AnySpec,
   type SpecKind,
   type ThemeTokens,
+  type PptxTemplateTokens,
 } from "./document-spec-renderer";
 
 const THEMES: Array<{ value: string; label: string }> = [
   { value: "professional", label: "Professional" },
   { value: "minimal", label: "Minimal" },
   { value: "report", label: "Report" },
+];
+
+// PPTX-only — a deck gets its own richer templates (fonts, decoration, photo
+// layouts) rather than the flat document themes above. Keys must match
+// backend/src/modules/document/document.pptxTemplates.ts.
+const PPTX_TEMPLATES: Array<{ value: string; label: string }> = [
+  { value: "corporate", label: "Corporate" },
+  { value: "aurora", label: "Aurora" },
+  { value: "sunset", label: "Sunset" },
+  { value: "emerald", label: "Emerald" },
+  { value: "mono", label: "Mono" },
 ];
 
 const POLL_INTERVAL_MS = 2000;
@@ -33,7 +45,7 @@ interface SpecPayload {
   specKind: SpecKind;
   spec: AnySpec;
   theme: string;
-  themeTokens: ThemeTokens;
+  themeTokens: ThemeTokens | PptxTemplateTokens;
 }
 
 /**
@@ -131,7 +143,7 @@ export function DocumentPanel() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {THEMES.map((t) => (
+              {(payload.specKind === "presentation" ? PPTX_TEMPLATES : THEMES).map((t) => (
                 <SelectItem key={t.value} value={t.value}>
                   {t.label}
                 </SelectItem>
