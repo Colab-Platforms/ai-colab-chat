@@ -652,8 +652,22 @@ function keepOnlyFirstImageMarkdown(content: string): string {
   });
 }
 
-const EMPTY_IMAGE_RESPONSE_ERROR =
-  "Image generation failed: You have insufficient tokens for the image generation you should have minium 10K token for image generation.";
+/**
+ * An image request that comes back with no image is almost always a provider
+ * refusal / safety block, not a balance problem (the wallet is checked before
+ * the request is sent), so say that instead of blaming the user's tokens.
+ */
+function buildEmptyImageResponseError(
+  finishReason: string | null,
+  refusal: string | null,
+): string {
+  console.warn(
+    `[image-generation] empty response finishReason=${finishReason ?? "none"} refusal=${refusal ?? "none"}`,
+  );
+  const base =
+    "Image generation failed: the model didn't return an image. This can happen if the prompt or photo was blocked by the provider's safety filters. Try rephrasing your prompt.";
+  return refusal ? `${base} Provider message: ${refusal}` : base;
+}
 
 const FAILED_GENERATION_USER_MESSAGE =
   "Failed to generate a response. Please try again.";
@@ -667,6 +681,8 @@ interface OpenRouterSseAccumulator {
   imagesToUpload: string[];
   selectedImageUrl: string | null;
   finishReason: string | null;
+  /** Provider refusal text (e.g. safety block), when reported. */
+  refusal: string | null;
   /** Real $ OpenRouter charged for this request (usage.cost), when reported. */
   costUsd: number | null;
 }
@@ -683,6 +699,7 @@ function createEmptyOpenRouterAccumulator(): OpenRouterSseAccumulator {
     imagesToUpload: [],
     selectedImageUrl: null,
     finishReason: null,
+    refusal: null,
     costUsd: null,
   };
 }
@@ -693,7 +710,8 @@ function hasStreamAccumulatorData(acc: OpenRouterSseAccumulator): boolean {
     acc.promptTokens > 0 ||
     acc.completionTokens > 0 ||
     acc.imagesToUpload.length > 0 ||
-    acc.finishReason,
+    acc.finishReason ||
+    acc.refusal,
   );
 }
 
@@ -791,6 +809,12 @@ async function pipeOpenRouterStreamToClient(
           );
         }
       }
+    }
+    const refusal =
+      chunk.choices?.[0]?.delta?.refusal ||
+      chunk.choices?.[0]?.message?.refusal;
+    if (typeof refusal === "string" && refusal.trim()) {
+      acc.refusal = refusal;
     }
     const fr =
       chunk.choices?.[0]?.finish_reason ||
@@ -1366,6 +1390,7 @@ export async function streamChat(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let refusal: string | null = null;
     let costUsd: number | null = null;
 
     try {
@@ -1391,6 +1416,7 @@ export async function streamChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      refusal = acc.refusal;
       costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
@@ -1543,7 +1569,7 @@ export async function streamChat(req: Request, res: Response) {
     }
 
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
-      const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
+      const failureMessage = buildEmptyImageResponseError(finishReason, refusal);
       await prisma.$transaction(async (tx: any) => {
         await tx.message.update({
           where: { id: assistantMessage.id },
@@ -2094,6 +2120,7 @@ export async function regenerateChat(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let refusal: string | null = null;
     let costUsd: number | null = null;
 
     try {
@@ -2117,6 +2144,7 @@ export async function regenerateChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      refusal = acc.refusal;
       costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
@@ -2255,7 +2283,7 @@ export async function regenerateChat(req: Request, res: Response) {
     }
 
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
-      const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
+      const failureMessage = buildEmptyImageResponseError(finishReason, refusal);
       await prisma.modelResponse.create({
         data: {
           chatId,
@@ -2738,6 +2766,7 @@ export async function editAndResend(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let refusal: string | null = null;
     let costUsd: number | null = null;
 
     try {
@@ -2761,6 +2790,7 @@ export async function editAndResend(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      refusal = acc.refusal;
       costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
@@ -2903,7 +2933,7 @@ export async function editAndResend(req: Request, res: Response) {
     }
 
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
-      const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
+      const failureMessage = buildEmptyImageResponseError(finishReason, refusal);
       await prisma.$transaction(async (tx: any) => {
         await tx.message.update({
           where: { id: assistantMessage.id },

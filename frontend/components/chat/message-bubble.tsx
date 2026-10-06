@@ -38,6 +38,9 @@ function isInsufficientBalanceFailure(resp?: ModelResponse | null): boolean {
   if (!resp || resp.status !== "FAILED") return false;
   if (resp.insufficientBalance) return true;
   const text = (resp.content || "").toLowerCase();
+  // Older rows saved an empty-image result (usually a provider safety block)
+  // with a misleading "insufficient tokens" copy - that's not a balance issue.
+  if (text.includes("image generation")) return false;
   return (
     text.includes("insufficient tokens") ||
     text.includes("insufficient balance") ||
