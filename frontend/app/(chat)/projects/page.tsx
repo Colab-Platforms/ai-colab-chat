@@ -10,6 +10,7 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
+  BookOpen,
 } from "lucide-react";
 import { folderService, contextService } from "@/lib/services";
 import { toast } from "@/lib/toast";
@@ -32,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { FolderItem } from "@/components/sidebar/sidebar-types";
 import { ProjectChatsModal } from "@/components/projects/project-chats-modal";
+import { ProjectKnowledgeModal } from "@/components/projects/project-knowledge-modal";
 
 type ViewMode = "grid" | "list";
 
@@ -68,12 +70,14 @@ function ProjectCard({
   folder,
   viewMode,
   onOpen,
+  onKnowledge,
   onRename,
   onDelete,
 }: {
   folder: FolderItem & { updatedAt?: string };
   viewMode: ViewMode;
   onOpen: () => void;
+  onKnowledge: () => void;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -92,6 +96,9 @@ function ProjectCard({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem className="cursor-pointer" onClick={onKnowledge}>
+          <BookOpen className="mr-2 h-4 w-4" /> Knowledge
+        </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer" onClick={onRename}>
           <Edit2 className="mr-2 h-4 w-4" /> Edit
         </DropdownMenuItem>
@@ -181,6 +188,7 @@ export default function ProjectsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [activeModalFolder, setActiveModalFolder] = useState<FolderItem | null>(null);
+  const [knowledgeFolder, setKnowledgeFolder] = useState<FolderItem | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -269,7 +277,7 @@ export default function ProjectsPage() {
         setRenameContextId(existing.id);
       }
     } catch {
-      // context field just starts empty — not fatal
+      // context field just starts empty - not fatal
     } finally {
       setRenameContextLoading(false);
     }
@@ -407,7 +415,7 @@ export default function ProjectsPage() {
             <p className="text-sm text-muted-foreground mt-2.5 max-w-md leading-relaxed">
               Projects keep related chats, a short description and shared context together in one
               place. Give it a title and a one-line description, then start as many chats inside it
-              as you need — every chat will remember what the project is about.
+              as you need - every chat will remember what the project is about.
             </p>
             <Button
               onClick={() => setCreateOpen(true)}
@@ -433,6 +441,7 @@ export default function ProjectsPage() {
                 folder={folder}
                 viewMode="grid"
                 onOpen={() => setActiveModalFolder(folder)}
+                onKnowledge={() => setKnowledgeFolder(folder)}
                 onRename={() => openEditDialog(folder)}
                 onDelete={() => setDeleteTarget(folder)}
               />
@@ -446,6 +455,7 @@ export default function ProjectsPage() {
                 folder={folder}
                 viewMode="list"
                 onOpen={() => setActiveModalFolder(folder)}
+                onKnowledge={() => setKnowledgeFolder(folder)}
                 onRename={() => openEditDialog(folder)}
                 onDelete={() => setDeleteTarget(folder)}
               />
@@ -588,6 +598,7 @@ export default function ProjectsPage() {
       </Dialog>
 
       <ProjectChatsModal folder={activeModalFolder} onClose={() => setActiveModalFolder(null)} />
+      <ProjectKnowledgeModal folder={knowledgeFolder} onClose={() => setKnowledgeFolder(null)} />
     </div>
   );
 }

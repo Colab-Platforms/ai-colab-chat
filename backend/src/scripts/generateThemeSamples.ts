@@ -2,7 +2,7 @@
  * Generates one document spec and renders it through every theme.
  *
  * Rendering a single spec N ways is what makes the themes actually
- * comparable — three different documents would confound theme differences
+ * comparable - three different documents would confound theme differences
  * with content differences.
  *
  * Usage:

@@ -7,7 +7,7 @@ export interface ThemeTokens {
   text: string;
   muted: string;
   border: string;
-  /** CSS font stacks — used by the HTML/PDF renderer. */
+  /** CSS font stacks - used by the HTML/PDF renderer. */
   headingFont: string;
   bodyFont: string;
   /**
@@ -87,7 +87,7 @@ const CALLOUT_COLORS: Record<string, { bg: string; border: string }> = {
 /**
  * The theme as raw tokens, for renderers that are not CSS-based.
  *
- * A theme is a set of design decisions, not a stylesheet — each renderer
+ * A theme is a set of design decisions, not a stylesheet - each renderer
  * expresses the same tokens in its own medium. Sharing the tokens is what
  * keeps a "report" PDF and a "report" Word file recognisably the same theme.
  */

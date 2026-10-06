@@ -31,7 +31,7 @@ function getCycleAmount(plan: CashfreePlanSource, billingCycle: BillingCycle): u
 }
 
 /**
- * Plan prices (Plan.monthlyPrice etc.) are stored tax-EXCLUSIVE — GST is
+ * Plan prices (Plan.monthlyPrice etc.) are stored tax-EXCLUSIVE - GST is
  * added on top here, at the single point where an amount is actually about
  * to be charged, rather than baked into the stored price. Callers must pass
  * the live CreditPricingConfig.gstPercent (same rate credit top-ups already
@@ -48,7 +48,7 @@ export function getCashfreePlanId(
   gstPercent: number,
 ): string {
   // gstPercent is part of the hash so a GST-rate change (not just a price
-  // change) also produces a new plan_id — otherwise Cashfree would keep
+  // change) also produces a new plan_id - otherwise Cashfree would keep
   // treating it as the same already-registered plan while the amount we
   // send for it silently changed.
   const raw = `${plan.id}|${billingCycle}|${String(getCycleAmount(plan, billingCycle))}|${gstPercent}|${plan.tokenLimit}`;

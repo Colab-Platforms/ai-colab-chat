@@ -51,7 +51,7 @@ class PaymentCashfreeService {
     customerName: string;
     customerEmail: string;
     customerPhone: string;
-    /** Where Cashfree redirects after checkout — defaults to the subscription success page. */
+    /** Where Cashfree redirects after checkout - defaults to the subscription success page. */
     returnPath?: string;
   }) {
     const endpoint = `${this.paymentsBaseUrl}/orders`;

@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (isLoading) return;
 
     if (!user) {
-      // Check if this was an intentional logout — if so, go to the landing
+      // Check if this was an intentional logout - if so, go to the landing
       // page rather than /login with a redirect parameter.
       const isExplicitLogout = sessionStorage.getItem("explicit_logout") === "1";
       sessionStorage.removeItem("explicit_logout");
@@ -117,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // ─── Expanded inner content ───────────────────────────────────────────────
   const innerContent = (
     <>
-      {/* Back to chat link — sits just below the logo/collapse row */}
+      {/* Back to chat link - sits just below the logo/collapse row */}
       <div className="px-3 pb-2">
         <Link href="#" onClick={(e) => {
           e.preventDefault();
@@ -187,7 +187,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-full relative bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40 text-foreground">
-      {/* Mobile top bar — same pattern as chat layout */}
+      {/* Mobile top bar - same pattern as chat layout */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center px-3 bg-background/80 backdrop-blur-md border-b border-border/50 justify-between">
         <Button
           variant="ghost"

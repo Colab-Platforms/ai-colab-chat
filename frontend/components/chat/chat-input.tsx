@@ -106,7 +106,7 @@ interface ChatInputProps {
   onCapabilityChange?: (type: ChatType) => void;
   chatType?: ChatType;
   /**
-   * Video generation is deliberately NOT a ChatType — it doesn't route
+   * Video generation is deliberately NOT a ChatType - it doesn't route
    * through chat.stream.ts's capability/model-switching machinery the way
    * IMAGE_GENERATION does, it's a standalone async job (see modules/video on
    * the backend). This just opens the caller's own video dialog; it never
@@ -375,7 +375,7 @@ export function ChatInput({
   }, [content]);
 
   const handleMicStop = useCallback(() => {
-    // Nothing needed — content is already set by handleSpeechResult
+    // Nothing needed - content is already set by handleSpeechResult
   }, []);
 
   useEffect(() => {
@@ -949,9 +949,9 @@ export function ChatInput({
                 </div>
               )}
 
-              {/* Selected model chip(s) — shown for single selection too, so the
+              {/* Selected model chip(s) - shown for single selection too, so the
                   active model is always visible in the bar, not just in multi
-                  mode. This row is the ONLY trigger for the Models modal —
+                  mode. This row is the ONLY trigger for the Models modal -
                   click any chip (or the placeholder) to open it. */}
               <div
                 data-guide="model-capability-trigger"
@@ -1232,7 +1232,7 @@ export function ChatInput({
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Single / Multi mode toggle — "Single" / "Multi" on all sizes */}
+                {/* Single / Multi mode toggle - "Single" / "Multi" on all sizes */}
                 <div className="flex items-center ml-2 bg-muted/60 border border-border/40 rounded-full p-0.5 gap-0.5 flex-shrink-0">
                   <button
                     onClick={() => handleModeToggle("single")}
@@ -1295,7 +1295,7 @@ export function ChatInput({
                   <span className="hidden sm:inline">Enhance</span>
                 </Button>
 
-                {/* Conversation AI — opens the full-screen voice modal */}
+                {/* Conversation AI - opens the full-screen voice modal */}
                 <Button
                   type="button"
                   variant="ghost"
@@ -1308,7 +1308,7 @@ export function ChatInput({
                   <AudioLines className="h-4.5 w-4.5" />
                 </Button>
 
-                {/* Mic — conditionally hidden in full screen */}
+                {/* Mic - conditionally hidden in full screen */}
                 <div className={isExpanded ? "hidden" : ""}>
                   <MicButton
                     onResult={handleSpeechResult}
@@ -1350,7 +1350,7 @@ export function ChatInput({
             </div>
           </div>
 
-          {/* Quick capability switcher — shortcuts into the same chatType
+          {/* Quick capability switcher - shortcuts into the same chatType
               state/handler as the "+" menu's Capabilities section. */}
           {!isExpanded && (
             <div className="flex flex-wrap items-center justify-center gap-2 pt-3">

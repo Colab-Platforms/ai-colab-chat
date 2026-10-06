@@ -47,7 +47,7 @@ const buildPublicId = (title: string, id: number): string =>
  * Claims a PENDING row for this worker.
  *
  * The guard on `status: "PENDING"` inside updateMany is what makes the claim
- * atomic — if two instances race, exactly one gets count === 1. The existing
+ * atomic - if two instances race, exactly one gets count === 1. The existing
  * crons in this app read-then-write and would double-process under horizontal
  * scaling; this one will not.
  */
@@ -91,7 +91,7 @@ const failDocument = async (id: number, error: unknown): Promise<void> => {
 export const processDocument = async (id: number): Promise<void> => {
   const claimed = await claimDocument(id);
   if (!claimed) {
-    dlog("worker", `job=${id} already claimed by another worker — skipping`);
+    dlog("worker", `job=${id} already claimed by another worker - skipping`);
     return;
   }
 
@@ -103,7 +103,7 @@ export const processDocument = async (id: number): Promise<void> => {
       where: { id },
     });
     if (!document) {
-      dlog("worker", `job=${id} vanished after claim — nothing to do`);
+      dlog("worker", `job=${id} vanished after claim - nothing to do`);
       return;
     }
 
@@ -124,7 +124,7 @@ export const processDocument = async (id: number): Promise<void> => {
     const specKind = FORMAT_SPEC_KIND[format];
 
     // A spec already on the row means this is a re-render (retry, or a theme
-    // change) — skip the model call and go straight to rendering.
+    // change) - skip the model call and go straight to rendering.
     let spec = document.spec as unknown as AnySpec | null;
     let promptTokens = document.promptTokens;
     let completionTokens = document.completionTokens;
@@ -153,7 +153,7 @@ export const processDocument = async (id: number): Promise<void> => {
         },
       });
 
-      // Metered once, on first generation only — a stored-spec re-render
+      // Metered once, on first generation only - a stored-spec re-render
       // (retry, theme change) makes no new model call, so it must not be
       // billed again. Real token counts, no multiplier.
       const billableTotal = (promptTokens ?? 0) + (completionTokens ?? 0);
@@ -170,17 +170,17 @@ export const processDocument = async (id: number): Promise<void> => {
             }),
           );
         } else {
-          dlogError("worker", `job=${id} user=${document.userId} has no wallet — skipping debit`, null);
+          dlogError("worker", `job=${id} user=${document.userId} has no wallet - skipping debit`, null);
         }
       }
-      dlog("worker", `job=${id} spec persisted — re-renders are now free`);
+      dlog("worker", `job=${id} spec persisted - re-renders are now free`);
     } else {
-      dlog("worker", `job=${id} reusing stored spec — no model call`);
+      dlog("worker", `job=${id} reusing stored spec - no model call`);
     }
 
     const renderer = getRenderer(format);
 
-    // Reached only if a row was written for a format with no renderer — the
+    // Reached only if a row was written for a format with no renderer - the
     // enqueue paths resolve that away, so this is a wiring error rather than a
     // user-facing condition. Failing loudly beats emitting the wrong file type.
     if (!renderer) {
@@ -190,7 +190,7 @@ export const processDocument = async (id: number): Promise<void> => {
     }
 
     // A stored spec from an older row could be the wrong shape for this
-    // format's renderer — check rather than trust, since the alternative is a
+    // format's renderer - check rather than trust, since the alternative is a
     // crash deep inside the renderer on a missing field.
     const storedKind = specKindOf(spec!);
     if (storedKind !== renderer.kind) {
@@ -213,7 +213,7 @@ export const processDocument = async (id: number): Promise<void> => {
 
     // Named rather than left to Cloudinary's random id: this string becomes the
     // URL basename, and the URL basename is what the browser actually saves as
-    // — the frontend's `download` attribute is ignored on a cross-origin link.
+    // - the frontend's `download` attribute is ignored on a cross-origin link.
     const publicId = buildPublicId(spec.title, id);
     const fileName = `${publicId}.${meta.extension}`;
 
@@ -255,7 +255,7 @@ export const processDocument = async (id: number): Promise<void> => {
 let isDraining = false;
 
 /**
- * Drains the PENDING queue. Safe to call concurrently — overlapping calls
+ * Drains the PENDING queue. Safe to call concurrently - overlapping calls
  * return immediately rather than double-processing, so the cron tick and the
  * post-enqueue kick can both invoke it freely.
  */
@@ -274,7 +274,7 @@ export const runPendingDocumentJobs = async (): Promise<void> => {
     // Run the batch in parallel rather than one at a time: two users
     // generating at once should not queue behind each other. Actual
     // parallelism is bounded by the browser pool's semaphore, so this cannot
-    // launch unbounded renders — and the atomic claim keeps it safe.
+    // launch unbounded renders - and the atomic claim keeps it safe.
     await Promise.all(
       pending.map((document: { id: number }) => processDocument(document.id)),
     );

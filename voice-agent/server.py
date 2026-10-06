@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from src.bot import run_bot
 from src.config import settings
 
-app = FastAPI(title="Personal AI Agent — Voice Service")
+app = FastAPI(title="Personal AI Agent - Voice Service")
 
 app.add_middleware(
     CORSMiddleware,

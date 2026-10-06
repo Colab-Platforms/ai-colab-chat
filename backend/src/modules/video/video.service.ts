@@ -31,7 +31,7 @@ const getVideoModelInfo = async (externalId: string): Promise<VideoModelInfo | n
 
 class VideoService {
   /**
-   * Picks the model to generate with — the same defaultForCapabilities-first
+   * Picks the model to generate with - the same defaultForCapabilities-first
    * lookup chat.service.ts uses for IMAGE_GENERATION, so a video model is
    * configured the same way any other model is (see model.route.ts).
    */
@@ -80,7 +80,7 @@ class VideoService {
 
   /**
    * Active VIDEO_GENERATION models, cheapest first, each annotated with
-   * whether the requesting user's plan is allowed to use it — the frontend
+   * whether the requesting user's plan is allowed to use it - the frontend
    * shows locked models (rather than hiding them) with an upgrade badge, so
    * it needs this rather than a pre-filtered list.
    */
@@ -149,7 +149,7 @@ class VideoService {
     resolution: string,
     hasImageInput: boolean,
   ): Promise<number> {
-    // 1. Known exact OpenRouter rate card — deterministic, matches what will
+    // 1. Known exact OpenRouter rate card - deterministic, matches what will
     // actually be billed, so this is authoritative when present.
     const exactUsdPerSecond = VideoService.EXACT_USD_PER_SECOND[model.externalId]?.[resolution.toLowerCase()];
     if (typeof exactUsdPerSecond === "number") return exactUsdPerSecond / USD_PER_CREDIT;
@@ -171,7 +171,7 @@ class VideoService {
     // 3. Flat per-model rate, if set.
     if (model.creditCostPerSecond) return model.creditCostPerSecond;
 
-    // 4. OpenRouter's own live catalogue price for this model — same source
+    // 4. OpenRouter's own live catalogue price for this model - same source
     // the duration/resolution validation below already fetches, so this
     // costs nothing extra. Converts its $/sec straight to credits/sec at the
     // fixed $0.03/credit peg.
@@ -188,26 +188,26 @@ class VideoService {
       vlogError("cost-estimate", `live OpenRouter pricing lookup failed for ${model.externalId}`, error);
     }
 
-    // 5. Last resort — a deliberately generous flat estimate so we never
+    // 5. Last resort - a deliberately generous flat estimate so we never
     // block a generation over a missing/unreachable price source. The real
     // OpenRouter-reported cost still settles the actual charge afterward.
-    vlog("cost-estimate", `no pricing source found for ${model.name} — using fallback estimate`);
+    vlog("cost-estimate", `no pricing source found for ${model.name} - using fallback estimate`);
     return 10;
   }
 
-  /** INR value of 1 credit, for cost logging — falls back to the seeded default if pricing isn't configured yet. */
+  /** INR value of 1 credit, for cost logging - falls back to the seeded default if pricing isn't configured yet. */
   private async getCostPerCreditInr(): Promise<number> {
     const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
     return pricing ? Number(pricing.costPerCreditInr) : 2.85;
   }
 
   /**
-   * Enqueues a video and returns immediately with a PENDING row — generation
+   * Enqueues a video and returns immediately with a PENDING row - generation
    * runs in the background against OpenRouter's async video API, which can
    * take anywhere from ~20 seconds to a few minutes.
    */
   async create(userId: number, input: CreateVideoInput) {
-    vlog("create", `user=${userId} request received — prompt="${input.prompt.slice(0, 80)}..."`);
+    vlog("create", `user=${userId} request received - prompt="${input.prompt.slice(0, 80)}..."`);
 
     if (input.chatId) {
       const chat = await prisma.chat.findFirst({
@@ -215,7 +215,7 @@ class VideoService {
         select: { id: true },
       });
       if (!chat) {
-        vlog("create", `user=${userId} chatId=${input.chatId} not found — rejecting`);
+        vlog("create", `user=${userId} chatId=${input.chatId} not found - rejecting`);
         throw new ApiError("Chat not found", STATUS_CODES.NOT_FOUND);
       }
     }
@@ -242,7 +242,7 @@ class VideoService {
     vlog("create", `user=${userId} params duration=${duration}s resolution=${resolution} aspectRatio=${aspectRatio}`);
 
     // Best-effort cross-check against what the model actually supports.
-    // Never blocks generation on its own failure — a flaky catalogue fetch
+    // Never blocks generation on its own failure - a flaky catalogue fetch
     // must not be the reason a paying user can't generate a video.
     try {
       const modelInfo = await getVideoModelInfo(model.externalId);
@@ -267,7 +267,7 @@ class VideoService {
           );
         }
       } else {
-        vlog("create", `catalogue check: model ${model.externalId} not found in OpenRouter's /videos/models — skipping validation`);
+        vlog("create", `catalogue check: model ${model.externalId} not found in OpenRouter's /videos/models - skipping validation`);
       }
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -276,7 +276,7 @@ class VideoService {
 
     const hasImageInput = Boolean(input.firstFrameUrl || input.lastFrameUrl);
     const costPerSecond = await this.resolveExactCreditsPerSecond(model, resolution, hasImageInput);
-    const reservedTokens = Math.ceil(duration * costPerSecond); // credits, despite the field name — see refundReservation in video.generation.service.ts
+    const reservedTokens = Math.ceil(duration * costPerSecond); // credits, despite the field name - see refundReservation in video.generation.service.ts
     const costPerCreditInr = await this.getCostPerCreditInr();
     const estimatedCost = creditsToCostBreakdown(reservedTokens, costPerCreditInr);
 
@@ -321,7 +321,7 @@ class VideoService {
 
       // Recorded so a later partial refund (reconciliation, or a failed
       // job) can be credited back into the same pools it came from instead
-      // of always dumping into topupCredits — see refundCreditsToSource.
+      // of always dumping into topupCredits - see refundCreditsToSource.
       const updated = await tx.generatedVideo.update({
         where: { id: created.id },
         data: { reservedFromBundled: debit.fromBundled, reservedFromTopup: debit.fromTopup },
@@ -350,7 +350,7 @@ class VideoService {
       reservedTokens,
     });
 
-    // Kick the worker now rather than waiting for the next cron tick — the
+    // Kick the worker now rather than waiting for the next cron tick - the
     // user is watching a card for a request that can take minutes, so poll
     // latency here is very visible.
     void runPendingVideoJobs();
@@ -402,7 +402,7 @@ class VideoService {
   }
 
   /**
-   * Re-queues a failed video. Re-debits the wallet — unlike a document retry,
+   * Re-queues a failed video. Re-debits the wallet - unlike a document retry,
    * a failed video's reservation was already refunded in full (see
    * video.generation.service.ts), so a retry is a genuinely new paid attempt.
    */
@@ -415,11 +415,11 @@ class VideoService {
       throw new ApiError("Video not found", STATUS_CODES.NOT_FOUND);
     }
     if (video.status !== "FAILED") {
-      vlog("retry", `job=${id} rejected — status is ${video.status}, not FAILED`);
+      vlog("retry", `job=${id} rejected - status is ${video.status}, not FAILED`);
       throw new ApiError("Only failed videos can be retried", STATUS_CODES.BAD_REQUEST);
     }
 
-    // Re-check plan access — the user's plan may have changed (e.g. a
+    // Re-check plan access - the user's plan may have changed (e.g. a
     // downgrade) since the video was first created.
     const model = await prisma.model.findFirst({ where: { id: video.modelId } });
     if (model) {

@@ -25,7 +25,7 @@ import {
  * with the CSV renderer so the two cannot drift.
  *
  * Formulas are generated here from a column's declarative `total`, never taken
- * from the model — same principle as the renderer owning HTML for PDFs.
+ * from the model - same principle as the renderer owning HTML for PDFs.
  */
 
 const numberFormatFor = (
@@ -53,7 +53,7 @@ const numberFormatFor = (
  * ------------------------------------------------------------------ */
 
 /**
- * Excel rejects names over 31 chars, containing []:*?/\, or duplicated — and
+ * Excel rejects names over 31 chars, containing []:*?/\, or duplicated - and
  * it does so by declaring the whole workbook corrupt and "repairing" it, which
  * loses content silently. The validator catches the common cases; this is the
  * last line of defence.
@@ -123,7 +123,7 @@ const addSheet = (
   // the converted values, not the raw ones.
   const coerced = sheetSpec.rows.map((row) =>
     columns.map((column, index) =>
-      // Pad or trim — a ragged row would otherwise shift every later cell into
+      // Pad or trim - a ragged row would otherwise shift every later cell into
       // the wrong column, which is worse than a blank.
       coerceCell(row?.[index] ?? null, column.type ?? "text"),
     ),
@@ -249,7 +249,7 @@ export const renderSpecToXlsx = async (
 
   dlog(
     "xlsx",
-    `theme=${theme} sheets=${spec.sheets.length} rows=${spec.sheets.reduce((n, s) => n + s.rows.length, 0)} — building workbook`,
+    `theme=${theme} sheets=${spec.sheets.length} rows=${spec.sheets.reduce((n, s) => n + s.rows.length, 0)} - building workbook`,
   );
 
   const taken = new Set<string>();

@@ -74,7 +74,7 @@ function TicketForm() {
         subject,
         message,
       });
-      toast.success("Ticket submitted — our team will get back to you shortly.");
+      toast.success("Ticket submitted - our team will get back to you shortly.");
       setSubject("");
       setMessage("");
       setCategory("");
@@ -173,7 +173,7 @@ function ContactForm() {
     setLoading(true);
     try {
       await api.post("/support/contact", { name, email, subject, message });
-      toast.success("Message sent — we'll respond to your message soon.");
+      toast.success("Message sent - we'll respond to your message soon.");
       setSubject("");
       setMessage("");
     } catch (err) {
@@ -273,7 +273,7 @@ export default function SupportPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-balance">Support &amp; Help</h1>
         <p className="text-muted-foreground text-sm mt-2">
           Raise a support ticket for account or product issues, or send us a general
-          message — we usually respond within 1–2 business days.
+          message - we usually respond within 1–2 business days.
         </p>
 
         {/* Toggle */}

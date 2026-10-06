@@ -5,7 +5,7 @@ import { Fragment } from "react";
 /**
  * Mirrors the shapes in `backend/src/modules/document/document.types.ts` and
  * `document.theme.ts`. Kept as a local, minimal copy rather than a shared
- * package — frontend and backend are separate deploys here — but the field
+ * package - frontend and backend are separate deploys here - but the field
  * names must stay identical to what `GET /documents/:id/spec` returns.
  */
 export type SpecKind = "document" | "presentation" | "workbook";
@@ -39,7 +39,7 @@ export interface SlideSpec {
   subtitle?: string;
   blocks: DocumentBlock[];
   notes?: string;
-  /** A topic photo the backend attached (document.pptxImages.ts) — never
+  /** A topic photo the backend attached (document.pptxImages.ts) - never
    * authored by the model. Absent when no PPTX template is in play, or the
    * stock-photo lookup found nothing. */
   photoUrl?: string;
@@ -90,7 +90,7 @@ export interface ThemeTokens {
 }
 
 /**
- * PPTX-only template tokens — mirrors
+ * PPTX-only template tokens - mirrors
  * `backend/src/modules/document/document.pptxTemplates.ts`. A richer shape
  * than `ThemeTokens` because a slide is a fixed canvas with layout decisions
  * (photo placement, split panels, decoration) a reflowing PDF/DOCX page never
@@ -272,7 +272,7 @@ function BlockView({ block, tokens }: { block: DocumentBlock; tokens: ThemeToken
           {block.text}
           {block.attribution && (
             <span style={{ display: "block", marginTop: 6, fontStyle: "normal", fontSize: "9.5pt" }}>
-              — {block.attribution}
+              - {block.attribution}
             </span>
           )}
         </blockquote>
@@ -352,7 +352,7 @@ function DocumentPreview({ spec, tokens }: { spec: DocumentSpec; tokens: ThemeTo
   );
 }
 
-/** Mirrors document.pptx.ts's SPLIT_PHOTO_LAYOUT — how much of a "splitPhoto"
+/** Mirrors document.pptx.ts's SPLIT_PHOTO_LAYOUT - how much of a "splitPhoto"
  * title slide the text panel occupies, and an optional kicker label. */
 const SPLIT_PHOTO_LAYOUT: Record<string, { textRatio: number; kicker?: string }> = {
   corporate: { textRatio: 0.36 },
@@ -643,7 +643,7 @@ function WorkbookPreview({ spec, tokens }: { spec: WorkbookSpec; tokens: ThemeTo
 /**
  * Renders the same JSON spec the backend renderers turn into a real file, as
  * plain HTML. This is intentionally an approximation, not a pixel-exact
- * render of the PDF/DOCX/PPTX/XLSX — the point is to preview and edit
+ * render of the PDF/DOCX/PPTX/XLSX - the point is to preview and edit
  * content/theme, then let the real renderer produce the actual file.
  */
 export function DocumentSpecRenderer({

@@ -60,7 +60,7 @@ export default function VoiceChatTranscriptPage() {
   }, [chatId, fetchChat]);
 
   // Poll while any document is still generating, so a card flips from
-  // "generating" to "ready" without the user having to refresh — mirrors
+  // "generating" to "ready" without the user having to refresh - mirrors
   // what DocumentCard itself does per-card, just also refreshing the list
   // in case a *new* document was created by the model mid-call.
   useEffect(() => {

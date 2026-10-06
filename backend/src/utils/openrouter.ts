@@ -20,7 +20,7 @@ export interface OpenRouterJsonCompletionOptions {
 
 /**
  * Non-streaming JSON-object completion for internal/background calls
- * (e.g. context distillation) — the streaming helper below is for
+ * (e.g. context distillation) - the streaming helper below is for
  * user-facing chat only and isn't a fit for a single-shot batch job.
  */
 export const createOpenRouterJsonCompletion = async (
@@ -96,7 +96,7 @@ export const createOpenRouterStream = async (
       stream: true,
       stream_options: { include_usage: true },
       // OpenRouter-specific (not part of the OpenAI SDK's types, hence the
-      // `as any` cast on the whole call) — adds `usage.cost` (real $ charged
+      // `as any` cast on the whole call) - adds `usage.cost` (real $ charged
       // by OpenRouter for this request) to the final usage chunk, on top of
       // the standard token counts stream_options.include_usage already gives.
       usage: { include: true },
@@ -107,4 +107,53 @@ export const createOpenRouterStream = async (
   )) as unknown as AsyncIterable<any>;
 
   return stream;
+};
+
+export interface OpenRouterCompletionOptions {
+  model: string;
+  messages: any[];
+  /** Ask for a JSON object. Not every model supports it, so writers parse loosely instead. */
+  jsonMode?: boolean;
+  max_tokens?: number;
+  temperature?: number;
+  signal?: AbortSignal;
+}
+
+export interface OpenRouterCompletionResult {
+  content: string;
+  promptTokens: number;
+  completionTokens: number;
+  /** Real $ OpenRouter charged, when reported - the basis for wallet billing. */
+  costUsd: number | null;
+  finishReason: string | null;
+}
+
+/**
+ * Non-streaming completion that reports usage and real cost. Used by multi-step
+ * pipelines (content agent) that bill several calls as one turn.
+ */
+export const createOpenRouterCompletion = async (
+  options: OpenRouterCompletionOptions,
+): Promise<OpenRouterCompletionResult> => {
+  const completion: any = await getOpenRouterClient().chat.completions.create(
+    {
+      model: options.model,
+      messages: options.messages,
+      max_tokens: options.max_tokens,
+      temperature: options.temperature,
+      usage: { include: true },
+      ...(options.jsonMode ? { response_format: { type: "json_object" } } : {}),
+    } as any,
+    options.signal ? ({ signal: options.signal } as any) : undefined,
+  );
+
+  const choice = completion?.choices?.[0];
+  const rawCost = completion?.usage?.cost;
+  return {
+    content: String(choice?.message?.content ?? ""),
+    promptTokens: Number(completion?.usage?.prompt_tokens ?? 0),
+    completionTokens: Number(completion?.usage?.completion_tokens ?? 0),
+    costUsd: typeof rawCost === "number" ? rawCost : null,
+    finishReason: choice?.finish_reason ?? null,
+  };
 };

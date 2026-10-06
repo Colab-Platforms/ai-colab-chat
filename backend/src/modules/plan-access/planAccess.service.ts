@@ -10,7 +10,7 @@ export interface PlanContext {
 
 /**
  * Resolves the plan that currently governs a user's access. Falls back to
- * the Free plan (by name) if the user has no ACTIVE subscription — this is
+ * the Free plan (by name) if the user has no ACTIVE subscription - this is
  * the single place "what plan is this user on right now" gets decided, so
  * every module (chat, video, document) sees the same answer.
  */
@@ -30,7 +30,7 @@ export async function getUserPlanContext(userId: number): Promise<PlanContext> {
   });
 
   if (!freePlan) {
-    // Misconfiguration (Free plan deleted/renamed) — fail closed rather than
+    // Misconfiguration (Free plan deleted/renamed) - fail closed rather than
     // silently granting access.
     throw new ApiError("No active plan found for this account", STATUS_CODES.FORBIDDEN);
   }
@@ -70,7 +70,7 @@ export async function assertCanGenerateVideo(ctx: PlanContext, model: Pick<Model
 
   if (!allowed) {
     throw new ApiError(
-      `${model.name} isn't available on your current plan — upgrade to unlock it.`,
+      `${model.name} isn't available on your current plan - upgrade to unlock it.`,
       STATUS_CODES.FORBIDDEN,
     );
   }

@@ -30,8 +30,8 @@ export interface GeneratedVideo {
 }
 
 /**
- * Generation outlives any request/response cycle — a video can take from
- * ~20 seconds to a few minutes on the provider's side — so this card owns
+ * Generation outlives any request/response cycle - a video can take from
+ * ~20 seconds to a few minutes on the provider's side - so this card owns
  * its own polling lifecycle, same pattern as DocumentCard.
  */
 const POLL_INTERVAL_MS = 3000;
@@ -39,7 +39,7 @@ const MAX_POLL_MS = 6 * 60 * 1000;
 
 const STAGES_BY_STATUS: Record<string, string> = {
   PENDING: "Queuing your request",
-  SUBMITTED: "Rendering your video — this can take a couple of minutes",
+  SUBMITTED: "Rendering your video - this can take a couple of minutes",
 };
 
 const formatBytes = (bytes?: number | null): string => {
@@ -94,7 +94,7 @@ export function VideoCard({
         const res = await videoService.getById(video.id);
         if (!cancelled && res.data?.data) setVideo(res.data.data);
       } catch {
-        // Transient failures are fine — the next tick retries.
+        // Transient failures are fine - the next tick retries.
       }
     }, POLL_INTERVAL_MS);
 
@@ -116,7 +116,7 @@ export function VideoCard({
 
   /**
    * A plain `<a download>` on a Cloudinary URL is silently ignored by the
-   * browser — the `download` attribute only applies to same-origin links,
+   * browser - the `download` attribute only applies to same-origin links,
    * so clicking it just opens the video in a new tab instead of saving it.
    * Fetching the bytes ourselves and downloading from a same-origin
    * blob: URL is what actually makes "Download" download.
@@ -135,7 +135,7 @@ export function VideoCard({
       link.click();
       URL.revokeObjectURL(blobUrl);
     } catch {
-      toast.error("Couldn't download the video — try again.");
+      toast.error("Couldn't download the video - try again.");
     } finally {
       setIsDownloading(false);
     }

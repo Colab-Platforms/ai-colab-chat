@@ -48,6 +48,8 @@ interface Message {
   attachments?: any[];
   modelResponses?: any[];
   chatType?: string;
+  runSteps?: any[];
+  contentItems?: any[];
 }
 
 export default function ChatPage() {
@@ -104,7 +106,7 @@ export default function ChatPage() {
         if (!cancelled && res.data?.data?.items) setVideos(res.data.data.items);
       })
       .catch(() => {
-        /* no videos yet, or a transient failure — either way, start empty */
+        /* no videos yet, or a transient failure - either way, start empty */
       });
     return () => {
       cancelled = true;
@@ -542,7 +544,7 @@ export default function ChatPage() {
                 );
               } else if (parsed.type === "document_started") {
                 // Generation outlives this SSE connection, so we only attach a
-                // PENDING placeholder here — DocumentCard polls it to completion
+                // PENDING placeholder here - DocumentCard polls it to completion
                 // on its own, leaving the user free to keep chatting.
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -568,6 +570,33 @@ export default function ChatPage() {
                               : mr,
                           ),
                         }
+                      : msg,
+                  ),
+                );
+              } else if (parsed.type === "run_step") {
+                // Content agent pipeline progress - upsert by step id so a
+                // step moves running → done in place.
+                setMessages((prev) =>
+                  prev.map((msg) => {
+                    if (msg.id !== currentMsgId) return msg;
+                    const steps = [...(msg.runSteps || [])];
+                    const next = {
+                      step: parsed.step,
+                      label: parsed.label,
+                      status: parsed.status,
+                      detail: parsed.detail,
+                    };
+                    const at = steps.findIndex((s: any) => s.step === parsed.step);
+                    if (at >= 0) steps[at] = next;
+                    else steps.push(next);
+                    return { ...msg, runSteps: steps };
+                  }),
+                );
+              } else if (parsed.type === "content_items") {
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === currentMsgId
+                      ? { ...msg, contentItems: parsed.items }
                       : msg,
                   ),
                 );
@@ -705,7 +734,7 @@ export default function ChatPage() {
     try {
       const controller = createStreamAbortController();
       if (isUnpersisted) {
-        // Nothing was ever saved for this turn — resend fresh, reusing the
+        // Nothing was ever saved for this turn - resend fresh, reusing the
         // same local bubble ids so the UI doesn't jump.
         await streamSingleModel(
           newModelId,
@@ -947,7 +976,7 @@ export default function ChatPage() {
         syncChatAfterStop();
       } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
         // Nothing was persisted server-side yet (the balance check runs
-        // before the turn's messages are created) — keep the local bubble
+        // before the turn's messages are created) - keep the local bubble
         // so the user can still choose to switch to a free model or upgrade.
         setMessages((prev) =>
           prev.map((msg) =>

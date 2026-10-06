@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     internal_service_token: str = ""
 
     # Node backend (chat history / memory context, and where completed turns
-    # get persisted back to) — reachable from inside the Docker container.
+    # get persisted back to) - reachable from inside the Docker container.
     node_backend_url: str = "http://host.docker.internal:5000/api"
 
 

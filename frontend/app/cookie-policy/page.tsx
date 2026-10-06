@@ -21,9 +21,9 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: "2. Cookies We Use",
     body: (
       <ul className="list-disc pl-5 space-y-2">
-        <li><strong className="text-foreground">Essential cookies</strong> — required for authentication, session management, and core functionality of the Service. These cannot be disabled without breaking the Service.</li>
-        <li><strong className="text-foreground">Preference cookies</strong> — remember settings such as theme (light/dark) and sidebar state.</li>
-        <li><strong className="text-foreground">Analytics cookies</strong> — help us understand how the Service is used so we can improve it.</li>
+        <li><strong className="text-foreground">Essential cookies</strong> - required for authentication, session management, and core functionality of the Service. These cannot be disabled without breaking the Service.</li>
+        <li><strong className="text-foreground">Preference cookies</strong> - remember settings such as theme (light/dark) and sidebar state.</li>
+        <li><strong className="text-foreground">Analytics cookies</strong> - help us understand how the Service is used so we can improve it.</li>
       </ul>
     ),
   },

@@ -56,7 +56,7 @@ class PaymentService {
       throw new ApiError("Plan is not payable via one-time payment", STATUS_CODES.CONFLICT);
     }
 
-    // Plan prices are stored tax-exclusive — this is the actual "Subscribe"/
+    // Plan prices are stored tax-exclusive - this is the actual "Subscribe"/
     // "Upgrade" charging path (the recurring Subscriptions API flow in
     // subscription.cashfree.service.ts is only reached for the free plan and
     // AutoPay re-enable), so GST goes on top here, same rate top-ups already
@@ -133,7 +133,7 @@ class PaymentService {
   }
 
   /**
-   * Pay-as-you-go video-credit top-up — a standalone Cashfree order with no
+   * Pay-as-you-go video-credit top-up - a standalone Cashfree order with no
    * subscriptionId, distinguished from a plan purchase by the "credittopup_"
    * order-id prefix and Payment.purpose. Reuses the same one-time-order
    * plumbing as createSubscriptionOneTimePayment.
@@ -325,7 +325,7 @@ class PaymentService {
       const tokenLimit = subscription.plan.tokenLimit;
 
       // Reuse the PENDING Payment row created at checkout (createSubscriptionOneTimePayment)
-      // rather than recomputing from plan.monthlyPrice here — that would silently drop the
+      // rather than recomputing from plan.monthlyPrice here - that would silently drop the
       // GST already added on top and record/invoice the pre-tax base price as if it were
       // the full charge, which doesn't match what Cashfree actually collected.
       const pendingPayment = await prisma.payment.findFirst({
@@ -386,7 +386,7 @@ class PaymentService {
 
         // Every one-time-payment order creates a fresh PENDING subscription (there's no
         // auto-renew on this flow), so reaching here always means an explicit plan
-        // purchase/switch by the user — carry forward unused tokens instead of wiping them.
+        // purchase/switch by the user - carry forward unused tokens instead of wiping them.
         const isPlanSwitch = currentSub.status !== "ACTIVE";
 
         if (!isPlanSwitch && existingWallet && existingWallet.tokensRemaining > 0) {
@@ -442,7 +442,7 @@ class PaymentService {
         });
 
         // Bundled video credits reset (overwrite) to this plan's monthly
-        // grant on every activation/renewal — unlike tokens above, they
+        // grant on every activation/renewal - unlike tokens above, they
         // never carry forward. topupCredits is untouched.
         await creditBundledCredits(tx, {
           userId: subscription.userId,

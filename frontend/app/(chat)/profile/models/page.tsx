@@ -256,7 +256,7 @@ export default function ModelsAdminPage() {
               }}
             />
 
-            {/* Default For (chip toggles — only show capabilities this model supports) */}
+            {/* Default For (chip toggles - only show capabilities this model supports) */}
             <CapabilityToggle
               label="Default for"
               sublabel="Pre-selected when user switches to this mode"
@@ -277,7 +277,7 @@ export default function ModelsAdminPage() {
                 }`}
             >
               <div className={`w-4 h-4 rounded-full border-2 transition-colors ${form.isActive ? "bg-primary border-primary" : "border-muted-foreground/40"}`} />
-              {form.isActive ? "Active" : "Inactive"} — {form.isActive ? "Visible to users" : "Hidden from users"}
+              {form.isActive ? "Active" : "Inactive"} - {form.isActive ? "Visible to users" : "Hidden from users"}
             </button>
           </div>
           <DialogFooter>

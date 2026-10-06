@@ -4,7 +4,7 @@ import type { PptxTemplate } from "./document.types.js";
  * Visual design tokens for a PPTX template.
  *
  * Deliberately a separate, richer shape from `ThemeTokens` (document.theme.ts)
- * rather than an extension of it — PDF/DOCX themes are flat color/font pairs
+ * rather than an extension of it - PDF/DOCX themes are flat color/font pairs
  * because those renderers reflow text on a page; a slide is a fixed canvas,
  * so a template also owns layout decisions (title treatment, whether content
  * slides make room for a photo) that a document theme has no use for.
@@ -15,11 +15,11 @@ export interface PptxTemplateTokens {
 
   /** Slide background for content/section slides. */
   bg: string;
-  /** Secondary background — soft fills, alternating table rows. */
+  /** Secondary background - soft fills, alternating table rows. */
   bgSoft: string;
-  /** Primary accent — headings, rules, the title-slide treatment. */
+  /** Primary accent - headings, rules, the title-slide treatment. */
   accent: string;
-  /** Secondary accent — a second color for contrast (rarely the whole fill). */
+  /** Secondary accent - a second color for contrast (rarely the whole fill). */
   accent2: string;
   /** Body text color against `bg`. */
   text: string;
@@ -40,7 +40,7 @@ export interface PptxTemplateTokens {
    * How the title (first) slide is built.
    * - fullBleedPhoto: photo covers the whole slide, dark scrim, centered text.
    * - splitPhoto: photo fills one half, text sits in a solid panel on the other.
-   * - solid: no photo attempted/available — solid accent background, centered text.
+   * - solid: no photo attempted/available - solid accent background, centered text.
    */
   titleLayout: "fullBleedPhoto" | "splitPhoto" | "solid";
   /** Whether a content slide with a `photoUrl` gets a two-column layout. */

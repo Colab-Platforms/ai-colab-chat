@@ -2,7 +2,7 @@ const BASE_URL = "https://openrouter.ai/api/v1";
 
 /**
  * A 4xx from OpenRouter means the request itself is rejected (bad params,
- * content-policy block, etc) — retrying the identical request will fail the
+ * content-policy block, etc) - retrying the identical request will fail the
  * same way every time. A 5xx/network error is transient and worth retrying.
  */
 export class VideoSubmitError extends Error {
@@ -18,7 +18,7 @@ export class VideoSubmitError extends Error {
       let inner = parsed?.error;
       // OpenRouter often wraps the upstream provider's own error as a JSON
       // string inside `error.message` (e.g. `"HTTP 400: {\"error\":{...}}"`)
-      // — unwrap it so we get the actual code/message instead of that shell.
+      // - unwrap it so we get the actual code/message instead of that shell.
       if (typeof inner?.message === "string") {
         const nestedJson = inner.message.match(/\{.*\}/s)?.[0];
         if (nestedJson) {
@@ -26,14 +26,14 @@ export class VideoSubmitError extends Error {
             const nested = JSON.parse(nestedJson)?.error;
             if (nested) inner = nested;
           } catch {
-            // nested text wasn't valid JSON — keep the outer `inner` as-is
+            // nested text wasn't valid JSON - keep the outer `inner` as-is
           }
         }
       }
       providerCode = inner?.code ?? null;
       providerMessage = inner?.message ?? null;
     } catch {
-      // body wasn't JSON — fall through to the raw text
+      // body wasn't JSON - fall through to the raw text
     }
 
     super(providerMessage || `OpenRouter video submit failed (${status}): ${body.slice(0, 500)}`);
@@ -63,7 +63,7 @@ export interface SubmitVideoJobParams {
   resolution?: string;
   aspectRatio?: string;
   callbackUrl?: string;
-  /** Image-to-video: URLs only, no base64 — see OpenRouter's frame_images. */
+  /** Image-to-video: URLs only, no base64 - see OpenRouter's frame_images. */
   frameImages?: FrameImage[];
 }
 
@@ -156,7 +156,7 @@ export const pollVideoJob = async (jobId: string): Promise<VideoJobPollResult> =
 
 /**
  * Downloads the finished MP4 bytes for a completed job so they can be
- * re-uploaded to Cloudinary — OpenRouter's own URLs are not meant to be the
+ * re-uploaded to Cloudinary - OpenRouter's own URLs are not meant to be the
  * permanent home for the file (see the ZDR/retention note in their docs).
  */
 export const downloadVideoContent = async (
@@ -188,7 +188,7 @@ export interface VideoModelInfo {
 
 /**
  * Lists OpenRouter's available video models with their supported
- * durations/resolutions/aspect ratios and pricing — used to validate a
+ * durations/resolutions/aspect ratios and pricing - used to validate a
  * create request against what the chosen model actually supports, rather
  * than trusting the caller.
  */

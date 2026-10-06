@@ -116,7 +116,7 @@ const OnePlatform = () => {
                   <g key={m.id}>
                     {/* Faint static base line */}
                     <path d={d} stroke="#d5d5d5" strokeWidth="1" opacity="0.5" />
-                    {/* Traveling pulse — all start simultaneously (delay: 0) */}
+                    {/* Traveling pulse - all start simultaneously (delay: 0) */}
                     <path
                       d={d}
                       stroke="url(#pulseGrad)"

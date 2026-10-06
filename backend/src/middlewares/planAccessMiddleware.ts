@@ -10,7 +10,7 @@ import {
 type Capability = "IMAGE_GENERATION" | "DOCUMENT_GENERATION" | "VIDEO_GENERATION";
 
 /**
- * Coarse, route-level plan gate — mirrors the auth() middleware factory shape
+ * Coarse, route-level plan gate - mirrors the auth() middleware factory shape
  * and slots in right after it. Only covers capabilities that don't depend on
  * which specific model the request picks (video's per-model allow-list check
  * still has to happen in video.service.ts, once the model is loaded).

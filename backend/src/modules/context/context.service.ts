@@ -142,7 +142,7 @@ class ContextService {
       data: {
         ...data,
         // Once a user edits an auto-distilled memory, it's no longer just
-        // the model's guess — promote it to USER-owned so the distillation
+        // the model's guess - promote it to USER-owned so the distillation
         // worker's cap-eviction logic (which only culls DISTILLED rows)
         // never deletes something the user has curated.
         ...(context.origin === "DISTILLED" ? { origin: "USER" as const } : {}),

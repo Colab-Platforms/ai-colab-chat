@@ -21,7 +21,7 @@ const Card = ({
       "relative flex h-full flex-col rounded-2xl border border-gray-100 bg-white p-7 overflow-hidden",
       "shadow-[0_1px_4px_0_rgb(0,0,0,0.06)]",
       "hover:shadow-[0_4px_20px_0_rgb(0,0,0,0.09)] hover:border-gray-200 transition-all duration-300",
-      // dark: cards sit on a near-black section bg — give them enough lift
+      // dark: cards sit on a near-black section bg - give them enough lift
       "dark:bg-landing-primary/15 dark:border-landing-primary/60 dark:shadow-[0_1px_3px_0_rgb(0,0,0,0.4)] dark:hover:border-landing-primary/80",
       className
     )}
@@ -31,7 +31,7 @@ const Card = ({
 );
 
 // ---------------------------------------------------------------------------
-// Animated card wrapper — stagger on scroll
+// Animated card wrapper - stagger on scroll
 // ---------------------------------------------------------------------------
 const cardVariants = {
   hidden: { opacity: 0, y: 30, scale: 0.97 },
@@ -77,7 +77,7 @@ function AnimatedCard({
 }
 
 // ---------------------------------------------------------------------------
-// Card 1 — Multi-Model Access (LEFT tall, spans 3 rows)
+// Card 1 - Multi-Model Access (LEFT tall, spans 3 rows)
 // ---------------------------------------------------------------------------
 const models = [
   { name: "GPT-5.4",            cap: "Vision"           },
@@ -114,7 +114,7 @@ const IntegrationCard = () => (
         <p className="mt-2 text-sm leading-relaxed text-gray-400 dark:text-gray-500">
           Pick any model for any task.{" "}
           <span className="text-landing-primary dark:text-landing-primary font-medium">
-            Switch instantly — no new tabs, no separate accounts.
+            Switch instantly - no new tabs, no separate accounts.
           </span>
         </p>
       </div>
@@ -160,7 +160,7 @@ const IntegrationCard = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Card 2 — Rolling Context Window (top-middle)
+// Card 2 - Rolling Context Window (top-middle)
 // ---------------------------------------------------------------------------
 const TrackersCard = () => (
   <Card className="justify-between">
@@ -187,13 +187,13 @@ const TrackersCard = () => (
     </div>
 
     <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-      Older messages are dropped automatically so you always stay within token limits — without losing your newest context.
+      Older messages are dropped automatically so you always stay within token limits - without losing your newest context.
     </p>
   </Card>
 );
 
 // ---------------------------------------------------------------------------
-// Card 3 — Big stat (top-right)
+// Card 3 - Big stat (top-right)
 // ---------------------------------------------------------------------------
 const StatisticCard = () => (
   <Card className="items-start justify-center gap-3">
@@ -213,7 +213,7 @@ const StatisticCard = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Card 4 — Streaming speed stat (mid-middle)
+// Card 4 - Streaming speed stat (mid-middle)
 // ---------------------------------------------------------------------------
 const FocusCard = () => (
   <Card className="justify-between">
@@ -249,7 +249,7 @@ const FocusCard = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Card 5 — Parallel Multi-Model Chat (mid-right)
+// Card 5 - Parallel Multi-Model Chat (mid-right)
 // ---------------------------------------------------------------------------
 const ProductivityCard = () => (
   <Card className="justify-center gap-3">
@@ -267,7 +267,7 @@ const ProductivityCard = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Card 6 — Token Wallet (bottom, spans 2 cols)
+// Card 6 - Token Wallet (bottom, spans 2 cols)
 // ---------------------------------------------------------------------------
 const WalletCard = () => (
   <Card className="flex-row flex-wrap items-center justify-between gap-6">
@@ -301,7 +301,7 @@ const WalletCard = () => (
 );
 
 // ---------------------------------------------------------------------------
-// Grid — explicit Tailwind responsive classes (no inline style needed)
+// Grid - explicit Tailwind responsive classes (no inline style needed)
 // Mobile: single column stack
 // Desktop (md+): 3-col bento
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ export function BentoFeatures() {
           gridTemplateRows: "repeat(3, minmax(190px, auto))",
         }}
       >
-        {/* Left tall — rows 1-3 */}
+        {/* Left tall - rows 1-3 */}
         <AnimatedCard delay={0.05} style={{ gridRow: "1 / 4", gridColumn: "1" }}>
           <IntegrationCard />
         </AnimatedCard>

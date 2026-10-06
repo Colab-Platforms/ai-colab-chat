@@ -9,13 +9,13 @@ import SubscriptionCashfreeService from "@/modules/subscription/subscription.cas
 class PlanService {
     private cashfreeService = new SubscriptionCashfreeService();
 
-    /** Live GST rate — same CreditPricingConfig row credit top-ups already use. Falls back to 18% if unset. */
+    /** Live GST rate - same CreditPricingConfig row credit top-ups already use. Falls back to 18% if unset. */
     private async getGstPercent(): Promise<number> {
         const pricing = await prisma.creditPricingConfig.findFirst({ orderBy: { id: "desc" } });
         return pricing ? Number(pricing.gstPercent) : 18;
     }
 
-    /** allowedVideoModelIds isn't a Plan column — it backs the PlanVideoModel join table. */
+    /** allowedVideoModelIds isn't a Plan column - it backs the PlanVideoModel join table. */
     private async setAllowedVideoModels(planId: number, modelIds?: number[]) {
         if (!modelIds) return;
         await prisma.planVideoModel.deleteMany({ where: { planId } });

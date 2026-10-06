@@ -31,9 +31,9 @@ async function main() {
   for (const userId of userIds) {
     try {
       await generateVoiceMemorySummaryForUser(userId);
-      console.log(`[trigger-voice-memory] done — user=${userId}`);
+      console.log(`[trigger-voice-memory] done - user=${userId}`);
     } catch (error) {
-      console.error(`[trigger-voice-memory] failed — user=${userId}:`, error);
+      console.error(`[trigger-voice-memory] failed - user=${userId}:`, error);
     }
   }
 

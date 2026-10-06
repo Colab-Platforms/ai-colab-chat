@@ -60,7 +60,7 @@ export function calculateAdjustedTokens(
     };
   }
 
-  // Capped at available — scale the raw counts down proportionally so
+  // Capped at available - scale the raw counts down proportionally so
   // promptTokens/completionTokens stay consistent with what was billed.
   // (Unreachable when tokenMultiplier is 0, since billable is always 0 then.)
   let finalBillablePrompt = billablePrompt;
@@ -96,7 +96,7 @@ interface DebitTokensParams {
 }
 
 /**
- * Shared token-wallet debit — decrements tokensRemaining, increments
+ * Shared token-wallet debit - decrements tokensRemaining, increments
  * tokensUsed, and logs the WalletTransaction, all inside the caller's
  * transaction. Replaces the copy-pasted decrement/increment/log block that
  * used to be duplicated at every chat.stream.ts and video.service.ts call
@@ -155,7 +155,7 @@ interface DebitCreditsParams {
 
 /**
  * Debits video credits, spending bundledCredits first and only reaching into
- * topupCredits for whatever the bundled balance can't cover — bundled
+ * topupCredits for whatever the bundled balance can't cover - bundled
  * credits reset to zero value every renewal, so they should be the first
  * thing burned, leaving paid-for topupCredits untouched as long as possible.
  * Throws if the combined balance can't cover the amount.
@@ -177,7 +177,7 @@ export async function debitCredits(
 
   if (!wallet || available < params.amount) {
     throw new ApiError(
-      `Insufficient video credits — this needs ${params.amount} credits, you have ${available}.`,
+      `Insufficient video credits - this needs ${params.amount} credits, you have ${available}.`,
       STATUS_CODES.BAD_REQUEST,
     );
   }
@@ -203,7 +203,7 @@ export async function debitCredits(
     meta: params.meta,
   });
 
-  // Returned so callers can log exactly which pool absorbed the spend —
+  // Returned so callers can log exactly which pool absorbed the spend -
   // useful when debugging why bundled credits ran out sooner than expected.
   return {
     fromBundled,
@@ -216,7 +216,7 @@ export async function debitCredits(
 
 /**
  * Resets bundledCredits to the plan's monthly grant (overwrite, not
- * increment) — called on subscription activation/renewal. topupCredits is
+ * increment) - called on subscription activation/renewal. topupCredits is
  * never touched here.
  */
 export async function creditBundledCredits(
@@ -246,9 +246,9 @@ export async function creditBundledCredits(
  * refund landing there could be wiped before the user ever gets to use it.
  * topupCredits never resets, so a refund parked there is never lost.
  *
- * Use this for a FULL refund of a debit (nothing was consumed — e.g. a
+ * Use this for a FULL refund of a debit (nothing was consumed - e.g. a
  * generation that never ran). For a PARTIAL refund of a debit that already
- * paid for something real, use refundCreditsToSource instead — dumping a
+ * paid for something real, use refundCreditsToSource instead - dumping a
  * partial refund into topupCredits while the original spend came out of
  * bundledCredits silently drains a user's monthly allowance and inflates
  * their top-up balance with credits they never bought.
@@ -279,7 +279,7 @@ export async function refundCredits(
 /**
  * Refunds credits back into the SAME pools they were originally debited
  * from, up to `bundledPortion` going back to bundledCredits and the rest to
- * topupCredits — mirrors the original debit split instead of always
+ * topupCredits - mirrors the original debit split instead of always
  * crediting topupCredits. Needed for reconciliation refunds (the reservation
  * came out of bundled+topup in some ratio; a partial refund should undo that
  * ratio, not silently convert bundled spend into topup credit).
@@ -311,7 +311,7 @@ export async function refundCreditsToSource(
   });
 }
 
-// 1 credit's real-world cost basis — $0.03, pegged to 1 second of Seedance
+// 1 credit's real-world cost basis - $0.03, pegged to 1 second of Seedance
 // 2.0 Mini at 480p text-to-video (the cheapest video model/resolution). This
 // is fixed by design, unlike CreditPricingConfig.costPerCreditInr (the same
 // figure converted to INR at the FX rate used when pricing was set, which
@@ -330,7 +330,7 @@ export function creditsToCostBreakdown(credits: number, costPerCreditInr: number
 /**
  * Converts a top-up payment into a credit count: strip GST, take the
  * configured margin off the top, then convert whatever's left to credits at
- * raw cost. The single source of truth for this math — the webhook and the
+ * raw cost. The single source of truth for this math - the webhook and the
  * frontend's live preview must agree exactly, or a user could see one
  * number and be charged for another.
  */
@@ -344,25 +344,25 @@ export function calculateTopUpCredits(
 }
 
 // Fallback only, used if CreditPricingConfig has no row yet (fresh DB before
-// the first seed). $3.50/million tokens — derived from the plan budget math:
+// the first seed). $3.50/million tokens - derived from the plan budget math:
 // $19 plan @ 50% margin = $9.50 real-cost budget, minus 200 video credits ×
 // $0.03 = $6.00, leaves $3.50 for the 1,000,000 advertised tokens. ($39 plan
 // checks out the same way: $19.50 - (410 × $0.03 = $12.30) = $7.20 for
-// 2,000,000 tokens ≈ $3.60/million — close enough to share one rate.) The
+// 2,000,000 tokens ≈ $3.60/million - close enough to share one rate.) The
 // REAL, live value lives in CreditPricingConfig.usdPerToken (DB-configurable
-// — see getUsdPerToken below) precisely so it never needs to be hardcoded
+// - see getUsdPerToken below) precisely so it never needs to be hardcoded
 // again: when a plan's price changes, you retune that plan's tokenLimit to
 // match the new budget at this rate, not this rate itself.
 export const DEFAULT_USD_PER_TOKEN = 0.0000035;
 
-// Short TTL — an admin tuning this in the pricing config should see it take
+// Short TTL - an admin tuning this in the pricing config should see it take
 // effect quickly, unlike the video model catalogue (which genuinely only
 // changes rarely upstream).
 const TOKEN_PRICING_TTL_MS = 60 * 1000;
 let tokenPricingCache: { at: number; usdPerToken: number } | null = null;
 
 /**
- * The live $/token rate chat/image/doc wallet tokens are billed at — a
+ * The live $/token rate chat/image/doc wallet tokens are billed at - a
  * single global admin-editable setting (CreditPricingConfig.usdPerToken),
  * not a code constant, so retuning it (or a plan's price changing) never
  * needs a redeploy. Every plan shares this one rate; what differs per plan
@@ -408,10 +408,10 @@ export function splitBillableTokens(
 }
 
 /**
- * Real-cost-based billing for one chat/image/doc response — the chat
+ * Real-cost-based billing for one chat/image/doc response - the chat
  * equivalent of the video module's reservedTokens-vs-actualUsd reconcile,
  * except here the real cost (usage.cost, requested via `usage: { include:
- * true }` on every OpenRouter call — see openrouter.ts) is already known by
+ * true }` on every OpenRouter call - see openrouter.ts) is already known by
  * the time we bill, so there's no reserve/refund step needed, just one debit
  * for the real amount. Falls back to the legacy tokenMultiplier estimate
  * only on the rare response where a provider doesn't report cost at all.
@@ -443,7 +443,7 @@ export function computeBillableTokens(params: {
 }
 
 /**
- * Adds paid top-up credits — always additive, never reset by renewal.
+ * Adds paid top-up credits - always additive, never reset by renewal.
  */
 export async function creditTopupCredits(
   tx: Prisma.TransactionClient,

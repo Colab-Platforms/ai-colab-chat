@@ -38,7 +38,7 @@ const faqs = [
   {
     question: "Can I install the platform as an app on my device?",
     answer:
-      "Yes — you can install it from your browser as a Progressive Web App (PWA) on desktop and mobile. An active internet connection is required for chat features.",
+      "Yes - you can install it from your browser as a Progressive Web App (PWA) on desktop and mobile. An active internet connection is required for chat features.",
   },
 ];
 

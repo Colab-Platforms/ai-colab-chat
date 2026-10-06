@@ -24,6 +24,8 @@ import documentRoutes from "@/modules/document/document.route.js";
 import videoRoutes from "@/modules/video/video.route.js";
 import imageRoutes from "@/modules/image/image.route.js";
 import voiceRoutes from "@/modules/voice/voice.route.js";
+import contentRoutes from "@/modules/content-agent/content.route.js";
+import knowledgeRoutes from "@/modules/knowledge/knowledge.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
 
 
@@ -64,6 +66,8 @@ router.use("/documents", documentRoutes);
 router.use("/videos", videoRoutes);
 router.use("/images", imageRoutes);
 router.use("/voice", voiceRoutes);
+router.use("/knowledge", knowledgeRoutes);
+router.use("/content", contentRoutes);
 router.use("/admin", adminRoutes);
 
 export default router;

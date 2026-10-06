@@ -1,5 +1,5 @@
 /**
- * Verbose tracing for the video generation pipeline — mirrors
+ * Verbose tracing for the video generation pipeline - mirrors
  * document.logger.ts so both async job pipelines are debuggable the same
  * way.
  *
@@ -13,7 +13,7 @@ const maxChars = () => Number(process.env.VIDEO_DEBUG_MAX_CHARS ?? 4000);
 const clip = (value: string): string => {
   const limit = maxChars();
   if (limit === 0 || value.length <= limit) return value;
-  return `${value.slice(0, limit)}\n  …[truncated ${value.length - limit} more chars — raise VIDEO_DEBUG_MAX_CHARS or set it to 0]`;
+  return `${value.slice(0, limit)}\n  …[truncated ${value.length - limit} more chars - raise VIDEO_DEBUG_MAX_CHARS or set it to 0]`;
 };
 
 const render = (value: unknown): string => {

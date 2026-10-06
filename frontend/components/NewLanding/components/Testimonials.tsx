@@ -24,7 +24,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: 1,
     stars: 5,
-    text: "Colab AI helped us cut project delays by 40%. Everything—from tasks to docs to chats—is finally in one place. My team is moving faster than ever.",
+    text: "Colab AI helped us cut project delays by 40%. Everything-from tasks to docs to chats-is finally in one place. My team is moving faster than ever.",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=face",
     name: "Sarah Mendez",
     role: "Head of Operations, AltForms",

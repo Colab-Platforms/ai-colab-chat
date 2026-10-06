@@ -9,7 +9,7 @@
 
 interface SmoothRevealOptions {
   onUpdate: (text: string) => void;
-  /** Text already considered "shown" up front — e.g. a Continue action's
+  /** Text already considered "shown" up front - e.g. a Continue action's
    *  existing content, which shouldn't be re-typed, only appended to. */
   initialShown?: string;
   tickMs?: number;

@@ -28,7 +28,7 @@ export default function AdminOverviewPage() {
         const res = await adminService.getOverview();
         if (!cancelled) setOverview(res?.data?.data ?? null);
       } catch {
-        // silently swallow — UI shows zeros
+        // silently swallow - UI shows zeros
       } finally {
         if (!cancelled) setLoading(false);
       }

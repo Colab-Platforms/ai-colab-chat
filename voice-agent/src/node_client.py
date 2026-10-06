@@ -3,7 +3,7 @@ Thin client for the calls the bot makes back into the Node backend: fetching
 a chat's prior history + personalisation memory at call start, persisting
 each completed turn as it happens, and triggering document generation when
 the LLM calls the generate_document tool. Node owns all chat/message/document
-persistence — this service never touches Postgres directly.
+persistence - this service never touches Postgres directly.
 """
 
 import aiohttp
@@ -24,7 +24,7 @@ async def fetch_context(chat_id: int) -> dict:
     """Returns {"history": [...], "contextText": str, "userFirstName": str|None,
     "timeOfDay": "morning"|"afternoon"|"evening"|"night"}. Falls back to an
     empty context on any failure so a Node hiccup doesn't prevent the call
-    from starting — it just starts without memory or a personalised greeting
+    from starting - it just starts without memory or a personalised greeting
     that turn."""
     url = f"{settings.node_backend_url}/voice/internal/context/{chat_id}"
     try:
@@ -64,7 +64,7 @@ async def post_message(chat_id: int, role: str, content: str) -> None:
 
 async def trigger_document_generation(chat_id: int, prompt: str, format: str | None) -> dict:
     """Enqueues a document via the same path text-chat uses (document.service.ts's
-    DocumentService.create — PENDING row + immediate worker kick). Returns
+    DocumentService.create - PENDING row + immediate worker kick). Returns
     quickly regardless of render time; the LLM's tool-result callback uses
     this to keep the conversation going while it renders in the background."""
     url = f"{settings.node_backend_url}/voice/internal/documents"

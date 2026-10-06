@@ -25,7 +25,7 @@
 
 ## Overview
 
-**AI Colab Chat** is a full-stack, production-ready chat application that lets users interact with multiple AI models (OpenAI and others) through a clean, modern interface. It features real-time streaming responses, folder-based chat organisation, file attachments, public chat sharing, a token wallet system, tiered subscription plans, and a role-based admin panel — all wrapped in a Progressive Web App.
+**AI Colab Chat** is a full-stack, production-ready chat application that lets users interact with multiple AI models (OpenAI and others) through a clean, modern interface. It features real-time streaming responses, folder-based chat organisation, file attachments, public chat sharing, a token wallet system, tiered subscription plans, and a role-based admin panel - all wrapped in a Progressive Web App.
 
 ---
 

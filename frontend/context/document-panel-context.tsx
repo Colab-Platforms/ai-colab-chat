@@ -23,7 +23,7 @@ const DocumentPanelContext = createContext<DocumentPanelContextValue | null>(
   null,
 );
 
-// A full page reload remounts this provider and loses React state — persist
+// A full page reload remounts this provider and loses React state - persist
 // only *which* document was open so a reload restores the same view, not the
 // document content itself (that's refetched fresh via `getById`).
 const STORAGE_KEY = "document-panel:last-open";
@@ -47,13 +47,13 @@ const writeStoredDocumentId = (id: number | null) => {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ id }));
     }
   } catch {
-    // Private browsing / storage disabled — the panel just won't survive a
+    // Private browsing / storage disabled - the panel just won't survive a
     // reload, which is no worse than before this existed.
   }
 };
 
 /**
- * One panel per app shell, not per chat — a chat can only usefully preview
+ * One panel per app shell, not per chat - a chat can only usefully preview
  * one document at a time, and keeping this above the chat page (in
  * ChatLayoutView) means the panel survives whatever the chat page itself
  * re-renders.

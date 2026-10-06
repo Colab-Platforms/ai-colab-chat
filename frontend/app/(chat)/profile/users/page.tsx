@@ -344,7 +344,7 @@ export default function UsersAdminPage() {
         }
       }}>
         <DialogContent className="max-w-[95vw] lg:max-w-6xl w-full p-4 md:p-6 overflow-hidden max-h-[90vh] flex flex-col">
-          <DialogHeader><DialogTitle>Usage — {usageUser?.firstName} {usageUser?.lastName}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Usage - {usageUser?.firstName} {usageUser?.lastName}</DialogTitle></DialogHeader>
           {usageLoading ? (
             <div className="flex justify-center p-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : usageData ? (

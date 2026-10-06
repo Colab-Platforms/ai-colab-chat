@@ -5,7 +5,7 @@ const pendingNewChatFolderIdKey = "pending_new_chat_folder_id";
 
 /**
  * Shared by the sidebar's "New Chat" button and the Projects hub's
- * ProjectChatsModal — keeps the localStorage/event contract that
+ * ProjectChatsModal - keeps the localStorage/event contract that
  * NewChatPage/HomeFolderScopeSync depend on in one place.
  */
 export function startNewChatInFolder(
@@ -31,7 +31,7 @@ export function startNewChatInFolder(
 
   // HomeFolderScopeSync (app/(chat)/home/page.tsx) treats the URL's
   // `folderId` param as the source of truth and clears localStorage whenever
-  // it's absent — so navigating to a bare "/home" would immediately wipe the
+  // it's absent - so navigating to a bare "/home" would immediately wipe the
   // value just set above. Carry it through the URL too so the two stay in sync.
   const homeHref = nextFolderId ? `/home?folderId=${nextFolderId}` : "/home";
   if (opts?.isDraftRoute) {

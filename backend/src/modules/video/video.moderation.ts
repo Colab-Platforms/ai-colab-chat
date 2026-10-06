@@ -1,6 +1,6 @@
 /**
  * Cheap keyword gate on video prompts, checked BEFORE the paid OpenRouter
- * call — the provider models also refuse disallowed content, but by then the
+ * call - the provider models also refuse disallowed content, but by then the
  * wallet reservation has already been made and the request has cost a round
  * trip. This is deliberately narrow (obvious sexual/exploitative terms) and
  * not a substitute for real moderation; it exists to catch the cheap,

@@ -173,7 +173,7 @@ export function ModelUsageLineChart({
 
   return (
     <div className="space-y-3">
-      {/* Taller plot on mobile — legend is outside so height applies only to the chart */}
+      {/* Taller plot on mobile - legend is outside so height applies only to the chart */}
       <div className="relative z-0 h-[min(20rem,85svh)] min-h-[17.5rem] w-full sm:min-h-[18rem] md:h-[22rem] md:min-h-[22rem]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart

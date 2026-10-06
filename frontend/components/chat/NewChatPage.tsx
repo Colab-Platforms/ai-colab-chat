@@ -203,7 +203,7 @@ export function NewChatPage() {
           detail: { immediate: true, refreshFolders: createdInFolder },
         }),
       );
-      // Store pending first message in sessionStorage — never in URL params
+      // Store pending first message in sessionStorage - never in URL params
       sessionStorage.setItem(
         `pending_chat_${chatId}`,
         JSON.stringify({ content, modelIds: selectedModels, chatType: chatType || "STANDARD", attachmentIds, attachmentObjects })
@@ -216,7 +216,7 @@ export function NewChatPage() {
 
   /**
    * Video generation has no "pending first message" step the way normal
-   * chat does — it's a direct API call, not a chat.stream.ts turn — so this
+   * chat does - it's a direct API call, not a chat.stream.ts turn - so this
    * creates the chat, kicks off the video against it, and navigates
    * straight there. The new /c/[id] page fetches that video from the
    * server on mount and interleaves it into the message timeline by
@@ -273,7 +273,7 @@ export function NewChatPage() {
       }));
     }
   } else if (activeFolder) {
-    // Same hero treatment as an Assistant — just driven by the active project
+    // Same hero treatment as an Assistant - just driven by the active project
     // instead, so chats started here remember what the project is about.
     welcomeTitle = activeFolder.name;
     welcomeSubtitle = activeFolder.description || "Chats here belong to this project.";

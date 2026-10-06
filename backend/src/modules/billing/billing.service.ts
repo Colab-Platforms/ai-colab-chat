@@ -17,7 +17,7 @@ interface CreatePaymentAndInvoiceParams {
   providerPaymentId?: string | null;
   providerSubscriptionId?: string | null;
   amount: number;
-  /** Tax breakdown of `amount`, when known — see the matching comment on Payment in schema.prisma. */
+  /** Tax breakdown of `amount`, when known - see the matching comment on Payment in schema.prisma. */
   baseAmount?: number | null;
   taxPercent?: number | null;
   taxAmount?: number | null;

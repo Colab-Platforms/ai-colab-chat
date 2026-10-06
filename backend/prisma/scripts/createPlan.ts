@@ -1,5 +1,5 @@
 /**
- * Generic plan-creation script — builds a plan's tokenLimit/monthlyVideoCredits
+ * Generic plan-creation script - builds a plan's tokenLimit/monthlyVideoCredits
  * and INR prices from a nominal USD price + margin + video/token split via
  * computePlanPricing() (src/utils/planPricing.ts), then creates it through
  * the normal PlanService.create() path, which already syncs all three billing
@@ -59,7 +59,7 @@ async function main() {
   const fxRate = opts.fx ? Number(opts.fx) : undefined;
   const dryRun = opts.dryRun === "true";
 
-  // Live rate, not the code-default fallback — this is the whole point: the
+  // Live rate, not the code-default fallback - this is the whole point: the
   // plan's numbers always match whatever billing is actually charging today.
   const usdPerToken = await getUsdPerToken();
 
@@ -72,7 +72,7 @@ async function main() {
   });
 
   console.log(
-    `\nPlan "${name}" — $${pricing.priceUsd}/mo, ${pricing.marginPercent}% margin, ` +
+    `\nPlan "${name}" - $${pricing.priceUsd}/mo, ${pricing.marginPercent}% margin, ` +
       `${pricing.videoSplitPercent}/${100 - pricing.videoSplitPercent} video/token split\n`,
   );
   console.table({
@@ -87,7 +87,7 @@ async function main() {
   });
 
   if (dryRun) {
-    console.log("--dryRun set — nothing was written. Re-run without --dryRun to actually create this plan.");
+    console.log("--dryRun set - nothing was written. Re-run without --dryRun to actually create this plan.");
     return;
   }
 
@@ -100,7 +100,7 @@ async function main() {
     });
     const found = new Set(models.map((m) => m.externalId));
     for (const id of externalIds) {
-      if (!found.has(id)) console.warn(`  ⚠️ video model "${id}" not found — skipping`);
+      if (!found.has(id)) console.warn(`  ⚠️ video model "${id}" not found - skipping`);
     }
     allowedVideoModelIds = models.map((m) => m.id);
   }

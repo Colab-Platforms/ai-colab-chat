@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { DocumentCard, type GeneratedDocument } from "./document-card";
+import { ContentItemCard } from "./content-item-card";
+import { ContentRunTimeline, type RunStep } from "./content-run-timeline";
+import type { ContentItem } from "@/context/content-panel-context";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
 import useEmblaCarousel from "embla-carousel-react";
@@ -46,7 +49,7 @@ function isInsufficientBalanceFailure(resp?: ModelResponse | null): boolean {
 }
 
 // A hard plan restriction (free-tier picked a paid model, or a plan without
-// image/video generation) — unlike insufficient balance, switching to a free
+// image/video generation) - unlike insufficient balance, switching to a free
 // model can't fix this, so it gets a different recovery action.
 function isPlanRestrictedFailure(resp?: ModelResponse | null): boolean {
   if (!resp || resp.status !== "FAILED") return false;
@@ -62,7 +65,7 @@ function isImageGenerationMessage(message: Message): boolean {
 }
 
 // A user-initiated stop mid-stream is marked FAILED (there's no separate
-// "stopped" status), but it isn't an error — whatever text had streamed in
+// "stopped" status), but it isn't an error - whatever text had streamed in
 // should stay on screen as-is, not flip to the destructive/retry UI.
 function isStoppedByUser(resp?: ModelResponse | null): boolean {
   if (!resp || resp.status !== "FAILED") return false;
@@ -172,6 +175,9 @@ interface Message {
   sourceChatId?: number;
   sourceChatTitle?: string | null;
   chatType?: string;
+  // Content agent: live pipeline steps (SSE only) and the structured items it saved.
+  runSteps?: RunStep[];
+  contentItems?: ContentItem[];
 }
 
 interface MessageBubbleProps {
@@ -230,7 +236,7 @@ export const MessageBubble = React.memo(function MessageBubble({
     setVersionIndices(prev => ({ ...prev, [modelId]: Math.max(0, Math.min(list.length - 1, cur + dir)) }));
   };
 
-  // Edit state — two-phase for smooth open/close
+  // Edit state - two-phase for smooth open/close
   const [showEdit, setShowEdit] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [editText, setEditText] = useState("");
@@ -483,6 +489,7 @@ export const MessageBubble = React.memo(function MessageBubble({
 
           {/* break-words and overflow-hidden prevent horizontal scrolling on long continuous strings */}
           <div className=" rounded-2xl rounded-tl-md px-4 py-2.5 break-words overflow-hidden w-full">
+            {message.runSteps?.length ? <ContentRunTimeline steps={message.runSteps} /> : null}
             {singleResp ? (
               singleResp.status === "FAILED" && !isStoppedByUser(singleResp) ? (
                 isPlanRestrictedFailure(singleResp) ? (
@@ -554,6 +561,10 @@ export const MessageBubble = React.memo(function MessageBubble({
             <DocumentCard key={generatedDocument.id} document={generatedDocument} />
           ))}
 
+          {message.contentItems?.map((item) => (
+            <ContentItemCard key={item.id} item={item} />
+          ))}
+
           {isLastMessage && singleResp?.status === "COMPLETED" && parsedSingle.questions.length > 0 && onFollowUpClick && (
             <FollowUpTabs questions={parsedSingle.questions} onClick={onFollowUpClick} />
           )}
@@ -588,7 +599,7 @@ export const MessageBubble = React.memo(function MessageBubble({
     <div className={`px-4 py-3 w-full ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""} min-w-0`}>
       <div className="w-full space-y-2 min-w-0">
 
-        {/* Tab bar — scrollable, click jumps to card */}
+        {/* Tab bar - scrollable, click jumps to card */}
         <div className="flex items-center gap-2 min-w-0">
           <Bot className="w-4 h-4 text-primary/70 flex-shrink-0" />
           <div className="relative flex-1 min-w-0">

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ChatLayoutView } from "@/components/chat/ChatLayoutView";
 import { DocumentPanelProvider } from "@/context/document-panel-context";
+import { ContentPanelProvider } from "@/context/content-panel-context";
 
 /**
  * Keeps a single ChatLayoutView instance for all authenticated chat routes.
@@ -37,7 +38,9 @@ export function ChatRootShell({ children }: { children: ReactNode }) {
 
   return (
     <DocumentPanelProvider>
-      <ChatLayoutView>{children}</ChatLayoutView>
+      <ContentPanelProvider>
+        <ChatLayoutView>{children}</ChatLayoutView>
+      </ContentPanelProvider>
     </DocumentPanelProvider>
   );
 }

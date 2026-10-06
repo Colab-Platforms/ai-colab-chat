@@ -57,7 +57,7 @@ const cardItems: CardItem[] = [
   },
 ];
 
-// Height of your fixed navbar — cards start below this
+// Height of your fixed navbar - cards start below this
 const NAVBAR_HEIGHT = 120;
 // Bottom breathing room inside the sticky viewport
 const CARD_BOTTOM_GAP = 48; // px
@@ -304,7 +304,7 @@ export default function WhatYouGet() {
   return (
     <section className="bg-[#09090b] text-white py-16 md:py-24" >
 
-      {/* ── Header — normal scroll, disappears before the stack begins ── */}
+      {/* ── Header - normal scroll, disappears before the stack begins ── */}
       <div className="container max-w-7xl mx-auto px-5 sm:px-10 w-full">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 w-full pb-16">
           <div className="flex flex-col gap-4 max-w-2xl">
@@ -349,7 +349,7 @@ export default function WhatYouGet() {
               height: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
             }}
           >
-            {/* Card stage — cards are position:absolute inside this box */}
+            {/* Card stage - cards are position:absolute inside this box */}
             <div
               className="relative container max-w-7xl mx-auto px-5 sm:px-10 w-full"
               style={{ height: `calc(100vh - ${NAVBAR_HEIGHT}px - ${CARD_BOTTOM_GAP}px)` }}

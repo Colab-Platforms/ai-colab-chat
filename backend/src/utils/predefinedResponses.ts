@@ -21,17 +21,17 @@ const PLATFORM_NAME = "AI Colab Chat";
 const RESPONSES = {
   greeting: `Hello! Welcome to **${PLATFORM_NAME}**. How can I help you today?`,
 
-  identity: `I'm **${PLATFORM_NAME}**, your intelligent multi-model assistant platform.\n\nI'm not affiliated with any single AI company — I give you access to the best models from OpenAI, Google, Anthropic, Meta, and more, all in one place. The model currently powering your response is shown in your chat settings.\n\nWhat would you like to explore?`,
+  identity: `I'm **${PLATFORM_NAME}**, your intelligent multi-model assistant platform.\n\nI'm not affiliated with any single AI company - I give you access to the best models from OpenAI, Google, Anthropic, Meta, and more, all in one place. The model currently powering your response is shown in your chat settings.\n\nWhat would you like to explore?`,
 
   platform: `**${PLATFORM_NAME}** is a collaborative AI platform that lets you:\n\n- 💬 **Chat** with multiple AI models simultaneously\n- ⚖️ **Compare** responses side by side\n- 🔄 **Switch models** mid-conversation\n- 📁 **Organise** chats into folders\n- 🎙️ **Use voice input** for hands-free interaction\n\nType a question or task to get started!`,
 
   help: `Here are some things you can try:\n\n- Ask a question: *"Explain quantum computing in simple terms"*\n- Get help writing: *"Write a professional email declining a meeting"*\n- Brainstorm: *"Give me 10 startup ideas in the edtech space"*\n- Code: *"Write a Python function to reverse a linked list"*\n- Compare models: select multiple models in the selector and send the same prompt!\n\nWhat would you like to do?`,
 
-  creator: `**${PLATFORM_NAME}** was built by our team of engineers to give you seamless access to the world's best AI models — all in one unified interface.\n\nWe're constantly improving the platform. If you have feedback or ideas, we'd love to hear them! 🚀`,
+  creator: `**${PLATFORM_NAME}** was built by our team of engineers to give you seamless access to the world's best AI models - all in one unified interface.\n\nWe're constantly improving the platform. If you have feedback or ideas, we'd love to hear them! 🚀`,
 
   thanks: `You're welcome! 😊 Happy to help anytime. Is there anything else you'd like to explore?`,
 
-  bye: `Goodbye! 👋 It was great chatting with you. Come back anytime — I'm always here to help!`,
+  bye: `Goodbye! 👋 It was great chatting with you. Come back anytime - I'm always here to help!`,
 } as const;
 
 function extractPreferredName(contextMemory?: string[]): string | null {

@@ -8,7 +8,7 @@ const router = Router();
 router.get("/options", auth("USER", "ADMIN", "SUPERADMIN"), voiceController.listVoiceOptions);
 router.post("/session", auth("USER", "ADMIN", "SUPERADMIN"), voiceController.createSession);
 
-// Called by voice-agent (Python), not the browser — see voice.internal-auth.ts
+// Called by voice-agent (Python), not the browser - see voice.internal-auth.ts
 router.get("/internal/context/:chatId", internalServiceAuth, voiceController.getInternalContext);
 router.post("/internal/messages", internalServiceAuth, voiceController.postInternalMessage);
 router.post("/internal/documents", internalServiceAuth, voiceController.postInternalDocument);

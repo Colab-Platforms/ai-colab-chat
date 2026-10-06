@@ -4,7 +4,7 @@ import puppeteer, { type Browser, type Page } from "puppeteer";
  * A single shared Chromium instance, with pages leased per render.
  *
  * The invoice path launches a fresh browser per PDF, which is fine at webhook
- * volume but not at chat volume — every launch costs ~100-300MB RSS and a
+ * volume but not at chat volume - every launch costs ~100-300MB RSS and a
  * 1-3s cold start, so concurrent requests would exhaust memory. Here the
  * browser is launched once and only lightweight pages come and go, with a
  * semaphore capping how many render at a time.

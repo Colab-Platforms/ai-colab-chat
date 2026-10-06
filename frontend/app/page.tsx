@@ -7,7 +7,7 @@ import { useTheme } from "@/context/theme-context";
 import { NewLandingPage } from "@/components/NewLanding/NewLandingPage";
 
 /**
- * Signed-in users no longer see the chat home at "/" — it lives at "/home".
+ * Signed-in users no longer see the chat home at "/" - it lives at "/home".
  * Any query string (e.g. ?folderId=) is carried across so old links keep
  * their folder scope.
  */

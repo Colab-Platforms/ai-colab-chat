@@ -103,7 +103,7 @@ export default function Pricing() {
 
         const activePlans = planList.filter((plan: any) => plan.isActive && !plan.isDeleted);
         // The entry-level PAID plan is "Most Popular", whatever it happens to
-        // be named — matching on the literal name "pro" broke the moment a
+        // be named - matching on the literal name "pro" broke the moment a
         // plan got renamed (the ₹3699 tier briefly inherited the "pro" name
         // and got highlighted as the cheap/popular option instead).
         const cheapestPaidPrice = Math.min(
@@ -115,7 +115,7 @@ export default function Pricing() {
         const parsed = activePlans
           .sort((a: any, b: any) => Number(a.monthlyPrice) - Number(b.monthlyPrice))
           .map((plan: any) => {
-            // Shared parser (lib/planFeatures.ts) — also used by the real
+            // Shared parser (lib/planFeatures.ts) - also used by the real
             // subscription page, so marketing copy stays in sync with what a
             // subscriber actually gets.
             const features = getPlanFeatureLines(plan).included;
@@ -354,7 +354,7 @@ export default function Pricing() {
               Terms of Use
             </Link>
             . Higher-tier models draw down your tokens faster via a disclosed
-            per-model multiplier — please read the Terms carefully for full
+            per-model multiplier - please read the Terms carefully for full
             billing details before you pay.
           </p>
         </div>

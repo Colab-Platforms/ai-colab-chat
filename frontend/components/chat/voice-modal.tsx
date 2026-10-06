@@ -24,13 +24,13 @@ interface VoiceModalProps {
   onClose: () => void;
   /** Continue an existing voice chat instead of starting a new one. */
   chatId?: number;
-  /** Fires once the session is created — always, even for a brand new call,
+  /** Fires once the session is created - always, even for a brand new call,
    * so the caller can navigate to / refresh the chat that now has messages. */
   onChatId?: (chatId: number) => void;
 }
 
 // Hue in degrees (0-360), applied as a shift over the orb's base
-// purple/cyan gradient — distinct per state so the color itself signals
+// purple/cyan gradient - distinct per state so the color itself signals
 // what ColabAI is doing, not just the animation.
 const ORB_HUE: Record<AgentState, number> = {
   connecting: 200,
@@ -77,8 +77,8 @@ function Blob({ state }: { state: AgentState }) {
 }
 
 const STATE_LABEL: Record<AgentState, string> = {
-  connecting: "Setting up ColabAI — one moment…",
-  idle: "Ready — start talking",
+  connecting: "Setting up ColabAI - one moment…",
+  idle: "Ready - start talking",
   listening: "Listening…",
   thinking: "Thinking…",
   speaking: "Speaking…",
@@ -316,7 +316,7 @@ export function VoiceModal({ open, onClose, chatId, onChatId }: VoiceModalProps)
               </>
             )}
 
-            {/* No visible output — this is what actually creates the <audio>
+            {/* No visible output - this is what actually creates the <audio>
                 element and plays the bot's voice track. Without it the call
                 connects and streams audio, but nothing is ever heard. */}
             {client && (

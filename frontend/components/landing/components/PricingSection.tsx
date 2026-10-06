@@ -25,7 +25,7 @@ interface PlanTier {
 }
 
 // ─────────────────────────────────────────────────────
-//  PricingCard — reusable UI card (exported for reuse)
+//  PricingCard - reusable UI card (exported for reuse)
 // ─────────────────────────────────────────────────────
 export interface PricingCardProps {
   title: string;
@@ -154,7 +154,7 @@ export function PricingCard({
 }
 
 // ─────────────────────────────────────────────────────
-//  PricingSection — full section with header + cards
+//  PricingSection - full section with header + cards
 // ─────────────────────────────────────────────────────
 export function PricingSection() {
   const { user } = useAuth();
@@ -185,7 +185,7 @@ export function PricingSection() {
 
         const activePlans = planList.filter((plan: any) => plan.isActive && !plan.isDeleted);
         // The entry-level PAID plan is "Most Popular", whatever it happens to
-        // be named — matching on the literal name "pro" broke the moment a
+        // be named - matching on the literal name "pro" broke the moment a
         // plan got renamed (see the identical fix in NewLanding/Pricing.tsx).
         const cheapestPaidPrice = Math.min(
           ...activePlans
@@ -199,7 +199,7 @@ export function PricingSection() {
               Number(a.monthlyPrice) - Number(b.monthlyPrice)
           )
           .map((plan: any) => {
-            // Shared parser (lib/planFeatures.ts) — also used by the real
+            // Shared parser (lib/planFeatures.ts) - also used by the real
             // subscription page, so marketing copy stays in sync with what a
             // subscriber actually gets.
             const features = getPlanFeatureLines(plan).included;
@@ -255,7 +255,7 @@ export function PricingSection() {
     <section id="pricing" className="py-24 bg-[#e7e4eb] dark:bg-[#060104]">
       <div className="container mx-auto px-6">
 
-        {/* ── Section header — same ScrollReveal pattern as Testimonials & FAQ ── */}
+        {/* ── Section header - same ScrollReveal pattern as Testimonials & FAQ ── */}
         <ScrollReveal
           delay={0.1}
           className="flex flex-col items-center text-center max-w-4xl mx-auto mb-14"
@@ -267,7 +267,7 @@ export function PricingSection() {
             Invest in intelligence. Simple, transparent pricing
           </h2>
           <p className="mt-4 text-gray-600 dark:text-gray-400 text-balance">
-            Start free for your first month — no credit card needed. Upgrade
+            Start free for your first month - no credit card needed. Upgrade
             when you&rsquo;re ready and unlock the full power of 15+ AI models,
             rolling context, and team collaboration.
           </p>
@@ -302,7 +302,7 @@ export function PricingSection() {
                   plan.isFree
                     ? "Start Free"
                     : plan.isPopular
-                    ? "Get Started — Pro"
+                    ? "Get Started - Pro"
                     : `Choose ${plan.name}`
                 }
                 href={getPlanHref(plan.id)}

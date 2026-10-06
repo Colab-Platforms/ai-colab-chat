@@ -18,7 +18,7 @@ export function registerServerLifecycle(server: Server) {
 
     server.close(async () => {
       try {
-        // Chromium is a child process — without this it survives the restart.
+        // Chromium is a child process - without this it survives the restart.
         await closeBrowser();
         await prisma.$disconnect();
         console.log("[Server] Graceful shutdown complete.");

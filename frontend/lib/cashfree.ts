@@ -50,7 +50,7 @@ export async function openSubscriptionCheckout(sessionId: string): Promise<void>
   }
 }
 
-/** Opens Cashfree's one-time-order checkout — used for plan purchases and credit top-ups alike. */
+/** Opens Cashfree's one-time-order checkout - used for plan purchases and credit top-ups alike. */
 export async function openPaymentCheckout(paymentSessionId: string): Promise<void> {
   const Cashfree = await loadCashfreeSdk();
   if (!Cashfree) {

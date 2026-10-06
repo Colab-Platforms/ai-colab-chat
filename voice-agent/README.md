@@ -4,7 +4,7 @@ Python microservice, sibling to `backend/` and `frontend/`, that runs the
 real-time conversational voice pipeline using [Pipecat](https://www.pipecat.ai/).
 Scope: natural voice conversation with emotion-aware delivery and selectable
 voices/accents. No tool calling, no document generation, no integrations yet
-— that's Phase 2/3.
+- that's Phase 2/3.
 
 ## Why a separate service
 
@@ -12,7 +12,7 @@ The main app is Node/TS/Express. Pipecat's pipeline runtime is Python-only.
 This service owns real-time audio orchestration (STT → LLM → TTS,
 interruption handling, emotion delivery); the Node backend keeps owning auth,
 chat persistence, and usage metering. The two only talk over one small HTTP
-call — see [Integration](#integration-with-the-node-backend).
+call - see [Integration](#integration-with-the-node-backend).
 
 ## Layout
 
@@ -55,7 +55,7 @@ The browser never talks to this service directly. Flow:
    point on flows browser ⇄ Daily ⇄ this service directly (not through Node).
 
 `INTERNAL_SERVICE_TOKEN` must match between this service's `.env` and the
-Node backend's `.env` — treat it like any other service credential, not a
+Node backend's `.env` - treat it like any other service credential, not a
 user-facing secret.
 
 ## Required accounts
@@ -76,7 +76,7 @@ user-facing secret.
 - One bot process per active call (`multiprocessing.Process` in `server.py`).
   Fine for initial rollout; move to a proper worker pool before high
   concurrency.
-- No wallet/usage metering yet — same known gap flagged for document
+- No wallet/usage metering yet - same known gap flagged for document
   generation (voice-minutes don't fit the token-based UsageLog schema
   either). Needs a product decision before this goes further than an
   internal demo.

@@ -95,7 +95,7 @@ export default function SubscriptionPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => {
-    // Live rate, not hardcoded — same CreditPricingConfig.gstPercent the
+    // Live rate, not hardcoded - same CreditPricingConfig.gstPercent the
     // backend actually charges with, so this popup never quietly drifts
     // from what Cashfree really bills.
     creditWalletService
@@ -277,7 +277,7 @@ export default function SubscriptionPage() {
     if (isFreePlan && freePlanTaken) return;
 
     // Open the price/feature confirmation popup rather than charging
-    // immediately — a deep link from the marketing page shouldn't skip the
+    // immediately - a deep link from the marketing page shouldn't skip the
     // "here's what you're about to pay, including GST" step.
     autoStartedPlanIdsRef.current.add(parsedPlanId);
     setPlanToConfirm(selectedPlan);

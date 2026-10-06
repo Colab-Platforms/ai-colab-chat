@@ -36,7 +36,7 @@ import type {
  * the model produces.
  *
  * Unlike the PDF path there is no browser here, so model-supplied text is
- * never parsed as markup — it is written as literal runs. Image URLs remain
+ * never parsed as markup - it is written as literal runs. Image URLs remain
  * gated by the same allowlist, since this renderer *does* make network
  * requests to embed them.
  */
@@ -49,7 +49,7 @@ import type {
 const hp = (pt: number): number => Math.round(pt * 2);
 /** Word measures spacing in twips (1/20 pt). */
 const tw = (pt: number): number => Math.round(pt * 20);
-/** OOXML colours are bare hex — a leading "#" is written through literally. */
+/** OOXML colours are bare hex - a leading "#" is written through literally. */
 const hex = (color: string): string => color.replace(/^#/, "").toUpperCase();
 
 const PAGE_MARGIN_INCHES = 1;
@@ -69,7 +69,7 @@ type ImageKind = "png" | "jpg" | "gif";
 /**
  * Reads intrinsic pixel dimensions straight from the file header.
  *
- * Word needs an explicit width AND height on every image — there is no
+ * Word needs an explicit width AND height on every image - there is no
  * "auto". Guessing an aspect ratio would visibly distort the picture, so an
  * image whose real size cannot be determined is dropped instead, matching how
  * the PDF renderer drops images it is not allowed to fetch.
@@ -100,7 +100,7 @@ const readImageSize = (
     };
   }
 
-  // JPEG: no fixed offset — walk the segment chain to the start-of-frame
+  // JPEG: no fixed offset - walk the segment chain to the start-of-frame
   // marker, which is the only place the dimensions appear.
   if (buffer.length > 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
     let offset = 2;
@@ -141,7 +141,7 @@ interface EmbeddableImage {
 
 const fetchImage = async (url: string): Promise<EmbeddableImage | null> => {
   if (!isAllowedImageUrl(url)) {
-    dlog("docx", `image dropped — not on the allowlist: ${url.slice(0, 120)}`);
+    dlog("docx", `image dropped - not on the allowlist: ${url.slice(0, 120)}`);
     return null;
   }
 
@@ -150,25 +150,25 @@ const fetchImage = async (url: string): Promise<EmbeddableImage | null> => {
       signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS),
     });
     if (!response.ok) {
-      dlog("docx", `image dropped — HTTP ${response.status}: ${url.slice(0, 120)}`);
+      dlog("docx", `image dropped - HTTP ${response.status}: ${url.slice(0, 120)}`);
       return null;
     }
 
     const data = Buffer.from(await response.arrayBuffer());
     if (data.length > MAX_IMAGE_BYTES) {
-      dlog("docx", `image dropped — ${data.length} bytes exceeds the cap`);
+      dlog("docx", `image dropped - ${data.length} bytes exceeds the cap`);
       return null;
     }
 
     const size = readImageSize(data);
     if (!size || !size.width || !size.height) {
-      dlog("docx", `image dropped — unreadable dimensions: ${url.slice(0, 120)}`);
+      dlog("docx", `image dropped - unreadable dimensions: ${url.slice(0, 120)}`);
       return null;
     }
 
     return { data, kind: size.kind, width: size.width, height: size.height };
   } catch (error: any) {
-    dlog("docx", `image dropped — fetch failed: ${error?.message ?? error}`);
+    dlog("docx", `image dropped - fetch failed: ${error?.message ?? error}`);
     return null;
   }
 };
@@ -265,7 +265,7 @@ const inlineRuns = (
 const headingParagraph = (t: ThemeTokens, level: 1 | 2 | 3, text: string) => {
   const sizePt = level === 1 ? 20 : level === 2 ? 15 : 12.5;
   return new Paragraph({
-    // Word's own "keep with next" — the CSS renderer uses page-break-after.
+    // Word's own "keep with next" - the CSS renderer uses page-break-after.
     keepNext: true,
     spacing: { before: tw(level === 1 ? 18 : 14), after: tw(6) },
     children: parseInlineSegments(text).map(
@@ -370,7 +370,7 @@ const renderBlock = (
       });
 
       const rows = block.rows.map((row, rowIndex) => {
-        // Pad or trim so a ragged row from the model cannot break the grid —
+        // Pad or trim so a ragged row from the model cannot break the grid -
         // Word is stricter than HTML here and would produce a corrupt table.
         const cells = block.columns.map((_column, columnIndex) =>
           tableCell(
@@ -516,7 +516,7 @@ const renderBlock = (
       });
       if (block.attribution) {
         runs.push(
-          ...parseInlineSegments(`— ${block.attribution}`).map(
+          ...parseInlineSegments(`- ${block.attribution}`).map(
             (segment, index) =>
               new TextRun({
                 text: segment.text,
@@ -583,7 +583,7 @@ const renderBlock = (
     case "image": {
       const image = images.get(block.url);
       // Unfetchable or unreadable images are dropped, exactly as the PDF
-      // renderer drops them — a broken placeholder is worse than an omission.
+      // renderer drops them - a broken placeholder is worse than an omission.
       if (!image) return [];
 
       const targetWidth = Math.min(
@@ -775,7 +775,7 @@ export const renderSpecToDocx = async (
 
   dlog(
     "docx",
-    `theme=${theme} blocks=${spec.blocks.length} images=${images.size} — building document`,
+    `theme=${theme} blocks=${spec.blocks.length} images=${images.size} - building document`,
   );
 
   let listInstance = 0;

@@ -8,7 +8,7 @@ import { dlog } from "./document.logger.js";
  * `new PptxGenJS()` throws "not a constructor". Unwrapping a nested default
  * covers both rather than working in dev and failing in production.
  *
- * The imported binding is still used for its *types* below — only the runtime
+ * The imported binding is still used for its *types* below - only the runtime
  * value needs unwrapping.
  */
 const PptxGen = ((PptxGenJS as unknown as { default?: typeof PptxGenJS })
@@ -31,12 +31,12 @@ import type { PresentationSpec, SlideBlock, SlideSpec } from "./document.types.j
  *
  * Everything here is absolute-positioned in inches on a 13.33 x 7.5in stage
  * (16:9). Blocks are laid out top-down from a cursor, and anything that would
- * overflow the stage is dropped rather than allowed to spill off the slide —
+ * overflow the stage is dropped rather than allowed to spill off the slide -
  * PowerPoint has no reflow, so overflow is silent and invisible until someone
  * presents it.
  *
  * Visual design (colors/fonts/decoration/photos) is owned entirely by the
- * PPTX template tokens (document.pptxTemplates.ts) — a *separate*, richer set
+ * PPTX template tokens (document.pptxTemplates.ts) - a *separate*, richer set
  * of tokens from the flat `ThemeTokens` that PDF/DOCX/XLSX share, since only a
  * slide has fixed-canvas layout decisions (photo placement, split panels,
  * decorative shapes) to make.
@@ -95,7 +95,7 @@ interface LayoutCursor {
   y: number;
 }
 
-/** The horizontal band a block is laid out into — the full content width on
+/** The horizontal band a block is laid out into - the full content width on
  * a plain slide, or one column of a two-column (text + photo) content slide. */
 interface LayoutRegion {
   x: number;
@@ -107,7 +107,7 @@ const FULL_REGION: LayoutRegion = { x: MARGIN_X, w: CONTENT_W };
 /**
  * Places one block and advances the cursor.
  *
- * Returns false when the block did not fit, which stops the slide — carrying
+ * Returns false when the block did not fit, which stops the slide - carrying
  * on would stack later blocks off the bottom edge.
  */
 const placeBlock = (
@@ -196,7 +196,7 @@ const placeBlock = (
 
       const body = rows.map((row, rowIndex) =>
         // Pad or trim: pptxgenjs renders a ragged row as a broken grid.
-        // Every cell gets an explicit fill (not just the tinted ones) —
+        // Every cell gets an explicit fill (not just the tinted ones) -
         // PowerPoint applies its own default table style to any cell an
         // XML `<a:tc>` leaves unstyled, which would punch light stripes
         // through a dark template's background.
@@ -251,7 +251,7 @@ const placeBlock = (
         fill: { color: hex(colors.bg) },
         line: { color: hex(colors.border), width: 0 },
       });
-      // A left accent bar, drawn as its own shape — PowerPoint shapes cannot
+      // A left accent bar, drawn as its own shape - PowerPoint shapes cannot
       // carry a single-sided border.
       slide.addShape("rect", {
         x: region.x,
@@ -288,7 +288,7 @@ const placeBlock = (
     }
 
     case "keyValue": {
-      // Explicit fill on every cell — same reasoning as the "table" case
+      // Explicit fill on every cell - same reasoning as the "table" case
       // above: an unstyled cell picks up PowerPoint's own default table
       // style rather than staying transparent over a dark background.
       const rows = block.items.map((item) => [
@@ -318,7 +318,7 @@ const placeBlock = (
 
     case "quote": {
       const text = block.attribution
-        ? `“${block.text}”\n— ${block.attribution}`
+        ? `“${block.text}”\n- ${block.attribution}`
         : `“${block.text}”`;
       const h = Math.min(
         estimateTextHeight(text, bodyPt + 2, region.w - 0.6),
@@ -368,11 +368,11 @@ const placeBlock = (
 
     case "image": {
       // Same allowlist as the other renderers. PowerPoint fetches nothing at
-      // open time — pptxgenjs downloads the bytes while packing — so a
+      // open time - pptxgenjs downloads the bytes while packing - so a
       // disallowed URL is dropped here rather than becoming a broken link.
       const url = safePhoto(block.url);
       if (!url) {
-        dlog("pptx", `image dropped — not on the allowlist: ${block.url.slice(0, 120)}`);
+        dlog("pptx", `image dropped - not on the allowlist: ${block.url.slice(0, 120)}`);
         return true;
       }
 
@@ -412,7 +412,7 @@ const placeBlock = (
 };
 
 /* ------------------------------------------------------------------ *
- * Decoration — small per-template flourishes shared by section/content
+ * Decoration - small per-template flourishes shared by section/content
  * slides, so a deck reads as "designed" even on text-only slides.
  * ------------------------------------------------------------------ */
 
@@ -425,7 +425,7 @@ const addDecoration = (
   switch (t.decoration) {
     case "cornerBlob":
       // A soft, oversized translucent circle bleeding off the top-right
-      // corner — cheap to draw, reads as "designed" on an otherwise flat bg.
+      // corner - cheap to draw, reads as "designed" on an otherwise flat bg.
       slide.addShape("ellipse", {
         x: STAGE_W - 3.2,
         y: -1.8,
@@ -482,7 +482,7 @@ const addDecoration = (
  * Slides
  * ------------------------------------------------------------------ */
 
-/** Per-template geometry for the "splitPhoto" title layout — how much of the
+/** Per-template geometry for the "splitPhoto" title layout - how much of the
  * slide the text panel occupies, and a small kicker label above the title. */
 const SPLIT_PHOTO_LAYOUT: Partial<Record<string, { textRatio: number; kicker?: string }>> = {
   corporate: { textRatio: 0.36 },
@@ -710,7 +710,7 @@ const addTitleSlide = (
   let slide: PptxGenJS.Slide;
 
   // A missing photo (Pexels miss, disabled key, or an odd topic with no
-  // results) always falls back to the solid layout — the deck must never be
+  // results) always falls back to the solid layout - the deck must never be
   // left half-built because a stock-photo lookup didn't land anything.
   if (t.titleLayout === "fullBleedPhoto" && photoUrl) {
     slide = addFullBleedPhotoTitleSlide(pptx, spec, slideSpec, t, photoUrl);
@@ -879,7 +879,7 @@ export const renderSpecToPptx = async (
 
   dlog(
     "pptx",
-    `template=${t.key} slides=${spec.slides.length} — building presentation`,
+    `template=${t.key} slides=${spec.slides.length} - building presentation`,
   );
 
   let droppedBlocks = 0;
@@ -907,7 +907,7 @@ export const renderSpecToPptx = async (
     // hold, which is a prompt problem rather than a rendering one.
     dlog(
       "pptx",
-      `${droppedBlocks} block(s) dropped for overflow — slides are over-filled`,
+      `${droppedBlocks} block(s) dropped for overflow - slides are over-filled`,
     );
   }
 

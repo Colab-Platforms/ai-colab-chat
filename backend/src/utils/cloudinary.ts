@@ -23,7 +23,7 @@ export interface UploadOptions {
    *
    * Worth setting for anything a user downloads: browsers ignore the `download`
    * attribute on cross-origin links, so the saved filename is always the URL's
-   * basename — which is Cloudinary's random id unless we name it here.
+   * basename - which is Cloudinary's random id unless we name it here.
    * Must be unique per file, since a repeat overwrites the earlier upload.
    */
   publicId?: string;
@@ -126,7 +126,7 @@ export const uploadToCloudinary = async (
 /**
  * Delete a file from Cloudinary by its public ID.
  *
- * `resourceType` must match what the asset was uploaded with — Cloudinary
+ * `resourceType` must match what the asset was uploaded with - Cloudinary
  * namespaces destroy() by resource type, so deleting a "video" or "raw"
  * upload without passing it here silently does nothing (`image` is the
  * SDK's own default).

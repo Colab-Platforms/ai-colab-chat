@@ -16,7 +16,7 @@ import {
 /**
  * A renderer turns a validated spec into the bytes of one file format.
  *
- * Every format shares the same `DocumentSpec` input on purpose — the spec is
+ * Every format shares the same `DocumentSpec` input on purpose - the spec is
  * the contract with the model, so adding a format must never mean adding a
  * second thing for the model to learn.
  */
@@ -24,7 +24,7 @@ import {
  * A renderer, tagged with the spec shape it consumes.
  *
  * Tagged rather than widened to a union parameter so the worker has to narrow
- * before calling — handing a `DocumentSpec` to the PPTX renderer would
+ * before calling - handing a `DocumentSpec` to the PPTX renderer would
  * otherwise typecheck and fail at runtime on `spec.slides`.
  */
 export type RendererEntry =
@@ -46,7 +46,7 @@ export type RendererEntry =
  *
  * Deliberately `Partial`: the Prisma enum lists all four formats, but only the
  * ones registered here are real. Everything else in the pipeline asks this map
- * rather than assuming — which is what stops "make me an excel" from quietly
+ * rather than assuming - which is what stops "make me an excel" from quietly
  * handing back a PDF. Implementing a format means adding one line here.
  */
 const RENDERERS: Partial<Record<DocumentFormat, RendererEntry>> = {
@@ -71,7 +71,7 @@ export const getSupportedFormats = (): DocumentFormat[] =>
  *
  * PDF is the fallback because it is the only format guaranteed to be
  * registered. Callers must disclose the substitution to the user rather than
- * silently swapping — an undisclosed swap is the exact failure this registry
+ * silently swapping - an undisclosed swap is the exact failure this registry
  * exists to prevent.
  */
 export const FALLBACK_FORMAT: DocumentFormat = "PDF";

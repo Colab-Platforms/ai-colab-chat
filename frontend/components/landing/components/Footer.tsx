@@ -60,7 +60,7 @@ export function Footer() {
         className="container mx-auto px-5"
       >
 
-        {/* Top row — logo + socials */}
+        {/* Top row - logo + socials */}
         <div className="md:flex md:items-start md:justify-between">
           <Link href="/" className="flex items-center gap-x-2" aria-label="ColabPlatforms.ai">
             <Image
@@ -97,16 +97,16 @@ export function Footer() {
           </ul>
         </div>
 
-        {/* Bottom grid — copyright + nav + legal */}
+        {/* Bottom grid - copyright + nav + legal */}
         <div className=" mt-6 pt-6 md:mt-4 md:pt-8 lg:grid lg:grid-cols-10">
 
-          {/* Copyright — left col on lg */}
+          {/* Copyright - left col on lg */}
           <div className="mt-6 text-sm leading-6 text-gray-400 dark:text-gray-500 whitespace-nowrap lg:mt-0 lg:row-[1/3] lg:col-[1/4]">
             <div>© {year} ColabPlatforms.ai</div>
             <div className="mt-0.5">All rights reserved.</div>
           </div>
 
-          {/* Main nav links — right-aligned on lg */}
+          {/* Main nav links - right-aligned on lg */}
           <nav className="lg:mt-0 lg:col-[4/11]">
             <ul className="list-none flex flex-wrap -my-1 -mx-2 lg:justify-end">
               {mainLinks.map((link, i) => (
@@ -122,7 +122,7 @@ export function Footer() {
             </ul>
           </nav>
 
-          {/* Legal links — right-aligned on lg */}
+          {/* Legal links - right-aligned on lg */}
           <div className="mt-6 lg:mt-0 lg:col-[4/11]">
             <ul className="list-none flex flex-wrap -my-1 -mx-3 lg:justify-end">
               {legalLinks.map((link, i) => (

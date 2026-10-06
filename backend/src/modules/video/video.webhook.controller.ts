@@ -8,7 +8,7 @@ import type { VideoJobPollResult, VideoJobStatus } from "@/utils/openrouterVideo
 const SIGNATURE_MAX_AGE_SECONDS = 5 * 60;
 
 /**
- * Verifies X-OpenRouter-Signature: t={timestamp},v1={hash} — HMAC-SHA256 of
+ * Verifies X-OpenRouter-Signature: t={timestamp},v1={hash} - HMAC-SHA256 of
  * "{timestamp},{rawBody}" using the workspace signing secret. Uses the exact
  * raw bytes (captured globally in index.ts's express.json verify hook), not
  * the re-serialized req.body, since re-serializing JSON can change key
@@ -18,11 +18,11 @@ const SIGNATURE_MAX_AGE_SECONDS = 5 * 60;
 function verifySignature(req: Request): boolean {
   const secret = process.env.OPENROUTER_WEBHOOK_SECRET;
   if (!secret) {
-    // No secret configured — accept but log loudly, so this is visible
+    // No secret configured - accept but log loudly, so this is visible
     // immediately in staging rather than silently insecure forever. Set
     // OPENROUTER_WEBHOOK_SECRET once configured in OpenRouter's workspace
     // settings to enforce verification.
-    console.warn("[video-webhook] OPENROUTER_WEBHOOK_SECRET not set — accepting unverified webhook");
+    console.warn("[video-webhook] OPENROUTER_WEBHOOK_SECRET not set - accepting unverified webhook");
     return true;
   }
 
@@ -58,16 +58,16 @@ function verifySignature(req: Request): boolean {
 }
 
 export async function openRouterVideoWebhook(req: Request, res: Response) {
-  vlog("webhook", `received — jobId=${(req.body as any)?.id} status=${(req.body as any)?.status}`);
+  vlog("webhook", `received - jobId=${(req.body as any)?.id} status=${(req.body as any)?.status}`);
 
   if (!verifySignature(req)) {
-    vlogError("webhook", "signature verification FAILED — rejecting", (req.body as any)?.id);
+    vlogError("webhook", "signature verification FAILED - rejecting", (req.body as any)?.id);
     return res.status(401).json({ status: false, message: "Invalid signature" });
   }
   vlog("webhook", "signature verified OK");
 
   // OpenRouter's webhook body carries the same job fields the poll endpoint
-  // returns — see the "Poll Response" shape in the docs.
+  // returns - see the "Poll Response" shape in the docs.
   const body = req.body as {
     id?: string;
     status?: VideoJobStatus;
@@ -77,8 +77,8 @@ export async function openRouterVideoWebhook(req: Request, res: Response) {
   };
 
   if (!body?.id || !body?.status) {
-    vlog("webhook", "ignored — missing job id/status in payload");
-    return res.status(200).json({ status: true, message: "Ignored — missing job id/status" });
+    vlog("webhook", "ignored - missing job id/status in payload");
+    return res.status(200).json({ status: true, message: "Ignored - missing job id/status" });
   }
 
   const video = await prisma.generatedVideo.findFirst({
@@ -88,12 +88,12 @@ export async function openRouterVideoWebhook(req: Request, res: Response) {
 
   if (!video) {
     // Could be a job from another environment sharing the same OpenRouter
-    // account, or a duplicate delivery after the row was deleted — either
+    // account, or a duplicate delivery after the row was deleted - either
     // way, 200 so OpenRouter doesn't keep retrying.
-    vlog("webhook", `no local row for externalJobId=${body.id} — ignoring`);
-    return res.status(200).json({ status: true, message: "Unknown job — ignored" });
+    vlog("webhook", `no local row for externalJobId=${body.id} - ignoring`);
+    return res.status(200).json({ status: true, message: "Unknown job - ignored" });
   }
-  vlog("webhook", `matched to job=${video.id} — applying status`);
+  vlog("webhook", `matched to job=${video.id} - applying status`);
 
   const poll: VideoJobPollResult = {
     id: body.id,
@@ -107,7 +107,7 @@ export async function openRouterVideoWebhook(req: Request, res: Response) {
     await applyTerminalStatus(video.id, poll);
   } catch (error) {
     vlogError("webhook", `failed to apply status for job=${video.id}`, error);
-    // Still 200 — OpenRouter would otherwise retry the webhook, and the
+    // Still 200 - OpenRouter would otherwise retry the webhook, and the
     // 20s-later safety-net poll cron will pick this row up regardless.
   }
 

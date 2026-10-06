@@ -192,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Listen for 401 unauthorized events fired by the API interceptor.
-  // Clearing user state here is enough — layout useEffects that watch `user`
+  // Clearing user state here is enough - layout useEffects that watch `user`
   // will handle the client-side redirect via Next.js router (no page reload).
   useEffect(() => {
     const handleUnauthorized = () => {

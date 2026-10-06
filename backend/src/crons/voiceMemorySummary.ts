@@ -4,7 +4,7 @@ import { generateVoiceMemorySummaryForUser } from "@/modules/voice/voice-memory.
 
 const task = () => {
   // 11 PM in the product's home timezone (matches User.timezone's default
-  // and the Indian-user-facing accent work already done for voice) —
+  // and the Indian-user-facing accent work already done for voice) -
   // explicit `timezone` so this fires at 11 PM IST regardless of what
   // timezone the host machine/container actually runs in (Render's default
   // is UTC, which would otherwise fire this at 4:30 AM IST).
@@ -19,7 +19,7 @@ const task = () => {
         });
 
         console.log(
-          `[voice-memory] nightly run — ${usersWithVoiceChats.length} user(s) with voice chats`,
+          `[voice-memory] nightly run - ${usersWithVoiceChats.length} user(s) with voice chats`,
         );
 
         for (const { userId } of usersWithVoiceChats) {

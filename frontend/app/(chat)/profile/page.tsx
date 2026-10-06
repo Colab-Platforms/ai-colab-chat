@@ -48,7 +48,7 @@ export default function DashboardPage() {
         setChartDays(data?.chartDays ?? 30);
         setDailyByModel(Array.isArray(data?.dailyByModel) ? data.dailyByModel : []);
       } catch {
-        // silently swallow — UI shows zeros
+        // silently swallow - UI shows zeros
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -193,7 +193,7 @@ export default function DashboardPage() {
           <CardDescription>
             {wallet?.currentPeriodStart
               ? "Total tokens per day by model since your current plan renewed (UTC)."
-              : `Total tokens per day by model — last ${chartDays} days (UTC).`}
+              : `Total tokens per day by model - last ${chartDays} days (UTC).`}
           </CardDescription>
         </CardHeader>
         <CardContent>

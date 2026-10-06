@@ -27,7 +27,7 @@ const THEMES: Array<{ value: string; label: string }> = [
   { value: "report", label: "Report" },
 ];
 
-// PPTX-only — a deck gets its own richer templates (fonts, decoration, photo
+// PPTX-only - a deck gets its own richer templates (fonts, decoration, photo
 // layouts) rather than the flat document themes above. Keys must match
 // backend/src/modules/document/document.pptxTemplates.ts.
 const PPTX_TEMPLATES: Array<{ value: string; label: string }> = [

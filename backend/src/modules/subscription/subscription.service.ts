@@ -12,7 +12,7 @@ class SubscriptionService {
     private static readonly PENDING_AUTH_WINDOW_MINUTES = Number(process.env.SUBSCRIPTION_PENDING_AUTH_WINDOW_MINUTES ?? 15);
 
     /**
-     * Plan prices are stored tax-exclusive — this is the live rate GST gets
+     * Plan prices are stored tax-exclusive - this is the live rate GST gets
      * added at the point of actually charging Cashfree (same CreditPricingConfig
      * row credit top-ups already read). Falls back to 18% only if the config
      * row is somehow missing.
@@ -211,7 +211,7 @@ class SubscriptionService {
                     meta: { reason: "FREE_PLAN_ACTIVATION", planId: plan.id, planName: plan.name },
                 });
 
-                // Bundled video credits reset (overwrite) to this plan's grant —
+                // Bundled video credits reset (overwrite) to this plan's grant -
                 // unlike tokens above, they never carry forward across a switch.
                 await creditBundledCredits(tx, {
                     userId,

@@ -9,7 +9,7 @@ export async function seedModelProviders() {
         await prisma.modelProvider.update({
             where: { id: existing.id },
             data: {
-                description: "OpenRouter API — multi-model gateway",
+                description: "OpenRouter API - multi-model gateway",
                 apiKey: process.env.OPENROUTER_API_KEY ?? null,
             },
         });
@@ -17,7 +17,7 @@ export async function seedModelProviders() {
         await prisma.modelProvider.create({
             data: {
                 name: "OpenRouter",
-                description: "OpenRouter API — multi-model gateway",
+                description: "OpenRouter API - multi-model gateway",
                 apiKey: process.env.OPENROUTER_API_KEY ?? null,
             },
         });

@@ -59,7 +59,7 @@ export default function CreditTopUpSuccessPage() {
           }
         }
       } catch {
-        // keep polling — a transient failure shouldn't end the flow early
+        // keep polling - a transient failure shouldn't end the flow early
       } finally {
         if (mounted) setLoading(false);
         if (Date.now() - startedAt > POLL_TIMEOUT_MS && intervalId) {

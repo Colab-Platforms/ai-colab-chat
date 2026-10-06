@@ -34,7 +34,7 @@ export function MicButton({ onResult, onStart, onStop, hasText, guideId }: MicBu
     stopListening,
   } = useSpeechRecognition();
 
-  // Fire onResult whenever transcript changes — combine final + interim
+  // Fire onResult whenever transcript changes - combine final + interim
   const prevRef = useRef("");
   useEffect(() => {
     let combined = transcript;

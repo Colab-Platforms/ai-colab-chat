@@ -142,7 +142,7 @@ export default function PlansAdminPage() {
     { key: "models", label: "Models", render: (r) => r.features?.maxModels === -1 ? "∞" : r.features?.maxModels },
     {
       key: "videoCredits", label: "Video Credits",
-      render: (r) => r.videoGenEnabled ? `${r.monthlyVideoCredits ?? 0}/mo` : <span className="text-muted-foreground">—</span>,
+      render: (r) => r.videoGenEnabled ? `${r.monthlyVideoCredits ?? 0}/mo` : <span className="text-muted-foreground">-</span>,
     },
     {
       key: "actions", label: "Actions", className: "text-right",

@@ -8,10 +8,10 @@ import {
 /**
  * Safety net behind the two fast paths: create()/retry() kick submission
  * immediately, and a completed job normally arrives via the OpenRouter
- * webhook within seconds. This tick exists for what those miss — orphaned
+ * webhook within seconds. This tick exists for what those miss - orphaned
  * submissions from a mid-request crash, and jobs whose webhook never
  * arrived (delivery failure, unreachable callback URL in some
- * environments) — so a video isn't stuck forever on infra hiccups alone.
+ * environments) - so a video isn't stuck forever on infra hiccups alone.
  */
 const task = () => {
   cron.schedule("*/1 * * * *", async () => {

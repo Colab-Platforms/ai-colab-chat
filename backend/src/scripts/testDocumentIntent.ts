@@ -1,6 +1,6 @@
 /**
  * Exercises the two-stage document-intent detection against phrasings that
- * matter — especially the lookalikes that a keyword matcher would get wrong.
+ * matter - especially the lookalikes that a keyword matcher would get wrong.
  *
  * Usage: npx tsx src/scripts/testDocumentIntent.ts
  */
@@ -47,7 +47,7 @@ const CASES: Array<{ msg: string; expect: DocumentIntentMode; note?: string }> =
   {
     msg:
       "generate a pdf of following data\n" +
-      "Absolutely — here is a detailed, in-depth explanation of what an AI agent is. " +
+      "Absolutely - here is a detailed, in-depth explanation of what an AI agent is. " +
       "An AI agent is a system that perceives its environment and acts upon it. ".repeat(80),
     expect: "REPLACE",
     note: "long paste, instruction at START",

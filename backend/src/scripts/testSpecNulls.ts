@@ -39,7 +39,7 @@ const CASES: Array<{ label: string; spec: unknown }> = [
   },
 ];
 
-// These must STILL be rejected — loosening nulls must not loosen the schema.
+// These must STILL be rejected - loosening nulls must not loosen the schema.
 const MUST_FAIL: Array<{ label: string; spec: unknown }> = [
   { label: "required text null", spec: { title: "T", blocks: [{ type: "paragraph", text: null }] } },
   { label: "http image url", spec: { title: "T", blocks: [{ type: "image", url: "http://evil.com/x.png" }] } },

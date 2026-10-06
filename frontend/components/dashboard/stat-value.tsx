@@ -7,7 +7,7 @@ import { formatCompactNumber } from "@/lib/utils";
 /**
  * Renders a large number in compact form (307280 -> "307.3k") with a small
  * eye icon that reveals the exact full number in a tooltip on hover. Only
- * shows the eye icon when compacting actually changed the display — a
+ * shows the eye icon when compacting actually changed the display - a
  * number under 1,000 has nothing to reveal.
  */
 export function StatValue({ value }: { value: number }) {

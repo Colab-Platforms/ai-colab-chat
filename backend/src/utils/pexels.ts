@@ -27,7 +27,7 @@ export const searchPexelsPhoto = async (
 ): Promise<PexelsPhoto | null> => {
   const apiKey = process.env.PEXELS_API_KEY;
   if (!apiKey) {
-    dlog("pexels", "skipped — PEXELS_API_KEY is not set");
+    dlog("pexels", "skipped - PEXELS_API_KEY is not set");
     return null;
   }
 

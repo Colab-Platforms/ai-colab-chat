@@ -211,7 +211,7 @@ class UserService {
       Array.isArray(data.roles) &&
       callerRole === "SUPERADMIN"
     ) {
-      // Filter out SUPERADMIN from the input — it can never be assigned
+      // Filter out SUPERADMIN from the input - it can never be assigned
       const requestedRoles: string[] = data.roles.filter(
         (r: string) => r !== "SUPERADMIN" && r !== "SUPER_ADMIN",
       );

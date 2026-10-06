@@ -19,13 +19,13 @@ async function reclaimStaleDocuments() {
     .toDate();
 
   // Stuck in PROCESSING past this window means the worker died mid-render
-  // (deploy, restart, Chromium crash). Put it back on the queue — attempts is
+  // (deploy, restart, Chromium crash). Put it back on the queue - attempts is
   // already incremented per failure, so this cannot loop forever.
   const { count } = await prisma.generatedDocument.updateMany({
     where: { status: "PROCESSING", startedAt: { lt: staleBefore } },
     data: {
       status: "PENDING",
-      lastError: "Stale — worker did not complete in time",
+      lastError: "Stale - worker did not complete in time",
     },
   });
 

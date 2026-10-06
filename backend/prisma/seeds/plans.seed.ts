@@ -20,7 +20,7 @@ const PLANS = [
         },
     },
     {
-        // Formerly named "Pro" — renamed to "Plus" (see RENAMES below), same
+        // Formerly named "Pro" - renamed to "Plus" (see RENAMES below), same
         // ₹1799 tier/200 credits/1M tokens, name only.
         name: "Plus",
         monthlyPrice: 1799,
@@ -31,7 +31,7 @@ const PLANS = [
         documentGenEnabled: true,
         imageGenEnabled: true,
         videoGenEnabled: true,
-        // 200 credits/month, pegged to $0.03/credit real cost — see the $19
+        // 200 credits/month, pegged to $0.03/credit real cost - see the $19
         // plan pricing worksheet. Video limited to Seedance 2.0 Mini + Veo
         // 3.1 Lite via PlanVideoModel (seeded below); Seedance 2.0 full is
         // the higher tier only.
@@ -43,7 +43,7 @@ const PLANS = [
         },
     },
     {
-        // Formerly named "Pro Plus" — renamed to "Pro" (see RENAMES below),
+        // Formerly named "Pro Plus" - renamed to "Pro" (see RENAMES below),
         // same ₹3699 tier/410 credits/2M tokens, name only.
         name: "Pro",
         monthlyPrice: 3699,
@@ -54,7 +54,7 @@ const PLANS = [
         documentGenEnabled: true,
         imageGenEnabled: true,
         videoGenEnabled: true,
-        // 410 credits/month — all video models unlocked, including
+        // 410 credits/month - all video models unlocked, including
         // Seedance 2.0 full.
         monthlyVideoCredits: 410,
         features: {
@@ -69,7 +69,7 @@ const PLANS = [
 // in place instead of the upsert-by-name loop creating a new "Plus" row
 // while leaving the old "Pro Plus" row behind as an orphaned duplicate.
 // Order matters: rename the ₹1799 tier away from "Pro" FIRST so the ₹3699
-// tier can then safely take the "Pro" name without a collision. Idempotent —
+// tier can then safely take the "Pro" name without a collision. Idempotent -
 // safe to re-run once both renames have already landed (each is a no-op if
 // its target name already exists or its source name is already gone).
 const RENAMES: Array<{ from: string; to: string }> = [
@@ -90,7 +90,7 @@ async function applyPlanRenames() {
     }
 }
 
-// Which video models each plan may use — seeded by Model.externalId so this
+// Which video models each plan may use - seeded by Model.externalId so this
 // doesn't depend on model-row insertion order. Free gets none (videoGenEnabled
 // is false there anyway; this is belt-and-suspenders).
 const PLAN_VIDEO_MODELS: Record<string, string[]> = {
@@ -112,14 +112,14 @@ export async function seedPlans() {
     await applyPlanRenames();
 
     // Seeded first (moved ahead of the plan loop below) so gstPercent is
-    // available for the Cashfree sync — plan prices are stored tax-exclusive,
+    // available for the Cashfree sync - plan prices are stored tax-exclusive,
     // GST is added on top only at the point of actually charging/registering
     // an amount with Cashfree, never baked into Plan.monthlyPrice etc.
     console.log("💳 Seeding credit pricing config...");
     // costPerCreditInr is the RAW cost basis, no margin: $0.03/credit ×
     // ₹95.81/$ ≈ ₹2.85. A top-up's amount is de-taxed, has marginPercent
     // (10-20%, default 15) taken off the top, and only what's left converts
-    // to credits at this cost — see calculateTopUpCredits in walletUtils.ts.
+    // to credits at this cost - see calculateTopUpCredits in walletUtils.ts.
     const creditPricingData = { costPerCreditInr: 2.85, marginPercent: 15, gstPercent: 18 };
     const existingPricing = await prisma.creditPricingConfig.findFirst();
     const pricingConfig = existingPricing
@@ -182,7 +182,7 @@ export async function seedPlans() {
         const plan = await prisma.plan.findFirst({ where: { name: planName } });
         if (!plan) continue;
 
-        // Clear and re-write rather than diffing — the allow-list is small
+        // Clear and re-write rather than diffing - the allow-list is small
         // and this keeps the seed idempotent without a separate "remove
         // models no longer in the list" pass.
         await prisma.planVideoModel.deleteMany({ where: { planId: plan.id } });
@@ -190,7 +190,7 @@ export async function seedPlans() {
         for (const externalId of externalIds) {
             const model = await prisma.model.findFirst({ where: { externalId } });
             if (!model) {
-                console.warn(`  ⚠️ Video model "${externalId}" not found — skipping for plan "${planName}"`);
+                console.warn(`  ⚠️ Video model "${externalId}" not found - skipping for plan "${planName}"`);
                 continue;
             }
             await prisma.planVideoModel.create({ data: { planId: plan.id, modelId: model.id } });

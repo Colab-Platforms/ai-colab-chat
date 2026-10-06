@@ -15,7 +15,7 @@ async function main() {
     select: { userId: true },
   });
 
-  console.log(`[voice-memory] manual run — ${usersWithVoiceChats.length} user(s) with voice chats`);
+  console.log(`[voice-memory] manual run - ${usersWithVoiceChats.length} user(s) with voice chats`);
 
   for (const { userId } of usersWithVoiceChats) {
     try {

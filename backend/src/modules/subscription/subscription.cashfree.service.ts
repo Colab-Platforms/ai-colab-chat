@@ -289,10 +289,10 @@ class SubscriptionCashfreeService {
           : plan.yearlyPrice,
     );
 
-    // Plan.monthlyPrice/quarterlyPrice/yearlyPrice are stored tax-exclusive —
+    // Plan.monthlyPrice/quarterlyPrice/yearlyPrice are stored tax-exclusive -
     // this is the actual amount Cashfree charges the customer, so GST goes
     // on top here, not into the stored plan price. Defaults to 0 (no GST
-    // added) only if a caller genuinely has no rate to pass — every real
+    // added) only if a caller genuinely has no rate to pass - every real
     // call site should be passing the live CreditPricingConfig.gstPercent.
     const recurringAmount = applyGst(baseAmount, gstPercent);
 

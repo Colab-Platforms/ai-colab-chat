@@ -196,6 +196,109 @@ export const contextService = {
   delete: (id: number) => api.delete(`/contexts/${id}`),
 };
 
+export type KnowledgeSourceType =
+  | "DOCUMENT"
+  | "PAST_POST"
+  | "PRODUCT_DOC"
+  | "COMPETITOR"
+  | "NOTE";
+
+export const knowledgeService = {
+  list: (params?: { folderId?: number | null; type?: string }) =>
+    api.get("/knowledge/sources", {
+      params: {
+        ...params,
+        folderId: params?.folderId === null ? "null" : params?.folderId,
+      },
+    }),
+  addText: (data: {
+    folderId?: number | null;
+    type?: KnowledgeSourceType;
+    title: string;
+    text: string;
+    metadata?: Record<string, unknown>;
+  }) => api.post("/knowledge/sources", data),
+  upload: (
+    file: File,
+    opts: { folderId?: number | null; type?: KnowledgeSourceType; title?: string },
+  ) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (opts.folderId) formData.append("folderId", String(opts.folderId));
+    if (opts.type) formData.append("type", opts.type);
+    if (opts.title) formData.append("title", opts.title);
+    return api.post("/knowledge/sources/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  bulkPosts: (data: {
+    folderId?: number | null;
+    posts: Array<{
+      text: string;
+      title?: string;
+      platform?: string;
+      product?: string;
+      metrics?: Record<string, unknown>;
+      publishedAt?: string;
+    }>;
+  }) => api.post("/knowledge/sources/bulk", data),
+  reindex: (id: number) => api.post(`/knowledge/sources/${id}/reindex`),
+  delete: (id: number) => api.delete(`/knowledge/sources/${id}`),
+  search: (data: {
+    folderId?: number | null;
+    query: string;
+    k?: number;
+    types?: KnowledgeSourceType[];
+    metadata?: Record<string, unknown>;
+  }) => api.post("/knowledge/search", data),
+};
+
+export const contentService = {
+  list: (params?: { chatId?: number; folderId?: number; status?: string }) =>
+    api.get("/content/items", { params }),
+  getById: (id: number) => api.get(`/content/items/${id}`),
+  update: (id: number, data: { body: Record<string, unknown>; title?: string }) =>
+    api.patch(`/content/items/${id}`, data),
+  regenerate: (id: number, data: { instruction: string; modelId?: number }) =>
+    api.post(`/content/items/${id}/regenerate`, data),
+  approve: (id: number) => api.post(`/content/items/${id}/approve`),
+  restoreVersion: (id: number, version: number) =>
+    api.post(`/content/items/${id}/versions/${version}/restore`),
+  delete: (id: number) => api.delete(`/content/items/${id}`),
+  getBrandKit: (folderId: number | null) =>
+    api.get("/content/brand-kit", {
+      params: { folderId: folderId === null ? "null" : folderId },
+    }),
+  saveBrandKit: (data: {
+    folderId?: number | null;
+    name: string;
+    voice?: string;
+    audience?: string;
+    bannedWords?: string[];
+    mustInclude?: string[];
+    ctaRules?: string | null;
+    examples?: string[];
+  }) => api.put("/content/brand-kit", data),
+  listProducts: (folderId: number | null) =>
+    api.get("/content/products", {
+      params: { folderId: folderId === null ? "null" : folderId },
+    }),
+  createProduct: (data: ContentProductInput & { folderId?: number | null }) =>
+    api.post("/content/products", data),
+  updateProduct: (id: number, data: ContentProductInput) =>
+    api.put(`/content/products/${id}`, data),
+  deleteProduct: (id: number) => api.delete(`/content/products/${id}`),
+};
+
+export interface ContentProductInput {
+  name: string;
+  summary?: string;
+  features?: string[];
+  pricing?: string | null;
+  claimsAllowed?: string[];
+  claimsForbidden?: string[];
+}
+
 export const documentService = {
   list: (params?: Record<string, string>) => api.get("/documents", { params }),
   getById: (id: number) => api.get(`/documents/${id}`),

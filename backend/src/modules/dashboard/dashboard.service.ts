@@ -11,7 +11,7 @@ const usageLogService = new UsageLogService();
 
 class DashboardService {
   async getSummary(userId: number): Promise<DashboardSummary> {
-    // Fetch wallet and subscription in parallel; both can fail gracefully —
+    // Fetch wallet and subscription in parallel; both can fail gracefully -
     // a missing CreditWallet (pre-existing subscription, or Free plan) is
     // expected, not an error.
     const [walletResult, creditWalletResult, subscriptionResult] = await Promise.allSettled([

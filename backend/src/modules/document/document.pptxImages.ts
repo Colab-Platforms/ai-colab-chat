@@ -10,7 +10,7 @@ const MAX_QUERY_CHARS = 80;
  * Turns a title/subtitle into a Pexels search query.
  *
  * Slide titles are often full statements ("Revenue grew 40% in Q3"), which
- * makes a poor photo query verbatim — Pexels has no concept of the numbers
+ * makes a poor photo query verbatim - Pexels has no concept of the numbers
  * in it. Stripping trailing punctuation and truncating keeps it a short
  * keyword phrase without trying to be clever about extraction.
  */
@@ -25,11 +25,11 @@ const buildQuery = (...parts: Array<string | undefined>): string =>
 /**
  * Fetches a topic-relevant stock photo for the cover slide, and for a
  * handful of content slides when the template makes room for one, then
- * re-hosts each on Cloudinary — the only host every renderer allows through
+ * re-hosts each on Cloudinary - the only host every renderer allows through
  * `isAllowedImageUrl`.
  *
  * Called once, right after spec generation and before the spec is persisted
- * (see document.generation.service.ts) — a later template switch re-renders
+ * (see document.generation.service.ts) - a later template switch re-renders
  * from the already-enriched spec rather than re-querying Pexels.
  *
  * Never throws: a Pexels miss, a rate limit, or a Cloudinary upload failure

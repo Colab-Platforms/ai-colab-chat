@@ -62,7 +62,7 @@ export default function WalletPage() {
       .get()
       .then((res) => setCreditWallet(res.data.data))
       // A 404 here just means no CreditWallet row exists yet (e.g. the
-      // account subscribed before video credits existed, or is on Free) —
+      // account subscribed before video credits existed, or is on Free) -
       // not an error to hide the section for. It's created on first top-up
       // or the next plan renewal.
       .catch(() => setCreditWallet(null))
@@ -399,7 +399,7 @@ export default function WalletPage() {
             {wallet.currentPeriodStart
               ? new Date(wallet.currentPeriodStart).toLocaleDateString()
               : "N/A"}{" "}
-            —{" "}
+            -{" "}
             {wallet.currentPeriodEnd
               ? new Date(wallet.currentPeriodEnd).toLocaleDateString()
               : "N/A"}
@@ -432,13 +432,13 @@ export default function WalletPage() {
           <div>
             <h2 className="text-lg font-semibold">Video Credits</h2>
             <p className="text-muted-foreground text-sm mt-1">
-              Separate from tokens — spent only on video generation, top up any time
+              Separate from tokens - spent only on video generation, top up any time
             </p>
           </div>
 
           {!creditWallet && (
             <p className="text-xs text-muted-foreground -mt-2">
-              No credits yet — they're added automatically on your plan's next renewal, or as soon as you top up below.
+              No credits yet - they're added automatically on your plan's next renewal, or as soon as you top up below.
             </p>
           )}
 

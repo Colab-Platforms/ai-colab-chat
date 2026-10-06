@@ -3,7 +3,7 @@ import { parseOffice } from "officeparser";
 import { SPREADSHEET_MIME_TYPES, parseSpreadsheetFromUrl } from "@/utils/spreadsheet.js";
 import { parsePdfFromUrl } from "@/utils/pdf.js";
 
-// Same mime lists / caps as chat.stream.ts's buildAttachmentContentParts —
+// Same mime lists / caps as chat.stream.ts's buildAttachmentContentParts -
 // duplicated rather than shared since that function's constants are private
 // to that module and this is the only other caller.
 const PDF_MIME_TYPES = ["application/pdf"];
@@ -35,7 +35,7 @@ interface AttachmentLike {
 }
 
 /** Extracts a plain-text summary of a non-image attachment for voice
- * context. Images are intentionally skipped — the voice LLM pipeline isn't
+ * context. Images are intentionally skipped - the voice LLM pipeline isn't
  * wired for multimodal input, unlike text-chat's image_url content parts. */
 export async function extractAttachmentText(
   attachment: AttachmentLike,

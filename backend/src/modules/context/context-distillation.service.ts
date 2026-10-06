@@ -5,13 +5,13 @@ const DISTILLATION_MODEL =
   process.env.DISTILLATION_MODEL || "anthropic/claude-haiku-4.5";
 
 // Mirrors the per-folder cap enforced in context.service.ts for
-// user-authored FOLDER contexts — auto-distilled ones share the same budget.
+// user-authored FOLDER contexts - auto-distilled ones share the same budget.
 const MAX_FOLDER_CONTEXTS = 10;
 const SUMMARY_TITLE = "Project Summary (auto)";
 const MAX_MESSAGES = 40;
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_FACTS_PER_RUN = 5;
-// Mirrors context.validators.ts's `memory` cap (500 chars) — that Joi
+// Mirrors context.validators.ts's `memory` cap (500 chars) - that Joi
 // validator only guards the user-facing POST/PUT /contexts routes, and this
 // service writes ContextMemory rows directly via Prisma, bypassing it. Kept
 // equal to MAX_MEMORY_CHARS (not larger) so a user re-saving this row
@@ -31,7 +31,7 @@ function buildPrompt(
 ) {
   const systemPrompt = [
     "You extract durable project knowledge from a conversation snippet.",
-    "Only extract facts, decisions, or preferences that would still matter in a future, unrelated conversation about this same project — not small talk, not anything already covered.",
+    "Only extract facts, decisions, or preferences that would still matter in a future, unrelated conversation about this same project - not small talk, not anything already covered.",
     "Do not repeat or rephrase anything already present in existingMemories.",
     'Respond with strict JSON: { "facts": [ { "title": string (max 6 words), "memory": string (max 2 sentences) } ] }.',
     "Return at most 3 facts. Return an empty array if nothing new and durable was said.",
@@ -54,7 +54,7 @@ function buildPrompt(
 function parseFacts(rawContent: string | null | undefined): DistilledFact[] {
   if (!rawContent) return [];
 
-  // response_format: json_object is a request, not a guarantee — some
+  // response_format: json_object is a request, not a guarantee - some
   // models (observed with the configured DISTILLATION_MODEL via OpenRouter)
   // still wrap the JSON in a markdown code fence. Strip it before parsing.
   const cleaned = rawContent
@@ -165,15 +165,15 @@ async function mergeIntoSummary(
     return;
   }
 
-  // No summary row yet — make room for it if the folder is already at cap.
+  // No summary row yet - make room for it if the folder is already at cap.
   if (currentActiveCount >= MAX_FOLDER_CONTEXTS) {
     const evicted = await evictOldestDistilled(userId, folderId);
     if (!evicted) {
-      // Cap is filled entirely by the user's own contexts — never evict
+      // Cap is filled entirely by the user's own contexts - never evict
       // those to make room for an auto-generated one. Drop this run's
       // facts instead of exceeding the folder's context budget.
       console.log(
-        `[context-distillation] folder=${folderId} at cap with no distilled rows to evict — skipping summary creation`,
+        `[context-distillation] folder=${folderId} at cap with no distilled rows to evict - skipping summary creation`,
       );
       return;
     }
@@ -220,7 +220,7 @@ export async function distillChatIntoFolderMemory(
     select: { role: true, content: true },
   });
 
-  // Nothing new since the last run — skip the LLM call entirely.
+  // Nothing new since the last run - skip the LLM call entirely.
   if (recentMessages.length === 0) return;
 
   const existingMemories = await prisma.contextMemory.findMany({
@@ -256,7 +256,7 @@ export async function distillChatIntoFolderMemory(
 
   const rawContent = completion.choices?.[0]?.message?.content;
 
-  // Internal system call — not charged against the user's token wallet or
+  // Internal system call - not charged against the user's token wallet or
   // logged via UsageLog, since that table's modelId is a hard FK into the
   // user-facing Model catalog and this model isn't (deliberately) part of
   // it. If real cost tracking for this job becomes a priority, that's a

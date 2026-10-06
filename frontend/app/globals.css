@@ -362,7 +362,7 @@ body {
 }
 
 /* Light mode: the lavender (#DCD0FF) / mauve (#a791b6) strokes tuned for a
-   dark hero background wash out to near-invisible against a white one —
+   dark hero background wash out to near-invisible against a white one -
    swap in a darker, more saturated violet and raise the opacity floor. */
 html:not(.dark) .circles-group > path,
 html:not(.dark) .circles-group g[mask] path,

@@ -1,6 +1,6 @@
 /**
  * Single source of truth for turning a Plan record into human-readable
- * feature lines — used by the real subscription page and both marketing
+ * feature lines - used by the real subscription page and both marketing
  * pricing pages, which previously each had their own near-duplicate parser.
  */
 export interface PlanFeatureLines {
@@ -31,7 +31,7 @@ export function getPlanFeatureLines(plan: any): PlanFeatureLines {
     included.push(formatTokenLimit(Number(plan.tokenLimit)));
   }
 
-  // Model choice isn't plan-restricted on any tier — every plan can use any
+  // Model choice isn't plan-restricted on any tier - every plan can use any
   // model, gated purely by wallet balance (paid models bill real cost against
   // the token wallet; once it's exhausted, only free models keep working).
   included.push("All AI models, including paid");

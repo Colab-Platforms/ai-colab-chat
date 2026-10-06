@@ -5,6 +5,7 @@ import contextDistillationCron from "./contextDistillation.js";
 import documentGenerationCron from "./documentGeneration.js";
 import voiceMemorySummaryCron from "./voiceMemorySummary.js";
 import videoGenerationCron from "./videoGeneration.js";
+import knowledgeIngestionCron from "./knowledgeIngestion.js";
 
 export const startCronJobs = () => {
     subscriptionExpiryCron();
@@ -14,5 +15,6 @@ export const startCronJobs = () => {
     documentGenerationCron();
     voiceMemorySummaryCron();
     videoGenerationCron();
+    knowledgeIngestionCron();
     console.log("⏰ Cron jobs started");
 };

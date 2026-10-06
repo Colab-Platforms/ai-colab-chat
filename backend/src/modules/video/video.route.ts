@@ -10,7 +10,7 @@ const router = Router();
 router.get("/models", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideoModels);
 router.get("/", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideos);
 router.get("/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.getVideoById);
-// Coarse "does this plan allow video at all" gate — the specific-model
+// Coarse "does this plan allow video at all" gate - the specific-model
 // allow-list check (e.g. Seedance 2.0 full on Pro Plus only) still happens
 // in video.service.ts::create/retry, once the model is loaded.
 router.post(
@@ -27,7 +27,7 @@ router.post(
 );
 router.delete("/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.deleteVideo);
 
-// Unauthenticated — verified via HMAC signature instead (see video.webhook.controller.ts).
+// Unauthenticated - verified via HMAC signature instead (see video.webhook.controller.ts).
 router.post("/webhooks/openrouter", openRouterVideoWebhook);
 
 export default router;

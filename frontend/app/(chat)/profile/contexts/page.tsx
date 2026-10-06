@@ -332,7 +332,7 @@ export default function ContextsPage() {
           columns={columns}
           data={contexts}
           title="Contexts"
-          description="Memory the AI remembers across your chats — global, per-project, or chat-specific"
+          description="Memory the AI remembers across your chats - global, per-project, or chat-specific"
           searchPlaceholder="Search contexts..."
           headerActions={
             <Button onClick={handleOpenCreate} size="sm" className="gap-2">

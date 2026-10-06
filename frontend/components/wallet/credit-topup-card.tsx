@@ -43,7 +43,7 @@ export function CreditTopUpCard({ onCheckoutStart }: CreditTopUpCardProps) {
   const effectiveAmount = customAmount ? Number(customAmount) : amount;
 
   // Mirrors calculateTopUpCredits in backend/src/utils/walletUtils.ts exactly
-  // — strip GST, take the margin off the top, convert what's left at cost.
+  // - strip GST, take the margin off the top, convert what's left at cost.
   const estimatedCredits = useMemo(() => {
     if (!pricing || !effectiveAmount || effectiveAmount <= 0) return null;
     const preTax = effectiveAmount / (1 + pricing.gstPercent / 100);
@@ -79,7 +79,7 @@ export function CreditTopUpCard({ onCheckoutStart }: CreditTopUpCardProps) {
         <CardTitle className="text-base flex items-center gap-2">
           <Zap className="w-4 h-4 text-amber-500" /> Top Up Video Credits
         </CardTitle>
-        <CardDescription>Pay as you go — add credits any time, they never expire.</CardDescription>
+        <CardDescription>Pay as you go - add credits any time, they never expire.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">

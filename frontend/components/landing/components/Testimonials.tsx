@@ -4,7 +4,7 @@ import { TestimonialsColumn } from "@/components/ui/testimonials-columns-1";
 
 const testimonials = [
   {
-    text: "This platform revolutionized our team's AI workflow — multi-model access and rolling context windows keep us sharp and productive.",
+    text: "This platform revolutionized our team's AI workflow - multi-model access and rolling context windows keep us sharp and productive.",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&crop=face",
     name: "Briana Patton",
     role: "Operations Manager",
@@ -16,7 +16,7 @@ const testimonials = [
     role: "IT Manager",
   },
   {
-    text: "The support team is exceptional — they guided us through onboarding and keep the platform running flawlessly.",
+    text: "The support team is exceptional - they guided us through onboarding and keep the platform running flawlessly.",
     image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&crop=face",
     name: "Saman Malik",
     role: "Customer Support Lead",
@@ -86,7 +86,7 @@ export const Testimonials = () => {
             <span className="text-landing-primary dark:text-landing-primary">think with AI</span>
           </h2>
           <p className="text-center mt-4 text-gray-600 dark:text-gray-400 max-w-3xl text-balance">
-            From solo founders to enterprise teams — see why professionals across industries rely on our platform every day.
+            From solo founders to enterprise teams - see why professionals across industries rely on our platform every day.
           </p>
         </motion.div>
 

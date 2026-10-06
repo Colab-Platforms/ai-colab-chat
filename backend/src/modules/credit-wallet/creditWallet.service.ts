@@ -20,7 +20,7 @@ class CreditWalletService {
       );
     }
     // creditsRemaining is the single number the frontend shows/compares
-    // against — bundledCredits/topupCredits stay for the breakdown UI.
+    // against - bundledCredits/topupCredits stay for the breakdown UI.
     return {
       ...wallet,
       creditsRemaining: wallet.bundledCredits + wallet.topupCredits,
@@ -58,7 +58,7 @@ class CreditWalletService {
     return formatPaginationResponse(transactions, totalRecords, page, pageSize);
   }
 
-  /** Pay-as-you-go top-up — delegates order creation to PaymentService, which owns Cashfree integration. */
+  /** Pay-as-you-go top-up - delegates order creation to PaymentService, which owns Cashfree integration. */
   async createTopUp(userId: number, amountInr: number) {
     return paymentService.createCreditTopUp(userId, amountInr);
   }

@@ -22,7 +22,7 @@ interface PlanCapabilities {
   refresh: () => void;
 }
 
-// Free-plan-shaped defaults — used while loading and if the request fails,
+// Free-plan-shaped defaults - used while loading and if the request fails,
 // so a lock icon flickering to "unlocked" never happens: worst case a paid
 // user briefly sees things as locked, never the other way around.
 const DEFAULTS: Omit<PlanCapabilities, "refresh"> = {

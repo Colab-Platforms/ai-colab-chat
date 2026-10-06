@@ -8,7 +8,7 @@ export function ServiceWorkerRegister() {
 
     // In development the SW's stale-while-revalidate cache serves Next's dev
     // chunks (whose URLs are stable, unlike hashed production assets) from a
-    // cache that never invalidates — so edits appear not to take effect. Tear
+    // cache that never invalidates - so edits appear not to take effect. Tear
     // down any SW a previous dev/prod visit left behind instead of registering.
     if (process.env.NODE_ENV !== "production") {
       void navigator.serviceWorker
@@ -22,7 +22,7 @@ export function ServiceWorkerRegister() {
             : undefined,
         )
         .catch(() => {
-          // Nothing to clean up, or storage is unavailable — ignore.
+          // Nothing to clean up, or storage is unavailable - ignore.
         });
       return;
     }

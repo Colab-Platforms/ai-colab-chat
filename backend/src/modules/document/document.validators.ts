@@ -61,7 +61,7 @@ export const validateCreateDocumentSchema = (data: unknown) => {
 /**
  * v1 style-edit surface: theme/title only. Structural spec edits (reordering,
  * adding/removing blocks or pages) are a later phase and will get their own,
- * stricter schema — this one deliberately does not accept a `spec` field.
+ * stricter schema - this one deliberately does not accept a `spec` field.
  */
 export const updateDocumentStyleSchema = Joi.object({
   title: Joi.string().trim().min(1).max(MAX_TITLE_CHARS).optional(),
@@ -92,7 +92,7 @@ const text = (max = MAX_TEXT_CHARS) => Joi.string().allow("").max(max);
  * Optional fields must tolerate null, not just "".
  *
  * Models routinely emit `"attribution": null` for an absent optional value,
- * which is semantically identical to omitting the key — but a bare
+ * which is semantically identical to omitting the key - but a bare
  * Joi.string().allow("") rejects it, forcing a full retry and doubling the
  * cost of the document for nothing.
  */
@@ -103,7 +103,7 @@ const optionalText = (max = MAX_TEXT_CHARS) =>
  * One schema per block type, keyed by type.
  *
  * Keyed rather than inlined into `alternatives()` so the presentation spec can
- * compose its own narrower subset from the same definitions — two hand-written
+ * compose its own narrower subset from the same definitions - two hand-written
  * copies would drift the moment a block gains a field.
  */
 const BLOCK_SCHEMAS: Record<string, Joi.ObjectSchema> = {
@@ -167,7 +167,7 @@ const BLOCK_SCHEMAS: Record<string, Joi.ObjectSchema> = {
   }),
   image: Joi.object({
     type: Joi.string().valid("image").required(),
-    // Only https — the renderer additionally enforces a host allowlist. A
+    // Only https - the renderer additionally enforces a host allowlist. A
     // model-supplied file://, data: or http:// URL is an SSRF / local-file
     // read against our own renderer, so it never gets past this line.
     url: Joi.string().uri({ scheme: ["https"] }).max(2000).required(),
@@ -183,7 +183,7 @@ const BLOCK_SCHEMAS: Record<string, Joi.ObjectSchema> = {
  *
  * Deliberately NOT `Joi.alternatives().try(...)`. When a value fails every
  * branch of an alternatives schema, Joi reports only "does not match any of
- * the allowed types" and throws away the per-branch reasons — so a rejected
+ * the allowed types" and throws away the per-branch reasons - so a rejected
  * spec was undiagnosable, and the retry fed the model an error it could not
  * act on, turning a repair into a full reroll.
  *
@@ -254,7 +254,7 @@ const slideSchema = Joi.object({
   subtitle: optionalText(300),
   blocks: Joi.array()
     .items(slideBlockSchema)
-    // A slide with no blocks is legitimate — title and section slides are
+    // A slide with no blocks is legitimate - title and section slides are
     // exactly that.
     .max(MAX_BLOCKS_PER_SLIDE)
     .default([]),
@@ -371,7 +371,7 @@ export interface PruneResult {
  * blocks out of 150 can cost half the document plus a second full model call.
  * Dropping the bad entries keeps everything else and costs nothing.
  *
- * Only meaningful for entry-level failures — a spec missing its title prunes
+ * Only meaningful for entry-level failures - a spec missing its title prunes
  * nothing, reports `dropped: 0`, and the caller falls through to a real retry.
  */
 export const pruneInvalidEntries = (
@@ -424,7 +424,7 @@ export const pruneInvalidEntries = (
     const source = data as { sheets?: unknown };
     if (!Array.isArray(source.sheets)) return untouched;
 
-    // Rows are the workbook's repeating unit — one malformed row out of 200
+    // Rows are the workbook's repeating unit - one malformed row out of 200
     // should not force a reroll of the whole sheet.
     const rowSchema = Joi.array().items(cellSchema).max(MAX_SHEET_COLUMNS);
     const sheets = source.sheets.map((sheet, sheetIndex) => {

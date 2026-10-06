@@ -38,7 +38,7 @@ interface MessageListProps {
   onSwitchToFreeModel?: (assistantMessageId: number, modelId: number) => void;
   /**
    * Generated videos aren't tied to any Message row (video generation is a
-   * standalone async job, not a chat.stream.ts turn — see modules/video on
+   * standalone async job, not a chat.stream.ts turn - see modules/video on
    * the backend), so they can't come through `messages`. They're merged
    * into the render list here purely by createdAt, so a video appears
    * inline exactly where it was generated in the conversation instead of
@@ -140,13 +140,13 @@ function processMessagesWithVersions(
   return result;
 }
 
-/** Discriminated render item — how `messages` and `videos` merge into one timeline. */
+/** Discriminated render item - how `messages` and `videos` merge into one timeline. */
 type RenderItem =
   | { kind: "message"; createdAt: string; message: Message; editVersions?: Message[]; editVersionIndex?: number }
   | { kind: "video"; createdAt: string; video: GeneratedVideo };
 
 /**
- * Stable merge by createdAt — both inputs already arrive in ascending
+ * Stable merge by createdAt - both inputs already arrive in ascending
  * order, so this is a linear merge rather than a full sort, and ties keep
  * the message before the video (arbitrary but deterministic).
  */

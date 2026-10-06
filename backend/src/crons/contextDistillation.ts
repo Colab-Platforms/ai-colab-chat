@@ -10,11 +10,11 @@ async function reclaimStaleJobs() {
   const staleBefore = dayjs().subtract(STALE_PROCESSING_MINUTES, "minute").toDate();
 
   // A job stuck in PROCESSING past this window means the worker died
-  // mid-run (deploy/restart/crash) — fail it out so it can be re-enqueued
+  // mid-run (deploy/restart/crash) - fail it out so it can be re-enqueued
   // naturally by the next assistant turn in that chat.
   await prisma.contextDistillationJob.updateMany({
     where: { status: "PROCESSING", updatedAt: { lt: staleBefore } },
-    data: { status: "FAILED", lastError: "Stale — worker did not complete in time" },
+    data: { status: "FAILED", lastError: "Stale - worker did not complete in time" },
   });
 }
 

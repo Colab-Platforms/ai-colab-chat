@@ -37,7 +37,7 @@ export const usesPastedSource = (userPrompt: string): boolean =>
  * The resolved intent is handed back to `maybeGenerateDocumentFromChat` after
  * the stream so the turn never pays for classification twice.
  *
- * Never throws — a failure here must leave the chat turn completely unchanged.
+ * Never throws - a failure here must leave the chat turn completely unchanged.
  */
 export async function prepareDocumentTurn(params: {
   chatId: number;
@@ -45,7 +45,7 @@ export async function prepareDocumentTurn(params: {
   lastAssistantAnswer?: string | null;
 }): Promise<{
   intent: DocumentIntent;
-  /** What will actually be rendered — may differ from `intent.format`. */
+  /** What will actually be rendered - may differ from `intent.format`. */
   effectiveFormat: DocumentFormat;
   systemNote: string;
 } | null> {
@@ -92,7 +92,7 @@ export async function prepareDocumentTurn(params: {
  * Bridges a finished chat turn into the document pipeline.
  *
  * The enqueue still runs AFTER the assistant answer is complete, because for
- * most requests the answer itself is the document's source material — "turn
+ * most requests the answer itself is the document's source material - "turn
  * that into a PDF" has nothing to work from until the answer exists. Only the
  * *decision* moved earlier, into `prepareDocumentTurn`.
  *
@@ -131,11 +131,11 @@ export async function maybeGenerateDocumentFromChat(params: {
   try {
     dlog(
       "chat:hook",
-      `turn complete chat=${chatId} message=${messageId} response=${modelResponseId ?? "-"} — checking document intent`,
+      `turn complete chat=${chatId} message=${messageId} response=${modelResponseId ?? "-"} - checking document intent`,
     );
 
     if (params.intent === null) {
-      dlog("chat:hook", "pre-stream pass found no document intent — skipping");
+      dlog("chat:hook", "pre-stream pass found no document intent - skipping");
       return null;
     }
 
@@ -143,17 +143,17 @@ export async function maybeGenerateDocumentFromChat(params: {
       params.intent ??
       (await detectDocumentIntent(userPrompt, assistantAnswer));
     if (intent.intent === "NONE") {
-      dlog("chat:hook", "no document requested — chat turn ends normally");
+      dlog("chat:hook", "no document requested - chat turn ends normally");
       return null;
     }
     if (params.intent) {
       dlog(
         "chat:hook",
-        `reusing pre-stream intent ${intent.intent} — no second classifier call`,
+        `reusing pre-stream intent ${intent.intent} - no second classifier call`,
       );
     }
 
-    // Guard against a duplicate document for the same model response — the
+    // Guard against a duplicate document for the same model response - the
     // regenerate/edit paths can re-run over an assistant turn that already
     // produced one.
     if (modelResponseId) {
@@ -164,7 +164,7 @@ export async function maybeGenerateDocumentFromChat(params: {
       if (existing) {
         dlog(
           "chat:hook",
-          `skipped — document ${existing.id} already exists for response ${modelResponseId}`,
+          `skipped - document ${existing.id} already exists for response ${modelResponseId}`,
         );
         return null;
       }
@@ -181,7 +181,7 @@ export async function maybeGenerateDocumentFromChat(params: {
     //  1. The user pasted the content themselves ("generate a pdf of the
     //     following data: …"). Their message IS the material.
     //  2. The user referred back ("make a pdf of the above summary"). The
-    //     document must come from the PREVIOUS answer — the current turn may
+    //     document must come from the PREVIOUS answer - the current turn may
     //     be nothing more than "Sure, generating that now!".
     //  3. Otherwise the answer just produced is the richest material.
     let sourceText = assistantAnswer?.trim() || "";
@@ -192,8 +192,8 @@ export async function maybeGenerateDocumentFromChat(params: {
       sourceKind = "user-pasted";
     } else if (intent.useLastAnswer) {
       // A prior document-generation turn deliberately leaves a content-free
-      // chat reply ("Your PDF is being prepared.") — see the REPLACE branch of
-      // buildDocumentSystemNote — so the real material for "now make a docx of
+      // chat reply ("Your PDF is being prepared.") - see the REPLACE branch of
+      // buildDocumentSystemNote - so the real material for "now make a docx of
       // the same data" lives in that document's own stored `sourceText`, not
       // in the chat message. Check that FIRST, or a same-format-again request
       // silently downgrades to a near-empty source.
@@ -271,7 +271,7 @@ export async function maybeGenerateDocumentFromChat(params: {
       sourceTextChars: sourceText.length,
     });
 
-    // Kick the worker rather than waiting for the cron tick — the user is
+    // Kick the worker rather than waiting for the cron tick - the user is
     // watching a card in the chat.
     void runPendingDocumentJobs();
 

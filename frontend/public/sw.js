@@ -35,13 +35,13 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   if (url.origin !== self.location.origin) return;
 
-  // API calls — network only
+  // API calls - network only
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(request));
     return;
   }
 
-  // Navigation — network first, fall back to cached page or root
+  // Navigation - network first, fall back to cached page or root
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
@@ -59,7 +59,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets — stale-while-revalidate
+  // Static assets - stale-while-revalidate
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(request).then((cached) => {

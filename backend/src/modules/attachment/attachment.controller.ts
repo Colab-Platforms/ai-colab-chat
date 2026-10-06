@@ -60,7 +60,7 @@ export const presendAttachment = async (
   }
 };
 
-/** DELETE /attachments/:id — delete a presend attachment */
+/** DELETE /attachments/:id - delete a presend attachment */
 export const deleteAttachment = async (
   req: Request,
   res: Response,
@@ -92,7 +92,7 @@ export const deleteAttachment = async (
   }
 };
 
-/** POST /attachments — legacy: upload tied to an existing message */
+/** POST /attachments - legacy: upload tied to an existing message */
 export const uploadAttachment = async (
   req: Request,
   res: Response,
@@ -139,7 +139,7 @@ export const uploadAttachment = async (
   }
 };
 
-/** GET /attachments/:id/download — stream an attachment from Cloudinary. */
+/** GET /attachments/:id/download - stream an attachment from Cloudinary. */
 export const downloadAttachment = async (
   req: Request,
   res: Response,

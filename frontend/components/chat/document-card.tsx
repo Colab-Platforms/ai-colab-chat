@@ -32,7 +32,7 @@ export interface GeneratedDocument {
  * sensible defaults instead of producing a broken extension or icon.
  *
  * `tint` is the conventional colour each format is recognised by, so the icon
- * is identifiable before the label is read. `short` is the badge text — three
+ * is identifiable before the label is read. `short` is the badge text - three
  * characters is what fits legibly at 36px.
  */
 const FORMAT_META: Record<
@@ -43,7 +43,7 @@ const FORMAT_META: Record<
   DOCX: { label: "Word", extension: "docx", short: "DOC", tint: "#2B579A" },
   PPTX: { label: "PowerPoint", extension: "pptx", short: "PPT", tint: "#D14524" },
   XLSX: { label: "Excel", extension: "xlsx", short: "XLS", tint: "#1D7044" },
-  // Deliberately a distinct tone from XLS green — same "spreadsheet" family,
+  // Deliberately a distinct tone from XLS green - same "spreadsheet" family,
   // but a plain-text file is a genuinely different thing to open than a
   // styled workbook, and the icon should say so before the label does.
   CSV: { label: "CSV", extension: "csv", short: "CSV", tint: "#546E7A" },
@@ -59,7 +59,7 @@ const metaFor = (format: string) =>
  * Drawn inline rather than pulled from an icon set because no icon library
  * ships per-format file glyphs, and shipping four raster assets for something
  * this small would cost four network requests and break at high DPI. Inline
- * SVG also inherits the card's sizing and needs no dark-mode variant — the
+ * SVG also inherits the card's sizing and needs no dark-mode variant - the
  * tints are chosen to hold contrast against both themes.
  */
 function FileFormatIcon({
@@ -108,7 +108,7 @@ function FileFormatIcon({
  * Generation outlives the chat's SSE connection, so this card owns its own
  * lifecycle: it polls until the document reaches a terminal state, entirely
  * independently of the conversation. That is what lets the user keep chatting
- * — and keep sending new messages — while a PDF is still being built.
+ * - and keep sending new messages - while a PDF is still being built.
  */
 
 const POLL_INTERVAL_MS = 2000;
@@ -145,7 +145,7 @@ export function DocumentCard({
   const STAGES = stagesFor(meta.label);
 
   // Auto-opens the preview panel the moment a document that was generating
-  // (or re-rendering after a style edit) becomes ready — not on mount of an
+  // (or re-rendering after a style edit) becomes ready - not on mount of an
   // already-completed card, so scrolling through chat history doesn't spam
   // the panel open for every past document.
   const wasWorkingRef = useRef(
@@ -177,7 +177,7 @@ export function DocumentCard({
         const res = await documentService.getById(doc.id);
         if (!cancelled && res.data?.data) setDoc(res.data.data);
       } catch {
-        // Transient failures are fine — the next tick retries.
+        // Transient failures are fine - the next tick retries.
       }
     }, POLL_INTERVAL_MS);
 

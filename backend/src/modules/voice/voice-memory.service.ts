@@ -4,7 +4,7 @@ import { createOpenRouterJsonCompletion } from "@/utils/openrouter.js";
 const DISTILLATION_MODEL =
   process.env.DISTILLATION_MODEL || "anthropic/claude-haiku-4.5";
 
-// type: "CUSTOM" (never GLOBAL) is deliberate — GLOBAL contexts are
+// type: "CUSTOM" (never GLOBAL) is deliberate - GLOBAL contexts are
 // auto-linked to every new chat regardless of capability, which would leak
 // this voice-only summary into ordinary text chats. Voice chats get it
 // explicitly linked instead (see voice.service.ts createSession), so a
@@ -25,7 +25,7 @@ function buildPrompt(
 ) {
   const systemPrompt = [
     "You summarise a user's recent voice conversations with their AI assistant into a short",
-    "briefing the assistant can silently recall at the start of the next call — like notes a",
+    "briefing the assistant can silently recall at the start of the next call - like notes a",
     "personal assistant would jot down, not a transcript.",
     "Write at most",
     String(MAX_BULLETS),
@@ -79,7 +79,7 @@ function parseBullets(rawContent: string | null | undefined): SummaryBullet[] {
 
 /** Looks up this user's voice-memory summary row, if the nightly cron has
  * ever produced one. Returns null (not an empty row) when there's nothing
- * yet — a brand-new user with no history simply gets no memory linked. */
+ * yet - a brand-new user with no history simply gets no memory linked. */
 export async function findVoiceSummaryContext(userId: number) {
   return prisma.contextMemory.findFirst({
     where: {
@@ -94,7 +94,7 @@ export async function findVoiceSummaryContext(userId: number) {
 }
 
 /** Regenerates (replaces, never appends) one user's voice-memory summary
- * from their last two voice chats. Called nightly — see
+ * from their last two voice chats. Called nightly - see
  * crons/voiceMemorySummary.ts. */
 export async function generateVoiceMemorySummaryForUser(userId: number): Promise<void> {
   const recentChats = await prisma.chat.findMany({

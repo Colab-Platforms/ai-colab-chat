@@ -65,7 +65,7 @@ export default function ProvidersAdminPage() {
 
   const columns: Column[] = [
     { key: "name", label: "Name", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-    { key: "description", label: "Description", render: (r) => <span className="text-muted-foreground text-sm truncate max-w-[200px] block">{r.description || "—"}</span> },
+    { key: "description", label: "Description", render: (r) => <span className="text-muted-foreground text-sm truncate max-w-[200px] block">{r.description || "-"}</span> },
     { key: "isActive", label: "Status", render: (r) => <Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Disabled"}</Badge> },
     {
       key: "actions", label: "Actions", className: "text-right",

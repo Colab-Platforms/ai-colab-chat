@@ -44,7 +44,7 @@ class ModelService {
       allowedQueryKeys: ["page", "pageSize", "capability"],
     });
 
-    // Array-contains filter — buildPrismaQuery's generic filterFields do
+    // Array-contains filter - buildPrismaQuery's generic filterFields do
     // equality only, so this one is applied by hand.
     const finalWhere = query.capability
       ? { ...where, capabilities: { has: query.capability } }

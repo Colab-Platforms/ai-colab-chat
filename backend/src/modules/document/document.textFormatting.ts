@@ -40,8 +40,8 @@ export const parseInlineSegments = (value: unknown): InlineSegment[] => {
 /**
  * A line whose only content is a leading "- " or "* " marker followed by a
  * space is a list item the model wrote inline instead of using a list block.
- * Bold markers ("**") never match this — there is no space between the two
- * asterisks — so the two syntaxes cannot collide.
+ * Bold markers ("**") never match this - there is no space between the two
+ * asterisks - so the two syntaxes cannot collide.
  */
 const BULLET_LINE = /^\s*[-*]\s+(.*)$/;
 

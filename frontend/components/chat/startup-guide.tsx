@@ -41,7 +41,7 @@ const BASE_STEPS: GuideStep[] = [
     skipBeacon: true,
     title: "👋 Welcome to AI Colab Chat",
     content:
-      "Let's take a quick tour so you feel right at home. We'll highlight each key area and explain what it does — click Next to begin.",
+      "Let's take a quick tour so you feel right at home. We'll highlight each key area and explain what it does - click Next to begin.",
   },
   {
     id: "message-box",
@@ -61,7 +61,7 @@ const BASE_STEPS: GuideStep[] = [
     skipBeacon: true,
     title: "⚡ Capability & Model",
     content:
-      "Choose how AI responds. Pick Standard Chat, Web Search, or Image Generation — then select the model that fits your task. Click this selector to explore options.",
+      "Choose how AI responds. Pick Standard Chat, Web Search, or Image Generation - then select the model that fits your task. Click this selector to explore options.",
   },
   {
     id: "sidebar",
@@ -70,7 +70,7 @@ const BASE_STEPS: GuideStep[] = [
     skipBeacon: true,
     title: "🗂️ Sidebar",
     content:
-      "Your command centre on the left. Switch between Projects, Assistants (role-specific AI styles), Chat history, and Starred chats — all in one panel.",
+      "Your command centre on the left. Switch between Projects, Assistants (role-specific AI styles), Chat history, and Starred chats - all in one panel.",
     devices: ["tablet", "desktop"],
   },
   {
@@ -90,7 +90,7 @@ const BASE_STEPS: GuideStep[] = [
     skipBeacon: true,
     title: "⚙️ Settings & Account",
     content:
-      "Click your avatar or menu here to access Token Usage, My Account, Preferences, and your Subscription details — everything you need to manage your profile.",
+      "Click your avatar or menu here to access Token Usage, My Account, Preferences, and your Subscription details - everything you need to manage your profile.",
   },
   {
     id: "done",
@@ -155,7 +155,7 @@ export function StartupGuide({
               target: '[data-guide="sidebar-user-menu"]',
               placement: "top" as const,
               offset: 8,
-              title: "🗂️ Sidebar — Explore!",
+              title: "🗂️ Sidebar - Explore!",
               content:
                 "Scroll up to find Projects, Assistants, Chat history, and Starred chats. Tap Next when done.",
             }
@@ -387,7 +387,7 @@ export function StartupGuide({
             return;
           }
           // Keep sidebar open when going Next from sidebar-mobile step
-          // (next step — settings-menu — targets profile-menu inside the open sidebar)
+          // (next step - settings-menu - targets profile-menu inside the open sidebar)
           setStepIndex(Math.min(index + 1, steps.length - 1));
         }
       }

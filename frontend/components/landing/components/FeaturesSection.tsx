@@ -13,7 +13,7 @@ export function FeaturesSection() {
             Everything you need in one platform
           </h2>
           <p className="text-gray-600 max-w-2xl mx-auto text-balance dark:text-gray-400">
-            Write, code, compare, and create — all inside one unified AI workspace. No more tab-switching, no
+            Write, code, compare, and create - all inside one unified AI workspace. No more tab-switching, no
             more context-switching.
           </p>
         </ScrollReveal>

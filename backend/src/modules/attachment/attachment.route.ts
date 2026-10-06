@@ -5,7 +5,7 @@ import * as attachmentController from "./attachment.controller.js";
 
 const router = Router();
 
-// New presend route — upload file to Cloudinary before a message exists
+// New presend route - upload file to Cloudinary before a message exists
 router.post(
   "/presend",
   auth("USER", "ADMIN", "SUPERADMIN"),
@@ -13,7 +13,7 @@ router.post(
   attachmentController.presendAttachment,
 );
 
-// Legacy route — tied to an existing messageId
+// Legacy route - tied to an existing messageId
 router.post(
   "/",
   auth("USER", "ADMIN", "SUPERADMIN"),
@@ -21,7 +21,7 @@ router.post(
   attachmentController.uploadAttachment,
 );
 
-// Public download route — streams the file with the original filename.
+// Public download route - streams the file with the original filename.
 router.get(
   "/:id/download",
   attachmentController.downloadAttachment,

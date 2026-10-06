@@ -15,11 +15,11 @@ export const createVideoSchema = Joi.object({
   messageId: Joi.number().integer().optional().allow(null),
   modelId: Joi.number().integer().positive().optional(),
   // https-only, same SSRF-safety rule document.validators.ts's image block
-  // uses — a model-facing URL is never trusted to be http(s)-safe otherwise.
+  // uses - a model-facing URL is never trusted to be http(s)-safe otherwise.
   firstFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   lastFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   // Duration/resolution are further checked in the service against the
-  // chosen model's actual supported_durations/supported_resolutions — this
+  // chosen model's actual supported_durations/supported_resolutions - this
   // just keeps obviously-bad input out.
   duration: Joi.number().integer().min(1).max(60).optional(),
   resolution: Joi.string()

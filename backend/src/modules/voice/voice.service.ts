@@ -70,8 +70,8 @@ export default class VoiceService {
       resolvedChatId = chat.id;
 
       // Not GLOBAL, so chatService.create()'s default-context linking never
-      // picks this up on its own (deliberately — see voice-memory.service.ts)
-      // — link it explicitly, only for voice chats, only if the nightly job
+      // picks this up on its own (deliberately - see voice-memory.service.ts)
+      // - link it explicitly, only for voice chats, only if the nightly job
       // has produced one yet.
       const voiceMemory = await findVoiceSummaryContext(userId);
       if (voiceMemory) {
@@ -85,7 +85,7 @@ export default class VoiceService {
       await this.attachDocuments(resolvedChatId, attachmentIds);
     }
 
-    // Caller (browser) never sends a voiceId today — fall back to the
+    // Caller (browser) never sends a voiceId today - fall back to the
     // user's saved preference so the voice they picked in Settings applies
     // without every call site needing to know about it. voice-agent's own
     // env default still applies if the user has never picked one either.
@@ -118,11 +118,11 @@ export default class VoiceService {
   }
 
   /** Extracts text from documents attached in the pre-call upload screen and
-   * folds each into this chat's contextText via ChatContext — same
+   * folds each into this chat's contextText via ChatContext - same
    * CUSTOM/per-chat-linked shape as the voice-memory summary above, so it
    * never leaks into other chats and doesn't touch `history` (keeping the
    * new-chat proactive-greeting check in bot.py unaffected). Images are
-   * skipped — extractAttachmentText returns null for them. */
+   * skipped - extractAttachmentText returns null for them. */
   private async attachDocuments(chatId: number, attachmentIds: number[]) {
     const chat = await prisma.chat.findUnique({
       where: { id: chatId },
@@ -162,7 +162,7 @@ export default class VoiceService {
 
   /** Called by voice-agent (not the browser) when a bot process starts, to
    * seed the LLM with this chat's prior turns plus the same personalisation
-   * memory text-chat uses — so voice picks up mid-conversation and knows the
+   * memory text-chat uses - so voice picks up mid-conversation and knows the
    * user's context, not just a bare system prompt every call. */
   async getContextForChat(chatId: number) {
     const chat = await prisma.chat.findFirst({
@@ -199,7 +199,7 @@ export default class VoiceService {
     const contextStrings = contextLinks.map((link) => link.context.memory);
     const contextText =
       contextStrings.length > 0
-        ? `User context (personalisation — always keep in mind):\n${contextStrings.map((c) => `- ${c}`).join("\n")}`
+        ? `User context (personalisation - always keep in mind):\n${contextStrings.map((c) => `- ${c}`).join("\n")}`
         : "";
 
     return {
@@ -211,7 +211,7 @@ export default class VoiceService {
   }
 
   /** Called by voice-agent after each completed turn (user transcript or
-   * assistant reply) so the call shows up as normal chat history — same
+   * assistant reply) so the call shows up as normal chat history - same
    * Chat/Message tables the rest of the product already uses. */
   async appendMessage(chatId: number, role: "USER" | "ASSISTANT", content: string) {
     const chat = await prisma.chat.findFirst({
@@ -244,7 +244,7 @@ export default class VoiceService {
 
   /** Called by voice-agent when the LLM invokes the generate_document tool
    * mid-call. Reuses the exact same enqueue path the text-chat "generate a
-   * PDF" flow uses (document.service.ts) — the renderer/worker don't know or
+   * PDF" flow uses (document.service.ts) - the renderer/worker don't know or
    * care that the request came from voice instead of typed chat. Returns
    * immediately with a PENDING row; the caller keeps talking while it
    * renders in the background. */

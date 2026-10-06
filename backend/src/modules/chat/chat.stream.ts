@@ -24,6 +24,7 @@ import {
   parseSpreadsheetFromUrl,
 } from "@/utils/spreadsheet.js";
 import { parsePdfFromUrl } from "@/utils/pdf.js";
+import { runContentAgentTurn } from "@/modules/content-agent/content.agent.js";
 import {
   maybeGenerateDocumentFromChat,
   prepareDocumentTurn,
@@ -78,7 +79,7 @@ async function touchChat(chatId: number) {
 
 // Debounced enqueue for the background context-distillation worker
 // (see crons/contextDistillation.ts). Only chats inside a folder have
-// shared project memory worth updating. Never throws — a failure here
+// shared project memory worth updating. Never throws - a failure here
 // must not break the chat response it's attached to.
 async function maybeEnqueueDistillation(
   chatId: number,
@@ -294,7 +295,7 @@ async function buildAttachmentContentParts(
     const mime = att.mimeType;
 
     if (IMAGE_MIME_TYPES.includes(mime)) {
-      // Fetch image from Cloudinary and send as base64 — avoids URL fetch issues on OpenRouter
+      // Fetch image from Cloudinary and send as base64 - avoids URL fetch issues on OpenRouter
       try {
         const dataUrl = await urlToBase64DataUrl(att.fileUrl, mime);
         parts.push({ type: "image_url", image_url: { url: dataUrl } });
@@ -627,8 +628,8 @@ interface SendMessageBody {
  * Flattens a history entry's content to plain text.
  *
  * History content is either a bare string or the multipart array used for
- * attachments/images, so the document intent classifier — which only ever
- * reasons about words — needs the text parts pulled back out.
+ * attachments/images, so the document intent classifier - which only ever
+ * reasons about words - needs the text parts pulled back out.
  */
 function historyContentToText(content: any): string {
   if (typeof content === "string") return content;
@@ -908,7 +909,7 @@ export async function streamChat(req: Request, res: Response) {
 
     const isfreeModel = model.isFreeModel
 
-    // Model choice itself isn't plan-restricted — any plan (including Free)
+    // Model choice itself isn't plan-restricted - any plan (including Free)
     // may pick any model, gated purely by wallet balance: a paid model bills
     // real cost against tokensRemaining like normal, and once that hits zero
     // only free models (which bill $0) keep working. Image generation is
@@ -1071,6 +1072,7 @@ export async function streamChat(req: Request, res: Response) {
     // -----------------------------------------------------------------------
     let assistantTemperature: number | undefined;
     let personaPrompt: string | null = null;
+    let assistantKind: string = "STANDARD";
     if (chat.assistantId) {
       const chatAssistant = await prisma.assistant.findFirst({
         where: { id: chat.assistantId, isActive: true, isDeleted: false },
@@ -1081,6 +1083,7 @@ export async function streamChat(req: Request, res: Response) {
         );
         personaPrompt = chatAssistant.systemPrompt;
         assistantTemperature = chatAssistant.temperature;
+        assistantKind = chatAssistant.kind;
       } else {
         console.log(
           `[DEBUG] Assistant with ID ${chat.assistantId} not found or inactive`,
@@ -1102,7 +1105,7 @@ export async function streamChat(req: Request, res: Response) {
       console.log(
         `[DEBUG] Adding User Context (${contextStrings.length} items)`,
       );
-      const systemContent = `User context (personalisation — always keep in mind):\n${contextStrings.map((c: any) => `- ${c}`).join("\n")}`;
+      const systemContent = `User context (personalisation - always keep in mind):\n${contextStrings.map((c: any) => `- ${c}`).join("\n")}`;
       conversationHistory.unshift(
         buildSystemMessage(systemContent, model.externalId),
       );
@@ -1184,7 +1187,44 @@ export async function streamChat(req: Request, res: Response) {
     // ---------------------------------------
 
     // -----------------------------------------------------------------------
-    // Document generation — pre-stream pass.
+    // Content agent - structured pipeline for CONTENT_AGENT assistants. Returns
+    // false (having written nothing) for non-content turns, which then fall
+    // through to the ordinary streaming path below.
+    // -----------------------------------------------------------------------
+    if (assistantKind === "CONTENT_AGENT" && chatType !== "IMAGE_GENERATION") {
+      const handled = await runContentAgentTurn({
+        res,
+        isClientAborted,
+        signal: abortController.signal,
+        userId,
+        chat: { id: chatId, folderId: chat.folderId },
+        model: {
+          id: model.id,
+          externalId: model.externalId,
+          tokenMultiplier: model.tokenMultiplier,
+        },
+        persona: personaPrompt ?? "",
+        temperature: assistantTemperature ?? 0.7,
+        userMessage,
+        assistantMessage,
+        content: content.trim(),
+        history: conversationHistory
+          .filter(
+            (m: any) =>
+              (m.role === "user" || m.role === "assistant") &&
+              m !== conversationHistory[conversationHistory.length - 1],
+          )
+          .map((m: any) => ({
+            role: m.role as "user" | "assistant",
+            content: historyContentToText(m.content),
+          })),
+        userContext: contextStrings,
+      });
+      if (handled) return;
+    }
+
+    // -----------------------------------------------------------------------
+    // Document generation - pre-stream pass.
     //
     // Classifying BEFORE the answer streams is what stops the model from
     // refusing ("I can't create files, paste the text again") while the
@@ -1264,7 +1304,7 @@ export async function streamChat(req: Request, res: Response) {
       const tTokens = pTokens + cTokens;
       const tokenMultiplierPre = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
       // No OpenRouter call happens for a predefined/canned response, so there's
-      // no real costUsd to report here — this always falls back to the
+      // no real costUsd to report here - this always falls back to the
       // legacy multiplier math via computeBillableTokens's null-cost branch.
       const { billablePromptTokens: billablePromptPre, billableCompletionTokens: billableCompletionPre } =
         computeBillableTokens({
@@ -1747,7 +1787,7 @@ export async function streamChat(req: Request, res: Response) {
 
     await maybeEnqueueDistillation(chatId, chat.folderId);
 
-    // Document generation — enqueue pass. Intent was already resolved before
+    // Document generation - enqueue pass. Intent was already resolved before
     // the stream (see prepareDocumentTurn above) and is handed back here, so
     // the classifier is never paid for twice in one turn. The enqueue itself
     // still has to wait for the answer, which is the document's source text.
@@ -1889,7 +1929,7 @@ export async function regenerateChat(req: Request, res: Response) {
       userPreference?.enableFollowUpQuestions !== false;
 
     // Prepend the persona (assistant prompt, or the platform default for
-    // normal chats), then context memory on top — same order as streamChat.
+    // normal chats), then context memory on top - same order as streamChat.
     let personaPromptRegen: string | null = null;
     if (chat.assistantId) {
       const chatAssistant = await prisma.assistant.findFirst({
@@ -1914,7 +1954,7 @@ export async function regenerateChat(req: Request, res: Response) {
     const contextStringsRegen = selectedContextsRegen.map((c: any) => c.memory);
 
     if (contextStringsRegen.length > 0) {
-      const systemContent = `User context (personalisation — always keep in mind):\n${contextStringsRegen.map((c: any) => `- ${c}`).join("\n")}`;
+      const systemContent = `User context (personalisation - always keep in mind):\n${contextStringsRegen.map((c: any) => `- ${c}`).join("\n")}`;
       conversationHistory.unshift(
         buildSystemMessage(systemContent, model.externalId),
       );
@@ -2001,7 +2041,7 @@ export async function regenerateChat(req: Request, res: Response) {
       const tTokens = pTokens + cTokens;
       const tokenMultiplierRegen = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
       // No OpenRouter call happens for a predefined/canned response, so there's
-      // no real costUsd to report here — falls back to the legacy multiplier
+      // no real costUsd to report here - falls back to the legacy multiplier
       // math via computeBillableTokens's null-cost branch.
       const { billablePromptTokens: billablePromptRegen, billableCompletionTokens: billableCompletionRegen } =
         computeBillableTokens({
@@ -2349,7 +2389,7 @@ export async function regenerateChat(req: Request, res: Response) {
     let finalCompletion = completionTokens;
     let finalTotal = promptTokens + completionTokens;
 
-    // The regenerate flow has no fresh user prompt of its own — reuse the
+    // The regenerate flow has no fresh user prompt of its own - reuse the
     // user turn this assistant message is answering, same "prompt" a normal
     // send would have stored.
     const regeneratedPrompt =
@@ -3383,7 +3423,7 @@ export async function continueChatStream(req: Request, res: Response) {
 
     // Push the continue prompt with context-aware instruction
     const continueInstruction = isInCodeBlock
-      ? "Continue the code block immediately. Do NOT start with triple backticks or the language name—you are already inside the block. Just resume the raw code character-by-character."
+      ? "Continue the code block immediately. Do NOT start with triple backticks or the language name-you are already inside the block. Just resume the raw code character-by-character."
       : "Continue your response exactly where you left off. Do not repeat previous text and do not add any introductory framing. Just seamless continuation.";
 
     conversationHistory.push({ role: "user", content: continueInstruction });

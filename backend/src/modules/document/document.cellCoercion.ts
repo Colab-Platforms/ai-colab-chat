@@ -2,7 +2,7 @@ import type { CellValue, ColumnType } from "./document.types.js";
 
 /**
  * Shared by the XLSX and CSV renderers so a coercion rule (or a bug in one)
- * cannot drift between the two — they render the same `WorkbookSpec`, so a
+ * cannot drift between the two - they render the same `WorkbookSpec`, so a
  * cell must convert identically regardless of which file it ends up in.
  *
  * The hard part in a generated spreadsheet is not layout, it is TYPE. A model
@@ -54,7 +54,7 @@ const parseDate = (value: CellValue): Date | null => {
  * Converts one cell to what the target file should actually store.
  *
  * Anything that cannot be coerced falls back to the original value rather than
- * becoming null — a visibly wrong string beats silently deleting the user's
+ * becoming null - a visibly wrong string beats silently deleting the user's
  * data, and it shows up immediately when they open the file.
  */
 export const coerceCell = (value: CellValue, type: ColumnType): CoercedCell => {
@@ -71,7 +71,7 @@ export const coerceCell = (value: CellValue, type: ColumnType): CoercedCell => {
     case "percent": {
       // The prompt fixes the convention: the model emits the NUMBER OF PERCENT
       // (12.5 meaning 12.5%). A percent format multiplies by 100 for display,
-      // so the stored value must be the fraction. Applied uniformly — guessing
+      // so the stored value must be the fraction. Applied uniformly - guessing
       // from magnitude would silently turn "0.5%" into "50%".
       const parsed = parseNumeric(value);
       return parsed === null ? (value as string) : parsed / 100;

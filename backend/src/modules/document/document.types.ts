@@ -1,7 +1,7 @@
 /**
  * The document spec is the contract between the model and the renderer.
  *
- * The model only ever describes *what the document says* — semantic blocks and
+ * The model only ever describes *what the document says* - semantic blocks and
  * their text. It never emits HTML, CSS, colours or layout. The renderer owns
  * all presentation, which keeps output visually consistent and means model
  * output is escaped data rather than markup we have to trust.
@@ -16,13 +16,13 @@ export const DOCUMENT_THEMES: DocumentTheme[] = [
 ];
 
 /**
- * PPTX-only visual templates. Kept out of `DocumentTheme` — a deck earns a
+ * PPTX-only visual templates. Kept out of `DocumentTheme` - a deck earns a
  * richer set of design decisions (fonts, decorative layout, photo placement)
  * than the flat PDF/DOCX theme tokens express, so it gets its own type rather
  * than stretching `ThemeTokens` to cover both.
  *
  * These values live in the same `theme` column/field as `DocumentTheme` (see
- * document.pptxTemplates.ts) — a document's format is what disambiguates
+ * document.pptxTemplates.ts) - a document's format is what disambiguates
  * which table a given theme string is looked up in.
  */
 export type PptxTemplate =
@@ -66,7 +66,7 @@ export interface DocumentFormatMeta {
  * Everything that differs between formats *outside* the renderer itself.
  *
  * Kept as one table rather than scattered conditionals so adding a format is a
- * single entry plus a renderer, and nothing can be half-added — the old code
+ * single entry plus a renderer, and nothing can be half-added - the old code
  * hardcoded "pdf" in the upload call and ".pdf" in the filename, which is
  * exactly the kind of thing a second format silently inherits.
  */
@@ -139,7 +139,7 @@ export interface DocumentSpec {
  *
  * A deck is not a paginated document: a slide is a bounded container, so the
  * model has to decide what goes on each one. That decision cannot be made
- * after the fact by a renderer splitting a flat block list — it needs the
+ * after the fact by a renderer splitting a flat block list - it needs the
  * meaning of the content. Hence a second spec shape rather than pagination.
  *
  * Slide bodies deliberately reuse `DocumentBlock`, so the block vocabulary,
@@ -171,12 +171,12 @@ export interface SlideSpec {
   title: string;
   subtitle?: string;
   blocks: SlideBlock[];
-  /** Speaker notes — the one thing a deck has that a document does not. */
+  /** Speaker notes - the one thing a deck has that a document does not. */
   notes?: string;
   /**
    * A topic-relevant stock photo, already re-hosted on Cloudinary.
    *
-   * Populated by document.pptxImages.ts *after* the spec is validated — the
+   * Populated by document.pptxImages.ts *after* the spec is validated - the
    * model never sees or sets this field, since it is forbidden from
    * inventing image URLs. Absent whenever the lookup found nothing or the
    * template's layout has no place for one; renderers must treat it as
@@ -199,7 +199,7 @@ export interface PresentationSpec {
  *
  * The one spec that shares nothing with `DocumentBlock`, because blocks are
  * prose-shaped: every value in them is a string. A spreadsheet cell has a
- * TYPE, and that type is the whole point — a number written as text is
+ * TYPE, and that type is the whole point - a number written as text is
  * left-aligned, uncountable, and makes SUM() return 0.
  *
  * Formulas are declarative (`total: "sum"`) rather than authored by the model.
@@ -269,7 +269,7 @@ export const MAX_SHEET_COLUMNS = 30;
 /**
  * Which spec shape a format's model call produces and its renderer consumes.
  *
- * Adding a format means deciding this first — it determines the system prompt,
+ * Adding a format means deciding this first - it determines the system prompt,
  * the validator and the renderer signature, so it is the real fork in the
  * pipeline. XLSX will need a third kind; PDF and DOCX share the first.
  */
@@ -280,7 +280,7 @@ export const FORMAT_SPEC_KIND: Record<DocumentFormat, SpecKind> = {
   DOCX: "document",
   PPTX: "presentation",
   XLSX: "workbook",
-  // CSV shares the workbook spec — a CSV is just one flat sheet of it,
+  // CSV shares the workbook spec - a CSV is just one flat sheet of it,
   // rendered by a format-specific renderer rather than a different spec.
   CSV: "workbook",
 };

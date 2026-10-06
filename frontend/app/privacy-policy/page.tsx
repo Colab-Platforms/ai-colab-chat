@@ -21,10 +21,10 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: "2. Information We Collect",
     body: (
       <ul className="list-disc pl-5 space-y-2">
-        <li><strong className="text-foreground">Account information</strong> — name, email address, and password (stored hashed) when you register.</li>
-        <li><strong className="text-foreground">Usage data</strong> — prompts, chats, uploaded files, model selections, and token usage needed to operate the Service.</li>
-        <li><strong className="text-foreground">Billing data</strong> — subscription plan, payment status, and transaction history processed through our payment provider.</li>
-        <li><strong className="text-foreground">Technical data</strong> — IP address, browser/device information, and log data for security and reliability.</li>
+        <li><strong className="text-foreground">Account information</strong> - name, email address, and password (stored hashed) when you register.</li>
+        <li><strong className="text-foreground">Usage data</strong> - prompts, chats, uploaded files, model selections, and token usage needed to operate the Service.</li>
+        <li><strong className="text-foreground">Billing data</strong> - subscription plan, payment status, and transaction history processed through our payment provider.</li>
+        <li><strong className="text-foreground">Technical data</strong> - IP address, browser/device information, and log data for security and reliability.</li>
       </ul>
     ),
   },
@@ -66,8 +66,8 @@ const SECTIONS: { title: string; body: React.ReactNode }[] = [
     title: "6. Data Security",
     body: (
       <p>
-        We use industry-standard measures — including encryption in transit, access
-        controls, and hashed credential storage — to protect your information. No
+        We use industry-standard measures - including encryption in transit, access
+        controls, and hashed credential storage - to protect your information. No
         method of transmission or storage is 100% secure, and we cannot guarantee
         absolute security.
       </p>

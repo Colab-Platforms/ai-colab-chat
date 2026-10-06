@@ -34,7 +34,7 @@ export const renderSpecToPdf = async (
   const html = renderDocumentHtml(spec, theme);
   dlog(
     "render",
-    `theme=${theme} blocks=${spec.blocks.length} html=${html.length} chars — starting Chromium render`,
+    `theme=${theme} blocks=${spec.blocks.length} html=${html.length} chars - starting Chromium render`,
   );
 
   return withPage(async (page) => {
@@ -67,7 +67,7 @@ export const renderSpecToPdf = async (
     });
 
     // "load" already waits for images, which are the only external resource
-    // the allowlist permits — this Puppeteer version does not accept the
+    // the allowlist permits - this Puppeteer version does not accept the
     // networkidle variants on setContent.
     await page.setContent(html, {
       waitUntil: "load",

@@ -25,7 +25,7 @@ import {
 // conversation. Overridable per-deployment, and a future change can honour the
 // client-supplied model id instead.
 //
-// Read per call, NOT captured at module load — a module-level const would be
+// Read per call, NOT captured at module load - a module-level const would be
 // frozen at import time, which silently ignores any later override and makes
 // per-model comparison impossible.
 const getSpecModel = () =>
@@ -73,7 +73,7 @@ Block is one of:
 Hard rules:
 - Output raw JSON only. No markdown fences, no commentary.
 - NEVER emit HTML, CSS, colours, fonts, sizes, or any styling. The renderer owns all visual design. Your job is meaning and structure only.
-- Do not use markdown syntax inside text fields (no **bold**, no # headings, no | tables). Use the block types instead — a heading is a heading block, a table is a table block.
+- Do not use markdown syntax inside text fields (no **bold**, no # headings, no | tables). Use the block types instead - a heading is a heading block, a table is a table block.
 - Every table row must have exactly as many cells as there are columns.
 - Only include an "image" block if the user's material supplies a real https:// image URL. Never invent one.
 - Use "pageBreak" sparingly, to separate major sections of long documents.
@@ -118,14 +118,14 @@ Hard rules:
 - Every table row must have exactly as many cells as there are columns.
 - Only include an "image" block if the user's material supplies a real https:// image URL. Never invent one.
 
-Composition rules — these are what separate a deck from a sliced-up document:
+Composition rules - these are what separate a deck from a sliced-up document:
 - A slide is a BOUNDED space. One idea per slide. Prefer 1-2 blocks per slide; never fill all ${MAX_BLOCKS_PER_SLIDE}.
 - Bullets are fragments, not sentences. Aim for under 100 characters each, and at most 6 per slide. Split a longer list across consecutive slides.
 - The FIRST slide must be layout "title", carrying the deck title and subtitle, with no blocks.
-- Use layout "section" for a divider slide that opens a major part — title only, no blocks.
+- Use layout "section" for a divider slide that opens a major part - title only, no blocks.
 - Slide titles are statements, not labels: "Revenue grew 40% in Q3" beats "Revenue".
 - Put the detail a presenter would SAY in "notes", not on the slide. A slide the audience must read in full is a failed slide.
-- Tables on slides must be small — at most 5 columns and 8 rows. Summarise rather than dump.`;
+- Tables on slides must be small - at most 5 columns and 8 rows. Summarise rather than dump.`;
 
 const WORKBOOK_SYSTEM_PROMPT = `You are a spreadsheet composition engine. You convert a user's request into a structured workbook specification that a rendering engine turns into a spreadsheet file (Excel or CSV).
 
@@ -168,7 +168,7 @@ Hard rules:
 Choosing what goes in the spreadsheet:
 - NEVER invent numeric data. If the source material contains no figures, build the correct column headers and leave the rows empty (or omit rows entirely) so the user has a template to fill in. A spreadsheet of plausible-looking invented numbers is worse than an empty one, because numbers in a grid look authoritative.
 - You may always derive columns and labels from the material; the prohibition is on fabricating VALUES that were not given to you.
-- If the source is not already tabular — an article, an explanation, a process — find the genuinely tabular structure inside it: entities and their attributes, steps and their descriptions, options and their trade-offs, terms and their definitions.
+- If the source is not already tabular - an article, an explanation, a process - find the genuinely tabular structure inside it: entities and their attributes, steps and their descriptions, options and their trade-offs, terms and their definitions.
 - Do NOT pour paragraphs into cells. A cell holds a value or a short phrase, not prose.
 - Prefer several focused sheets over one wide sheet when the material covers distinct subjects.
 - Set "total" only on columns where a sum, average or count is genuinely meaningful. Never total an identifier, a year, or a percentage.`;
@@ -223,7 +223,7 @@ export interface GeneratedSpecResult {
  * Asks the model for a spec of the given kind and validates it.
  *
  * Validation failures are retried once with the specific error fed back, which
- * is the whole reason the spec is JSON rather than markup — a bad response is
+ * is the whole reason the spec is JSON rather than markup - a bad response is
  * detectable and correctable instead of silently rendering as a broken PDF.
  */
 export const generateSpec = async (
@@ -281,19 +281,19 @@ export const generateSpec = async (
       content: raw,
     });
 
-    // finish_reason "length" means the spec was cut off mid-JSON — the most
+    // finish_reason "length" means the spec was cut off mid-JSON - the most
     // common failure on models with a low output ceiling, and one that looks
     // like a bad model unless it is called out explicitly.
     if (completion?.choices?.[0]?.finish_reason === "length") {
       dlog(
         "spec:warn",
-        `output hit the ${SPEC_MAX_TOKENS}-token ceiling — JSON is likely truncated. Raise DOCUMENT_SPEC_MAX_TOKENS or use a model with a larger output limit.`,
+        `output hit the ${SPEC_MAX_TOKENS}-token ceiling - JSON is likely truncated. Raise DOCUMENT_SPEC_MAX_TOKENS or use a model with a larger output limit.`,
       );
     }
 
     if (!raw) {
       lastError = "Model returned an empty response";
-      dlog("spec:parse", "FAILED — empty content");
+      dlog("spec:parse", "FAILED - empty content");
       continue;
     }
 
@@ -327,7 +327,7 @@ export const generateSpec = async (
         } else if (prune.dropped > 0) {
           dlog(
             "spec:salvage",
-            `NOT salvaging — ${prune.dropped}/${prune.total} blocks invalid (${(ratio * 100).toFixed(1)}%) exceeds the ${(MAX_SALVAGE_RATIO * 100).toFixed(0)}% threshold`,
+            `NOT salvaging - ${prune.dropped}/${prune.total} blocks invalid (${(ratio * 100).toFixed(1)}%) exceeds the ${(MAX_SALVAGE_RATIO * 100).toFixed(0)}% threshold`,
           );
         }
       }

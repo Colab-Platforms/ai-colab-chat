@@ -50,7 +50,7 @@ export function HeroSection() {
           </motion.div>
         </div>
 
-        {/* Hero image — scroll-driven tilt */}
+        {/* Hero image - scroll-driven tilt */}
         <ScrollTiltHero />
       </div>
     </section>

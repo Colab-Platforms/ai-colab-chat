@@ -57,7 +57,7 @@ export function ImageCard({
 
   /**
    * A plain `<a download>` on a Cloudinary URL is silently ignored by the
-   * browser — the `download` attribute only applies to same-origin links —
+   * browser - the `download` attribute only applies to same-origin links -
    * so fetching the bytes ourselves and downloading from a same-origin
    * blob: URL is what actually makes "Download" download (same trick as
    * VideoCard.handleDownload).
@@ -75,7 +75,7 @@ export function ImageCard({
       link.click();
       URL.revokeObjectURL(blobUrl);
     } catch {
-      toast.error("Couldn't download the image — try again.");
+      toast.error("Couldn't download the image - try again.");
     } finally {
       setIsDownloading(false);
     }
@@ -93,7 +93,7 @@ export function ImageCard({
       setConfirmOpen(false);
       onDeleted?.(image.id);
     } catch {
-      toast.error("Couldn't delete the image — try again.");
+      toast.error("Couldn't delete the image - try again.");
       setIsDeleting(false);
     }
   }, [image.id, onDeleted]);

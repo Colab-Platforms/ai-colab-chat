@@ -70,13 +70,18 @@ model User {
   payments                      Payment[]
   invoices                      Invoice[]
   supportRequests               SupportRequest[]
+  knowledgeSources              KnowledgeSource[]
+  knowledgeChunks               KnowledgeChunk[]
+  brandKits                     BrandKit[]
+  products                      Product[]
+  contentItems                  ContentItem[]
 }
 
 model UserPreference {
   id                      Int      @id @default(autoincrement())
   userId                  Int      @unique
   enableFollowUpQuestions Boolean  @default(true)
-  // Null means "use the voice-agent's env-configured default" — see
+  // Null means "use the voice-agent's env-configured default" - see
   // ELEVENLABS_DEFAULT_VOICE_ID fallback in voice-agent/src/bot.py.
   voiceId                 String?
   createdAt               DateTime @default(now())
@@ -163,7 +168,7 @@ model WalletTransaction {
 }
 
 // Separate from UserWallet: video-generation spend is billed in credits, not
-// tokens. Split into two balances because they reset differently — bundledCredits
+// tokens. Split into two balances because they reset differently - bundledCredits
 // is overwritten to the plan's monthly grant on every renewal, while topupCredits
 // only ever increases (pay-as-you-go purchase) and is never reset/expired.
 model CreditWallet {
@@ -213,6 +218,11 @@ model Folder {
   deletedAt   DateTime?
   chats       Chat[]
   contexts    ContextMemory[]
+  knowledgeSources KnowledgeSource[]
+  knowledgeChunks  KnowledgeChunk[]
+  brandKits        BrandKit[]
+  products         Product[]
+  contentItems     ContentItem[]
   user        User            @relation(fields: [userId], references: [id])
 }
 
@@ -245,6 +255,7 @@ model Chat {
   generatedDocuments GeneratedDocument[]
   generatedVideos    GeneratedVideo[]
   generatedImages    GeneratedImage[]
+  contentItems       ContentItem[]
 
   @@index([userId])
   @@index([folderId])
@@ -441,6 +452,7 @@ model Message {
   generatedDocuments GeneratedDocument[]
   generatedVideos    GeneratedVideo[]
   generatedImages    GeneratedImage[]
+  contentItems       ContentItem[]
 
   @@index([chatId])
   @@index([createdAt])
@@ -517,13 +529,13 @@ model Model {
   videoCostPerSecond     Int?
   videoCostPerSecondByResolution Json?
   videoCostPerSecondByResolutionImageInput Json?
-  // Video-credit pricing (the CreditWallet unit, pegged to $0.03/credit —
+  // Video-credit pricing (the CreditWallet unit, pegged to $0.03/credit -
   // real cost, no multiplier). Independent of the legacy videoCostPerSecond*
   // fields above, which priced video in wallet *tokens* before video moved
   // to its own credit wallet.
   // Float, unlike the legacy videoCostPerSecond* (Int) fields above: credit
   // amounts are small (single/low-double digits), so per-second fractions
-  // matter — rounding happens once, on the ceil()'d total for a clip, not on
+  // matter - rounding happens once, on the ceil()'d total for a clip, not on
   // the rate itself (see video.service.ts).
   creditCostPerSecond    Float?
   creditCostPerSecondByResolution Json?
@@ -539,8 +551,14 @@ model Model {
   @@unique([modelProviderId, externalId])
 }
 
+enum AssistantKind {
+  STANDARD
+  CONTENT_AGENT
+}
+
 model Assistant {
   id               Int       @id @default(autoincrement())
+  kind             AssistantKind @default(STANDARD)
   name             String
   slug             String    @unique
   description      String?
@@ -628,7 +646,7 @@ model Plan {
   yearlyPrice          Decimal
   tokenLimit           Int
   features             Json
-  // Real, enforced access-control flags — `features` above stays for
+  // Real, enforced access-control flags - `features` above stays for
   // display-only metadata (support tier, attachments, etc.) but is never
   // branched on in code; these columns are what planAccess.service.ts reads.
   restrictToFreeModels Boolean          @default(false)
@@ -636,7 +654,7 @@ model Plan {
   imageGenEnabled      Boolean          @default(false)
   videoGenEnabled      Boolean          @default(false)
   // Bundled video-credit grant applied (overwritten, not incremented) on
-  // every renewal — see CreditWallet.bundledCredits.
+  // every renewal - see CreditWallet.bundledCredits.
   monthlyVideoCredits  Int              @default(0)
   isActive             Boolean          @default(true)
   isDeleted            Boolean          @default(false)
@@ -744,7 +762,7 @@ model Payment {
   subscriptionId         Int?
   type                   PaymentType
   // Distinguishes a subscription charge from a standalone pay-as-you-go
-  // video-credit top-up — the latter has no subscriptionId and its webhook
+  // video-credit top-up - the latter has no subscriptionId and its webhook
   // credits CreditWallet.topupCredits instead of activating a Subscription.
   purpose                PaymentPurpose @default(SUBSCRIPTION)
   creditsGranted         Int?
@@ -753,11 +771,11 @@ model Payment {
   providerPaymentId      String?
   providerSubscriptionId String?
   amount                 Decimal
-  // Tax breakdown for `amount` — nullable because older rows predate this
+  // Tax breakdown for `amount` - nullable because older rows predate this
   // split and credit top-ups compute tax differently (extracted, not added
   // on top; see calculateTopUpCredits). When set, baseAmount + taxAmount ==
   // amount and taxPercent is the rate actually applied AT THE TIME of this
-  // charge — never re-derive this later from the live CreditPricingConfig,
+  // charge - never re-derive this later from the live CreditPricingConfig,
   // since that rate can change and an invoice must reflect what was true
   // when the charge happened, not today's rate.
   baseAmount             Decimal?
@@ -781,16 +799,16 @@ model Payment {
 // Single-row, admin-editable config for pay-as-you-go video-credit top-ups.
 // Kept out of code as a constant so pricing can be tuned without a deploy.
 // Pay-as-you-go top-up pricing. costPerCreditInr is the RAW cost basis (no
-// margin) — a top-up's rupee amount is de-taxed, has marginPercent taken off
+// margin) - a top-up's rupee amount is de-taxed, has marginPercent taken off
 // the top as margin, and only what's left converts to credits at cost. This
 // keeps top-up margin explicit and independently tunable from whatever
 // margin is implied by a subscription plan's bundled credit grant.
-// Despite the name (kept for historical/migration reasons — this started as
+// Despite the name (kept for historical/migration reasons - this started as
 // video-credit-only pricing), this is now the single global pricing-config
 // row for BOTH wallet currencies: costPerCreditInr/marginPercent/gstPercent
 // price video credit top-ups, and usdPerToken prices chat/image/doc wallet
 // tokens (see computeBillableTokens in walletUtils.ts). One shared row so an
-// admin can retune either rate without a code change or redeploy — a plan's
+// admin can retune either rate without a code change or redeploy - a plan's
 // tokenLimit/monthlyVideoCredits are what change per-plan, not these rates.
 model CreditPricingConfig {
   id                Int      @id @default(autoincrement())
@@ -798,7 +816,7 @@ model CreditPricingConfig {
   marginPercent     Decimal  @default(15)
   gstPercent        Decimal  @default(18)
   // $ real cost per wallet token, billed off OpenRouter's actual usage.cost
-  // per response. Default derived from the $19 plan's budget math — see the
+  // per response. Default derived from the $19 plan's budget math - see the
   // comment on DEFAULT_USD_PER_TOKEN in walletUtils.ts.
   usdPerToken       Decimal  @default(0.0000035)
   updatedAt         DateTime @updatedAt
@@ -891,4 +909,186 @@ enum DistillationStatus {
   PROCESSING
   DONE
   FAILED
+}
+
+
+// ─── Knowledge base (RAG) ────────────────────────────────────────────────
+// Scope: folderId = a project's knowledge; folderId null = user-global.
+// `embedding` and `tsv` are Unsupported (pgvector / tsvector) so Prisma cannot
+// read or write them - chunks are inserted and searched with raw SQL in
+// knowledge.service.ts. The vector/GIN/btree indexes live in
+// prisma/sql/knowledge_indexes.sql because `db push` cannot express them.
+
+enum KnowledgeSourceType {
+  DOCUMENT
+  PAST_POST
+  PRODUCT_DOC
+  COMPETITOR
+  NOTE
+}
+
+enum KnowledgeSourceStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+model KnowledgeSource {
+  id                 Int                   @id @default(autoincrement())
+  userId             Int
+  folderId           Int?
+  type               KnowledgeSourceType   @default(DOCUMENT)
+  title              String
+  status             KnowledgeSourceStatus @default(PENDING)
+  attempts           Int                   @default(0)
+  lastError          String?
+  startedAt          DateTime?
+  // Raw text for NOTE / PAST_POST sources; uploads keep fileUrl instead.
+  rawText            String?
+  fileUrl            String?
+  cloudinaryPublicId String?
+  mimeType           String?
+  fileSize           Int?
+  contentHash        String?
+  metadata           Json                  @default("{}")
+  chunkCount         Int                   @default(0)
+  isDeleted          Boolean               @default(false)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  deletedAt          DateTime?
+  user               User                  @relation(fields: [userId], references: [id])
+  folder             Folder?               @relation(fields: [folderId], references: [id])
+  chunks             KnowledgeChunk[]
+
+  @@index([userId, folderId])
+  @@index([status, createdAt])
+  @@index([userId, contentHash])
+}
+
+model KnowledgeChunk {
+  id             Int                          @id @default(autoincrement())
+  sourceId       Int
+  userId         Int
+  folderId       Int?
+  ordinal        Int
+  content        String
+  tokenCount     Int                          @default(0)
+  metadata       Json                         @default("{}")
+  embeddingModel String?
+  embedding      Unsupported("vector(1536)")?
+  tsv            Unsupported("tsvector")?
+  createdAt      DateTime                     @default(now())
+  source         KnowledgeSource              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  user           User                         @relation(fields: [userId], references: [id])
+  folder         Folder?                      @relation(fields: [folderId], references: [id])
+
+  @@index([sourceId])
+  @@index([userId, folderId])
+}
+
+
+// ─── Content agent ───────────────────────────────────────────────────────
+// BrandKit / Product are small structured records injected into every
+// generation verbatim (exact facts, never chunked). folderId null = user-global.
+
+model BrandKit {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  folderId    Int?
+  name        String
+  voice       String   @default("")
+  audience    String   @default("")
+  bannedWords String[] @default([])
+  mustInclude String[] @default([])
+  ctaRules    String?
+  examples    Json     @default("[]")
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  folder      Folder?  @relation(fields: [folderId], references: [id])
+
+  @@index([userId, folderId])
+}
+
+model Product {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  folderId        Int?
+  name            String
+  summary         String   @default("")
+  features        Json     @default("[]")
+  pricing         String?
+  claimsAllowed   Json     @default("[]")
+  claimsForbidden Json     @default("[]")
+  isDeleted       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id])
+  folder          Folder?  @relation(fields: [folderId], references: [id])
+
+  @@index([userId, folderId])
+}
+
+enum ContentStatus {
+  DRAFT
+  GENERATING
+  IN_REVIEW
+  NEEDS_REVISION
+  READY
+  APPROVED
+  FAILED
+}
+
+model ContentItem {
+  id             Int              @id @default(autoincrement())
+  userId         Int
+  folderId       Int?
+  chatId         Int?
+  messageId      Int?
+  // social_post | blog | ad_copy | video_script | email
+  type           String
+  platform       String?
+  title          String
+  body           Json
+  brief          Json             @default("{}")
+  status         ContentStatus    @default(READY)
+  currentVersion Int              @default(1)
+  reviewScore    Int?
+  reviewIssues   Json?
+  isDeleted      Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  approvedAt     DateTime?
+  user           User             @relation(fields: [userId], references: [id])
+  folder         Folder?          @relation(fields: [folderId], references: [id])
+  chat           Chat?            @relation(fields: [chatId], references: [id])
+  message        Message?         @relation(fields: [messageId], references: [id])
+  versions       ContentVersion[]
+
+  @@index([userId, createdAt])
+  @@index([chatId])
+  @@index([messageId])
+  @@index([userId, folderId])
+}
+
+enum ContentVersionSource {
+  AI
+  USER_EDIT
+  REVISION
+}
+
+model ContentVersion {
+  id            Int                  @id @default(autoincrement())
+  contentItemId Int
+  version       Int
+  title         String
+  body          Json
+  source        ContentVersionSource @default(AI)
+  note          String?
+  createdAt     DateTime             @default(now())
+  contentItem   ContentItem          @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+
+  @@unique([contentItemId, version])
 }

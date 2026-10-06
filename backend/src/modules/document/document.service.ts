@@ -27,7 +27,7 @@ class DocumentService {
   /**
    * Enqueues a document and returns immediately with a PENDING row, so the UI
    * can render a "generating" state right away. Generation itself is a
-   * background job — a large PDF takes far longer than a request should.
+   * background job - a large PDF takes far longer than a request should.
    */
   async create(userId: number, input: CreateDocumentInput) {
     const planContext = await getUserPlanContext(userId);
@@ -35,12 +35,12 @@ class DocumentService {
 
     // Document generation is now metered against the token wallet (real
     // OpenRouter cost, deducted once actual usage is known in the background
-    // worker — see document.generation.service.ts). Reject up front if the
+    // worker - see document.generation.service.ts). Reject up front if the
     // wallet is already empty rather than letting the job fail asynchronously.
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
       throw new ApiError(
-        "You're out of tokens — upgrade your plan or wait for your next renewal to generate documents.",
+        "You're out of tokens - upgrade your plan or wait for your next renewal to generate documents.",
         STATUS_CODES.BAD_REQUEST,
       );
     }
@@ -85,7 +85,7 @@ class DocumentService {
       },
     });
 
-    // Kick the worker now rather than waiting for the next cron tick — the
+    // Kick the worker now rather than waiting for the next cron tick - the
     // user is watching a spinner, so poll latency is user-visible here.
     void runPendingDocumentJobs();
 
@@ -180,7 +180,7 @@ class DocumentService {
 
   /**
    * v1 editing: theme and title only. Both are cheap to change because they
-   * are re-render, not re-generation — the stored spec already exists, so
+   * are re-render, not re-generation - the stored spec already exists, so
    * this reuses the exact PENDING→worker path a retry uses, just without
    * clearing the spec. No model call happens on this path.
    */

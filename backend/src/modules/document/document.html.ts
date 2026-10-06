@@ -22,7 +22,7 @@ const escapeHtml = (value: unknown): string =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-/** Renders `**bold**` / `` `code` `` within a single line — no bullets, no line breaks. */
+/** Renders `**bold**` / `` `code` `` within a single line - no bullets, no line breaks. */
 const renderInline = (value: unknown): string =>
   parseInlineSegments(value)
     .map((segment) => {
@@ -53,8 +53,8 @@ const renderFormatted = (value: unknown): string =>
     .join("<br />");
 
 /**
- * Image hosts we are willing to have Chromium fetch. Anything else — including
- * anything resolving to link-local or private ranges — is dropped rather than
+ * Image hosts we are willing to have Chromium fetch. Anything else - including
+ * anything resolving to link-local or private ranges - is dropped rather than
  * rendered. The renderer also blocks non-allowlisted requests at the network
  * layer; this is the first of the two gates.
  */
@@ -135,7 +135,7 @@ const renderBlock = (block: DocumentBlock): string => {
 
     case "quote": {
       const attribution = block.attribution
-        ? `<span class="attribution">— ${renderInline(block.attribution)}</span>`
+        ? `<span class="attribution">- ${renderInline(block.attribution)}</span>`
         : "";
       return `<blockquote>${renderFormatted(block.text)}${attribution}</blockquote>`;
     }
