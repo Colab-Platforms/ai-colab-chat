@@ -7,7 +7,7 @@ import { motion, type Variants } from "framer-motion";
 import { chatService, messageService, modelService, assistantService, folderService, videoService } from "@/lib/services";
 import * as LucideIcons from "lucide-react";
 import { ChatInput } from "@/components/chat/chat-input";
-import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
+import { VideoGenerateDialog, type VideoGenerateParams, type VideoSequenceParams } from "@/components/chat/video-generate-dialog";
 import { MessageSquare, Sparkles, Folder } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { ChatHyperspeedBackground } from "@/components/chat/ChatHyperspeedBackground";
@@ -222,13 +222,13 @@ export function NewChatPage() {
    * server on mount and interleaves it into the message timeline by
    * createdAt, so nothing needs to be threaded through sessionStorage.
    */
-  const handleGenerateVideo = async (params: VideoGenerateParams) => {
+  const createChatForVideo = async (title: string): Promise<number> => {
     const rawPendingFolderId = localStorage.getItem("pending_new_chat_folder_id");
     const pendingFolderId = rawPendingFolderId ? Number(rawPendingFolderId) : null;
     const validPendingFolderId = pendingFolderId && !Number.isNaN(pendingFolderId) ? pendingFolderId : null;
 
     const payload: any = {
-      title: params.prompt.substring(0, 50),
+      title: title.substring(0, 50),
       capability: "STANDARD",
     };
     if (validPendingFolderId) payload.folderId = validPendingFolderId;
@@ -244,7 +244,20 @@ export function NewChatPage() {
       }),
     );
 
+    return chatId;
+  };
+
+  const handleGenerateVideo = async (params: VideoGenerateParams) => {
+    const chatId = await createChatForVideo(params.prompt);
     await videoService.create({ ...params, chatId });
+    router.push(`/c/${chatId}`);
+  };
+
+  // Same flow for an image sequence — the /c/[id] page picks up the in-flight
+  // sequence from the server on mount, just like a single video.
+  const handleGenerateVideoSequence = async (params: VideoSequenceParams) => {
+    const chatId = await createChatForVideo(params.images[0]?.prompt || "Image sequence video");
+    await videoService.createSequence({ ...params, chatId });
     router.push(`/c/${chatId}`);
   };
 
@@ -370,6 +383,7 @@ export function NewChatPage() {
         open={videoDialogOpen}
         onOpenChange={setVideoDialogOpen}
         onSubmit={handleGenerateVideo}
+        onSubmitSequence={handleGenerateVideoSequence}
       />
     </div>
   );

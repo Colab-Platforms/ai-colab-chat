@@ -47,6 +47,35 @@ export interface CreateVideoInput {
   lastFrameUrl?: string;
 }
 
+export const MIN_SEQUENCE_IMAGES = 2;
+export const MAX_SEQUENCE_IMAGES = 8;
+/** Entries in one sequence request — higher than the image cap because an image can be reused. */
+export const MAX_SEQUENCE_STEPS = 12;
+
+export interface SequenceImageInput {
+  /** Public HTTPS URL from the existing attachment upload flow. */
+  imageUrl: string;
+  /** What should happen to this image — the motion/scene prompt for its clip. */
+  prompt: string;
+}
+
+export interface CreateVideoSequenceInput {
+  chatId?: number;
+  modelId?: number;
+  /** Per-clip duration, in seconds. */
+  duration?: number;
+  resolution?: string;
+  aspectRatio?: string;
+  /**
+   * false: one clip per image, hard-cut together.
+   * true: clip i animates from image i to image i+1 (first + last frame), so N
+   * images make N-1 clips and the final image's prompt is unused.
+   */
+  smoothTransitions?: boolean;
+  /** In playback order. */
+  images: SequenceImageInput[];
+}
+
 export interface ListVideosQuery {
   page?: number;
   limit?: number;

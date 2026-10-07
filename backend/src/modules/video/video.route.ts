@@ -8,6 +8,23 @@ const router = Router();
 
 // Registered before "/:id" so Express doesn't treat "models" as an :id param.
 router.get("/models", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideoModels);
+// Image sequences — registered before "/:id" for the same reason as "/models".
+router.get("/sequences", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideoSequences);
+router.get("/sequences/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.getVideoSequenceById);
+router.post(
+  "/sequences",
+  auth("USER", "ADMIN", "SUPERADMIN"),
+  requirePlanCapability("VIDEO_GENERATION"),
+  videoController.createVideoSequence,
+);
+router.post(
+  "/sequences/:id/retry",
+  auth("USER", "ADMIN", "SUPERADMIN"),
+  requirePlanCapability("VIDEO_GENERATION"),
+  videoController.retryVideoSequence,
+);
+router.delete("/sequences/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.deleteVideoSequence);
+
 router.get("/", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideos);
 router.get("/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.getVideoById);
 // Coarse "does this plan allow video at all" gate — the specific-model

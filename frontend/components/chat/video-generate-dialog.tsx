@@ -22,6 +22,15 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { attachmentService, videoService, creditWalletService } from "@/lib/services";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
+import {
+  VideoSequenceEditor,
+  buildSequenceImages,
+  isSequenceReady,
+  sequenceStepCount,
+  type PromptMode,
+  type SequenceItem,
+} from "./video-sequence-editor";
 
 export interface VideoModelOption {
   id: number;
@@ -101,6 +110,17 @@ export interface VideoGenerateParams {
   aspectRatio: string;
   firstFrameUrl?: string;
   lastFrameUrl?: string;
+}
+
+export interface VideoSequenceParams {
+  /** In playback order. */
+  images: { imageUrl: string; prompt: string }[];
+  modelId: number;
+  /** Per-clip duration. */
+  duration: number;
+  resolution: string;
+  aspectRatio: string;
+  smoothTransitions: boolean;
 }
 
 interface FrameUpload {
@@ -196,10 +216,13 @@ export function VideoGenerateDialog({
   open,
   onOpenChange,
   onSubmit,
+  onSubmitSequence,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (params: VideoGenerateParams) => Promise<void>;
+  /** When provided, the dialog offers an "Image sequence" mode alongside a single clip. */
+  onSubmitSequence?: (params: VideoSequenceParams) => Promise<void>;
 }) {
   const [models, setModels] = useState<VideoModelOption[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -209,6 +232,11 @@ export function VideoGenerateDialog({
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [firstFrame, setFirstFrame] = useState<FrameUpload | null>(null);
   const [lastFrame, setLastFrame] = useState<FrameUpload | null>(null);
+  const [mode, setMode] = useState<"single" | "sequence">("single");
+  const [seqItems, setSeqItems] = useState<SequenceItem[]>([]);
+  const [smoothTransitions, setSmoothTransitions] = useState(false);
+  const [promptMode, setPromptMode] = useState<PromptMode>("each");
+  const [singlePrompt, setSinglePrompt] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
 
@@ -242,7 +270,10 @@ export function VideoGenerateDialog({
   const selectedModel = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
   const constraints = constraintsFor(selectedModel);
   const supportsImageToVideo = selectedModel ? IMAGE_TO_VIDEO_MODELS.has(selectedModel.externalId) : false;
-  const hasImageInput = Boolean(firstFrame?.fileUrl || lastFrame?.fileUrl);
+  const isSequence = mode === "sequence" && supportsImageToVideo && Boolean(onSubmitSequence);
+  // Every clip of a sequence starts from an image, so it always bills at the image-input rate.
+  const hasImageInput = isSequence || Boolean(firstFrame?.fileUrl || lastFrame?.fileUrl);
+  const clipCount = isSequence ? sequenceStepCount(seqItems, smoothTransitions, promptMode, singlePrompt) : 1;
 
   // Keep duration/resolution/aspectRatio valid whenever the model changes —
   // e.g. switching from Seedance (max 15s) to Veo (max 8s) with 12s selected
@@ -266,26 +297,45 @@ export function VideoGenerateDialog({
       selectedModel.creditCostPerSecondByResolution?.[resolution] ??
       selectedModel.creditCostPerSecond
     : null;
-  const estimatedCredits = costPerSecond != null ? Math.ceil(duration * costPerSecond) : null;
+  const estimatedCredits =
+    costPerSecond != null ? Math.ceil(duration * costPerSecond) * Math.max(clipCount, 1) : null;
   const insufficientCredits =
     estimatedCredits !== null && creditsRemaining !== null && estimatedCredits > creditsRemaining;
 
   const handleSubmit = useCallback(async () => {
-    if (!prompt.trim() || !modelId) return;
+    if (!modelId) return;
+    const sequenceImages = isSequence
+      ? buildSequenceImages(seqItems, smoothTransitions, promptMode, singlePrompt).images
+      : null;
+    if (isSequence ? !sequenceImages : !prompt.trim()) return;
     setIsSubmitting(true);
     try {
-      await onSubmit({
-        prompt: prompt.trim(),
-        modelId,
-        duration,
-        resolution,
-        aspectRatio,
-        firstFrameUrl: firstFrame?.fileUrl || undefined,
-        lastFrameUrl: lastFrame?.fileUrl || undefined,
-      });
-      setPrompt("");
-      setFirstFrame(null);
-      setLastFrame(null);
+      if (isSequence && onSubmitSequence && sequenceImages) {
+        await onSubmitSequence({
+          images: sequenceImages,
+          modelId,
+          duration,
+          resolution,
+          aspectRatio,
+          smoothTransitions,
+        });
+        seqItems.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+        setSeqItems([]);
+        setSinglePrompt("");
+      } else {
+        await onSubmit({
+          prompt: prompt.trim(),
+          modelId,
+          duration,
+          resolution,
+          aspectRatio,
+          firstFrameUrl: firstFrame?.fileUrl || undefined,
+          lastFrameUrl: lastFrame?.fileUrl || undefined,
+        });
+        setPrompt("");
+        setFirstFrame(null);
+        setLastFrame(null);
+      }
       onOpenChange(false);
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { message?: string; code?: string } } })?.response;
@@ -301,17 +351,58 @@ export function VideoGenerateDialog({
     } finally {
       setIsSubmitting(false);
     }
-  }, [prompt, modelId, duration, resolution, aspectRatio, firstFrame, lastFrame, onSubmit, onOpenChange]);
+  }, [
+    prompt,
+    modelId,
+    duration,
+    resolution,
+    aspectRatio,
+    firstFrame,
+    lastFrame,
+    isSequence,
+    seqItems,
+    smoothTransitions,
+    promptMode,
+    singlePrompt,
+    onSubmit,
+    onSubmitSequence,
+    onOpenChange,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className={cn("max-h-[90vh] overflow-y-auto", isSequence && "sm:max-w-2xl")}>
         <DialogHeader>
           <DialogTitle>Generate a video</DialogTitle>
           <DialogDescription>
-            Describe the video you want — this spends your video credits and can take a couple of minutes.
+            {isSequence
+              ? "Turn a set of images into one video — this spends your video credits and can take several minutes."
+              : "Describe the video you want — this spends your video credits and can take a couple of minutes."}
           </DialogDescription>
         </DialogHeader>
+
+        {onSubmitSequence && supportsImageToVideo && (
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-xs font-medium">
+            {(
+              [
+                ["single", "Single clip"],
+                ["sequence", "Image sequence"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 transition-colors",
+                  mode === value ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {creditsRemaining !== null && (
           <p className="-mb-1 text-xs text-muted-foreground">
@@ -341,15 +432,28 @@ export function VideoGenerateDialog({
           <p className="-mt-2 text-xs text-muted-foreground">{selectedModel.description}</p>
         )}
 
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="A slow cinematic push-in on a neon sign in the rain..."
-          maxLength={2000}
-          className="min-h-24"
-        />
+        {isSequence ? (
+          <VideoSequenceEditor
+            items={seqItems}
+            setItems={setSeqItems}
+            smoothTransitions={smoothTransitions}
+            onSmoothTransitionsChange={setSmoothTransitions}
+            promptMode={promptMode}
+            onPromptModeChange={setPromptMode}
+            singlePrompt={singlePrompt}
+            onSinglePromptChange={setSinglePrompt}
+          />
+        ) : (
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="A slow cinematic push-in on a neon sign in the rain..."
+            maxLength={2000}
+            className="min-h-24"
+          />
+        )}
 
-        {supportsImageToVideo && (
+        {supportsImageToVideo && !isSequence && (
           <div>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">
               Image-to-video (optional) — {selectedModel?.creditCostPerSecondByResolutionImageInput
@@ -366,12 +470,12 @@ export function VideoGenerateDialog({
         <div className="grid grid-cols-3 gap-2">
           <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
             <SelectTrigger size="sm">
-              <SelectValue placeholder="Duration" />
+              <SelectValue placeholder={isSequence ? "Per clip" : "Duration"} />
             </SelectTrigger>
             <SelectContent>
               {constraints.durations.map((d) => (
                 <SelectItem key={d} value={String(d)}>
-                  {d}s
+                  {isSequence ? `${d}s per clip` : `${d}s`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -417,13 +521,17 @@ export function VideoGenerateDialog({
           {estimatedCredits !== null && (
             <p className="text-xs text-muted-foreground">
               Estimated cost: <span className="font-medium text-foreground">{estimatedCredits} credits</span>
-              {hasImageInput && " (image-to-video rate)"}
+              {isSequence
+                ? ` (${clipCount} × ${duration}s clips)`
+                : hasImageInput && " (image-to-video rate)"}
             </p>
           )}
           <Button
             type="button"
             disabled={
-              !prompt.trim() ||
+              (isSequence
+                ? !isSequenceReady(seqItems, smoothTransitions, promptMode, singlePrompt)
+                : !prompt.trim()) ||
               !modelId ||
               isSubmitting ||
               firstFrame?.uploading ||

@@ -231,6 +231,20 @@ export const videoService = {
   }) => api.post("/videos", data),
   retry: (id: number) => api.post(`/videos/${id}/retry`),
   delete: (id: number) => api.delete(`/videos/${id}`),
+  // Image sequences: ordered images, each with its own prompt, stitched into one video.
+  createSequence: (data: {
+    images: { imageUrl: string; prompt: string }[];
+    chatId?: number;
+    modelId?: number;
+    duration?: number;
+    resolution?: string;
+    aspectRatio?: string;
+    smoothTransitions?: boolean;
+  }) => api.post("/videos/sequences", data),
+  listSequences: (params?: Record<string, string>) => api.get("/videos/sequences", { params }),
+  getSequence: (id: number) => api.get(`/videos/sequences/${id}`),
+  retrySequence: (id: number) => api.post(`/videos/sequences/${id}/retry`),
+  deleteSequence: (id: number) => api.delete(`/videos/sequences/${id}`),
 };
 
 export const imageService = {

@@ -6,7 +6,8 @@ import { chatService, modelService, messageService, assistantService, folderServ
 import { MessageList } from "@/components/chat/message-list";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ProjectBanner } from "@/components/chat/project-banner";
-import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
+import { VideoGenerateDialog, type VideoGenerateParams, type VideoSequenceParams } from "@/components/chat/video-generate-dialog";
+import type { VideoSequence } from "@/components/chat/video-sequence-card";
 import { videoService } from "@/lib/services";
 import type { GeneratedVideo } from "@/components/chat/video-card";
 import { toast } from "@/lib/toast";
@@ -95,6 +96,7 @@ export default function ChatPage() {
   const [chatCapability, setChatCapability] = useState<any>("STANDARD");
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [videos, setVideos] = useState<GeneratedVideo[]>([]);
+  const [videoSequences, setVideoSequences] = useState<VideoSequence[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,6 +107,14 @@ export default function ChatPage() {
       })
       .catch(() => {
         /* no videos yet, or a transient failure — either way, start empty */
+      });
+    videoService
+      .listSequences({ chatId: String(chatId) })
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.data?.data)) setVideoSequences(res.data.data);
+      })
+      .catch(() => {
+        /* none in flight — start empty */
       });
     return () => {
       cancelled = true;
@@ -121,6 +131,30 @@ export default function ChatPage() {
 
   const handleVideoDeleted = useCallback((id: number) => {
     setVideos((prev) => prev.filter((v) => v.id !== id));
+  }, []);
+
+  const handleGenerateVideoSequence = useCallback(
+    async (params: VideoSequenceParams) => {
+      const res = await videoService.createSequence({ ...params, chatId });
+      if (res.data?.data) setVideoSequences((prev) => [...prev, res.data.data]);
+    },
+    [chatId],
+  );
+
+  // The stitched video replaces the progress card, keeping its place in the timeline.
+  const handleSequenceCompleted = useCallback((sequenceId: number, video: GeneratedVideo) => {
+    setVideoSequences((prev) => prev.filter((s) => s.id !== sequenceId));
+    setVideos((prev) =>
+      prev.some((v) => v.id === video.id)
+        ? prev
+        : [...prev, video].sort(
+            (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime(),
+          ),
+    );
+  }, []);
+
+  const handleSequenceDeleted = useCallback((sequenceId: number) => {
+    setVideoSequences((prev) => prev.filter((s) => s.id !== sequenceId));
   }, []);
   const [maxModels, setMaxModels] = useState<number>(1); // 1 = single mode (default)
 
@@ -1558,11 +1592,15 @@ export default function ChatPage() {
         scrollContainerId="chat-scroll-container"
         videos={videos}
         onVideoDeleted={handleVideoDeleted}
+        sequences={videoSequences}
+        onSequenceCompleted={handleSequenceCompleted}
+        onSequenceDeleted={handleSequenceDeleted}
       />
       <VideoGenerateDialog
         open={videoDialogOpen}
         onOpenChange={setVideoDialogOpen}
         onSubmit={handleGenerateVideo}
+        onSubmitSequence={handleGenerateVideoSequence}
       />
       <ChatInput
         models={models}

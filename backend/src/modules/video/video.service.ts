@@ -11,9 +11,9 @@ import { MAX_TITLE_CHARS, type CreateVideoInput, type ListVideosQuery } from "./
 import { getUserPlanContext, assertCanGenerateVideo } from "@/modules/plan-access/planAccess.service.js";
 
 const DEFAULT_LIMIT = 20;
-const DEFAULT_DURATION = 4;
-const DEFAULT_RESOLUTION = "720p";
-const DEFAULT_ASPECT_RATIO = "16:9";
+export const DEFAULT_DURATION = 4;
+export const DEFAULT_RESOLUTION = "720p";
+export const DEFAULT_ASPECT_RATIO = "16:9";
 
 // The provider's own model catalogue rarely changes; refetching it on every
 // create request would add a network round trip to every video request for
@@ -35,7 +35,7 @@ class VideoService {
    * lookup chat.service.ts uses for IMAGE_GENERATION, so a video model is
    * configured the same way any other model is (see model.route.ts).
    */
-  private async resolveModel(modelId?: number) {
+  async resolveModel(modelId?: number) {
     if (modelId) {
       const requested = await prisma.model.findFirst({
         where: {
@@ -206,7 +206,14 @@ class VideoService {
    * runs in the background against OpenRouter's async video API, which can
    * take anywhere from ~20 seconds to a few minutes.
    */
-  async create(userId: number, input: CreateVideoInput) {
+  async create(
+    userId: number,
+    input: CreateVideoInput,
+    // Set when this job is one clip of an image sequence. `deferKick` lets the
+    // sequence create every clip before any starts, so a failure partway
+    // through (e.g. out of credits) can still be rolled back cleanly.
+    sequence?: { sequenceId: number; sequenceOrder: number; deferKick?: boolean },
+  ) {
     vlog("create", `user=${userId} request received — prompt="${input.prompt.slice(0, 80)}..."`);
 
     if (input.chatId) {
@@ -308,6 +315,8 @@ class VideoService {
           aspectRatio,
           firstFrameUrl: input.firstFrameUrl ?? null,
           lastFrameUrl: input.lastFrameUrl ?? null,
+          sequenceId: sequence?.sequenceId ?? null,
+          sequenceOrder: sequence?.sequenceOrder ?? null,
           reservedTokens,
         },
       });
@@ -353,8 +362,10 @@ class VideoService {
     // Kick the worker now rather than waiting for the next cron tick — the
     // user is watching a card for a request that can take minutes, so poll
     // latency here is very visible.
-    void runPendingVideoJobs();
-    vlog("create", `job=${video.id} worker kicked`);
+    if (!sequence?.deferKick) {
+      void runPendingVideoJobs();
+      vlog("create", `job=${video.id} worker kicked`);
+    }
 
     return video;
   }
@@ -366,6 +377,8 @@ class VideoService {
     const where = {
       userId,
       isDeleted: false,
+      // Clips of an image sequence are internal — only the stitched result shows up.
+      sequenceId: null,
       ...(query.status ? { status: query.status as any } : {}),
       ...(query.chatId ? { chatId: Number(query.chatId) } : {}),
     };
@@ -467,6 +480,14 @@ class VideoService {
       topupRemaining: debitResult.topupRemaining,
       totalRemaining: debitResult.totalRemaining,
     });
+    // A retried clip puts its sequence back to rendering, so the sequence
+    // can stitch once this clip lands.
+    if (video.sequenceId) {
+      await prisma.videoSequence.update({
+        where: { id: video.sequenceId },
+        data: { status: "GENERATING", lastError: null },
+      });
+    }
     void runPendingVideoJobs();
     vlog("retry", `job=${id} worker kicked`);
 
@@ -494,6 +515,11 @@ class VideoService {
       where: { id },
       data: { isDeleted: true, deletedAt: new Date() },
       select: { id: true },
+    });
+    // Deleting a stitched video retires the sequence that produced it.
+    await prisma.videoSequence.updateMany({
+      where: { finalVideoId: id },
+      data: { isDeleted: true },
     });
     vlog("delete", `job=${id} soft-deleted`);
     return result;

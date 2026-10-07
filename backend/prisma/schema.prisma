@@ -66,6 +66,7 @@ model User {
   creditTransactions            CreditTransaction[]
   generatedDocuments            GeneratedDocument[]
   generatedVideos               GeneratedVideo[]
+  videoSequences               VideoSequence[]
   generatedImages               GeneratedImage[]
   payments                      Payment[]
   invoices                      Invoice[]
@@ -244,6 +245,7 @@ model Chat {
   usageLogs          UsageLog[]
   generatedDocuments GeneratedDocument[]
   generatedVideos    GeneratedVideo[]
+  videoSequences    VideoSequence[]
   generatedImages    GeneratedImage[]
 
   @@index([userId])
@@ -359,6 +361,11 @@ model GeneratedVideo {
   aspectRatio        String               @default("16:9")
   firstFrameUrl      String?
   lastFrameUrl       String?
+  // Set when this row is one clip of an image sequence (see VideoSequence) —
+  // clips are internal and hidden from the normal video list; the stitched
+  // result is a separate GeneratedVideo row linked via VideoSequence.finalVideoId.
+  sequenceId         Int?
+  sequenceOrder      Int?
   externalJobId      String?
   reservedTokens     Int
   reservedFromBundled Int                 @default(0)
@@ -380,6 +387,8 @@ model GeneratedVideo {
   chat               Chat?                @relation(fields: [chatId], references: [id])
   message            Message?             @relation(fields: [messageId], references: [id])
   model              Model                @relation(fields: [modelId], references: [id])
+  sequence           VideoSequence?       @relation("SequenceClips", fields: [sequenceId], references: [id])
+  sequenceOutput     VideoSequence?       @relation("SequenceOutput")
 
   @@index([userId])
   @@index([status])
@@ -387,6 +396,42 @@ model GeneratedVideo {
   @@index([chatId])
   @@index([messageId])
   @@index([externalJobId])
+  @@index([sequenceId])
+}
+
+enum VideoSequenceStatus {
+  GENERATING
+  STITCHING
+  COMPLETED
+  FAILED
+}
+
+/// An ordered set of images, each turned into its own GeneratedVideo clip, then
+/// concatenated into one video. Billing/retry/refund all stay per-clip.
+model VideoSequence {
+  id                Int                 @id @default(autoincrement())
+  userId            Int
+  chatId            Int?
+  modelId           Int
+  status            VideoSequenceStatus @default(GENERATING)
+  /// true: clip i runs from image i to image i+1 (first+last frame), so N images make N-1 clips.
+  smoothTransitions Boolean             @default(false)
+  resolution        String              @default("720p")
+  aspectRatio       String              @default("16:9")
+  finalVideoId      Int?                @unique
+  lastError         String?
+  isDeleted         Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  user              User                @relation(fields: [userId], references: [id])
+  chat              Chat?               @relation(fields: [chatId], references: [id])
+  model             Model               @relation(fields: [modelId], references: [id])
+  clips             GeneratedVideo[]    @relation("SequenceClips")
+  finalVideo        GeneratedVideo?     @relation("SequenceOutput", fields: [finalVideoId], references: [id])
+
+  @@index([userId])
+  @@index([chatId])
+  @@index([status])
 }
 
 model GeneratedImage {
@@ -533,6 +578,7 @@ model Model {
   responses              ModelResponse[]
   usageLogs              UsageLog[]
   generatedVideos        GeneratedVideo[]
+  videoSequences        VideoSequence[]
   generatedImages        GeneratedImage[]
   allowedInPlans         PlanVideoModel[]
 

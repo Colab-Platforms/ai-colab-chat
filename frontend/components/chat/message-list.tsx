@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { MessageBubble } from "./message-bubble";
 import { SelectionContextTooltip } from "./selection-context-tooltip";
 import { VideoCard, type GeneratedVideo } from "./video-card";
+import { VideoSequenceCard, type VideoSequence } from "./video-sequence-card";
 
 interface Message {
   id: number;
@@ -46,6 +47,10 @@ interface MessageListProps {
    */
   videos?: GeneratedVideo[];
   onVideoDeleted?: (id: number) => void;
+  /** In-flight or failed image sequences — a finished one shows up as a regular entry in `videos`. */
+  sequences?: VideoSequence[];
+  onSequenceCompleted?: (sequenceId: number, video: GeneratedVideo) => void;
+  onSequenceDeleted?: (sequenceId: number) => void;
 }
 
 /**
@@ -143,7 +148,12 @@ function processMessagesWithVersions(
 /** Discriminated render item — how `messages` and `videos` merge into one timeline. */
 type RenderItem =
   | { kind: "message"; createdAt: string; message: Message; editVersions?: Message[]; editVersionIndex?: number }
-  | { kind: "video"; createdAt: string; video: GeneratedVideo };
+  | { kind: "video"; createdAt: string; video: GeneratedVideo }
+  | { kind: "sequence"; createdAt: string; sequence: VideoSequence };
+
+type TimelineExtra =
+  | { kind: "video"; createdAt: string; video: GeneratedVideo }
+  | { kind: "sequence"; createdAt: string; sequence: VideoSequence };
 
 /**
  * Stable merge by createdAt — both inputs already arrive in ascending
@@ -152,7 +162,7 @@ type RenderItem =
  */
 function mergeWithVideos(
   processed: { message: Message; editVersions?: Message[]; editVersionIndex?: number }[],
-  videos: GeneratedVideo[],
+  videos: TimelineExtra[],
 ): RenderItem[] {
   const merged: RenderItem[] = [];
   let mi = 0;
@@ -166,7 +176,7 @@ function mergeWithVideos(
       merged.push({ kind: "message", createdAt: nextMessage.message.createdAt, ...nextMessage });
       mi++;
     } else {
-      merged.push({ kind: "video", createdAt: nextVideo.createdAt || "", video: nextVideo });
+      merged.push(nextVideo);
       vi++;
     }
   }
@@ -178,7 +188,7 @@ export function MessageList({
   messages, activeModelTabs, onModelTabChange, onRegenerate, onFeedback,
   onEditMessage, editVersionIndices = {}, onEditVersionChange, onFollowUpClick,
   showSelectionTooltip = true, sharedView = false, onToggleStar, bottomAnchorId, forceScrollToBottom = false, scrollContainerId, onContinue, onRetryAssistantResponse,
-  onSwitchToFreeModel, videos = [], onVideoDeleted
+  onSwitchToFreeModel, videos = [], onVideoDeleted, sequences = [], onSequenceCompleted, onSequenceDeleted
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -200,7 +210,11 @@ export function MessageList({
   }, [forceScrollToBottom, messages.length]);
 
   const processed = processMessagesWithVersions(messages, editVersionIndices);
-  const merged = mergeWithVideos(processed, videos);
+  const extras: TimelineExtra[] = [
+    ...videos.map((video): TimelineExtra => ({ kind: "video", createdAt: video.createdAt || "", video })),
+    ...sequences.map((sequence): TimelineExtra => ({ kind: "sequence", createdAt: sequence.createdAt, sequence })),
+  ].sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
+  const merged = mergeWithVideos(processed, extras);
 
   return (
     <>
@@ -208,7 +222,15 @@ export function MessageList({
       <div id={scrollContainerId} ref={containerRef} className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto py-4">
           {merged.map((entry, idx) =>
-            entry.kind === "video" ? (
+            entry.kind === "sequence" ? (
+              <div key={`sequence-${entry.sequence.id}`} className="mb-4">
+                <VideoSequenceCard
+                  sequence={entry.sequence}
+                  onCompleted={onSequenceCompleted}
+                  onDeleted={onSequenceDeleted}
+                />
+              </div>
+            ) : entry.kind === "video" ? (
               <div key={`video-${entry.video.id}`} className="mb-4">
                 <VideoCard video={entry.video} onDeleted={onVideoDeleted} />
               </div>

@@ -10,6 +10,7 @@ import {
   type VideoJobPollResult,
 } from "@/utils/openrouterVideo.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
+import { settleSequence } from "./video.sequence.settle.js";
 
 const MAX_ATTEMPTS = Number(process.env.VIDEO_MAX_ATTEMPTS ?? 3);
 const BATCH_SIZE = Number(process.env.VIDEO_BATCH_SIZE ?? 3);
@@ -30,6 +31,16 @@ const getCostPerCreditInr = async (): Promise<number> => {
   return pricing ? Number(pricing.costPerCreditInr) : 2.85;
 };
 
+/** A clip reaching a terminal state may complete (or fail) its whole image sequence. */
+const settleClipSequence = async (video: { id: number; sequenceId: number | null }): Promise<void> => {
+  if (!video.sequenceId) return;
+  try {
+    await settleSequence(video.sequenceId);
+  } catch (error) {
+    vlogError("sequence", `job=${video.id} couldn't settle sequence ${video.sequenceId}`, error);
+  }
+};
+
 /** Atomically claims a PENDING row so exactly one worker submits it. */
 const claimPending = async (id: number): Promise<boolean> => {
   const { count } = await prisma.generatedVideo.updateMany({
@@ -46,7 +57,7 @@ const claimPending = async (id: number): Promise<boolean> => {
  * tokens). The `reservedTokens` field name on GeneratedVideo is unchanged to
  * avoid a wider rename, but it holds a credit amount, not wallet tokens.
  */
-const refundReservation = async (video: {
+export const refundReservation = async (video: {
   id: number;
   userId: number;
   reservedTokens: number;
@@ -104,6 +115,7 @@ const handleSubmitFailure = async (id: number, error: unknown): Promise<void> =>
 
   if (exhausted) {
     await refundReservation(video);
+    await settleClipSequence(video);
   }
 
   vlogError(
@@ -337,6 +349,7 @@ export const applyTerminalStatus = async (
       await refundReservation(video);
       vlogError("terminal", `job=${video.id} download/upload failed after provider completed — refunded`, message);
     }
+    await settleClipSequence(video);
     return;
   }
 
@@ -352,6 +365,7 @@ export const applyTerminalStatus = async (
     });
     await refundReservation(video);
     vlog("terminal", `job=${video.id} ${status} — refunded ${video.reservedTokens} tokens (reason: ${poll.error ?? poll.status})`);
+    await settleClipSequence(video);
     return;
   }
 
