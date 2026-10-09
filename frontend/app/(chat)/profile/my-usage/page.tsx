@@ -6,6 +6,7 @@ import { DataTable, Column } from "@/components/dashboard/data-table";
 import { usageLogService } from "@/lib/services";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Eye } from "lucide-react";
+import { SettingsHeader } from "@/components/settings/settings-ui";
 
 interface GroupedLog {
   id: string; // generated id
@@ -58,16 +59,16 @@ export default function UsagePage() {
     { key: "models", label: "Model(s)", render: (r: GroupedLog) => (
       <div className="flex flex-wrap gap-1 max-w-[250px]">
         {r.models.map((m, i) => (
-          <span key={i} className="text-xs border border-border bg-card px-2 py-0.5 rounded-full whitespace-nowrap">
+          <span key={i} className="text-[13px] font-medium whitespace-nowrap">
             {m?.name || "Unknown"}
           </span>
         ))}
       </div>
     )},
-    { key: "capability", label: "Capability", render: (r: GroupedLog) => <span className="text-xs uppercase text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">{r.capability?.replace(/_/g, " ") || "STANDARD"}</span> },
-    { key: "promptTokens", label: "Prompt", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="font-mono text-xs text-muted-foreground">{r.billablePromptTokens?.toLocaleString() || 0}</span> },
-    { key: "completionTokens", label: "Completion", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="font-mono text-xs text-muted-foreground">{r.billableCompletionTokens?.toLocaleString() || 0}</span> },
-    { key: "totalTokens", label: "Total", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="font-mono text-xs font-medium text-primary">{r.billableTotalTokens?.toLocaleString() || 0}</span> },
+    { key: "capability", label: "Capability", render: (r: GroupedLog) => <span className="text-xs capitalize text-muted-foreground bg-sunken px-2 py-1 rounded-md">{(r.capability?.replace(/_/g, " ") || "standard").toLowerCase()}</span> },
+    { key: "promptTokens", label: "Prompt", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="text-sm text-muted-foreground">{r.billablePromptTokens?.toLocaleString() || 0}</span> },
+    { key: "completionTokens", label: "Completion", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="text-sm text-muted-foreground">{r.billableCompletionTokens?.toLocaleString() || 0}</span> },
+    { key: "totalTokens", label: "Total", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="font-semibold text-sm text-foreground">{r.billableTotalTokens?.toLocaleString() || 0}</span> },
     { key: "createdAt", label: "Date", sortable: true, render: (r: GroupedLog) => <span className="text-muted-foreground text-sm">{new Date(r.createdAt).toLocaleString()}</span> },
     { key: "actions", label: "", className: "w-10", render: (r: GroupedLog) => (
       r.subLogs.length > 1 ? (
@@ -83,12 +84,11 @@ export default function UsagePage() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div>
+      <SettingsHeader title="Usage" description="Every request this billing cycle and the tokens it used." />
       <DataTable
         columns={columns}
         data={logs}
-        title="My Usage"
-        description="Your token usage history"
         sort={sort}
         onSortChange={setSort}
         page={page}
@@ -122,9 +122,9 @@ export default function UsagePage() {
                 {selectedGroup?.subLogs.map((log: any, idx: number) => (
                   <tr key={idx} className="hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">{log.model?.name || "Unknown"}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">{log.billablePromptTokens?.toLocaleString() || 0}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">{log.billableCompletionTokens?.toLocaleString() || 0}</td>
-                    <td className="px-4 py-3 text-right font-mono text-xs font-medium text-primary">{log.billableTotalTokens?.toLocaleString() || 0}</td>
+                    <td className="px-4 py-3 text-right text-sm text-muted-foreground">{log.billablePromptTokens?.toLocaleString() || 0}</td>
+                    <td className="px-4 py-3 text-right text-sm text-muted-foreground">{log.billableCompletionTokens?.toLocaleString() || 0}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-sm text-foreground">{log.billableTotalTokens?.toLocaleString() || 0}</td>
                   </tr>
                 ))}
               </tbody>

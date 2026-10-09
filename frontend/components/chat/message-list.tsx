@@ -206,10 +206,10 @@ export function MessageList({
     <>
       {showSelectionTooltip && <SelectionContextTooltip />}
       <div id={scrollContainerId} ref={containerRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto py-4">
+        <div className="py-4">
           {merged.map((entry, idx) =>
             entry.kind === "video" ? (
-              <div key={`video-${entry.video.id}`} className="mb-4">
+              <div key={`video-${entry.video.id}`} className="mx-auto mb-4 w-full max-w-3xl px-4">
                 <VideoCard video={entry.video} onDeleted={onVideoDeleted} />
               </div>
             ) : (

@@ -62,7 +62,7 @@ const metaFor = (format: string) =>
  * SVG also inherits the card's sizing and needs no dark-mode variant — the
  * tints are chosen to hold contrast against both themes.
  */
-function FileFormatIcon({
+export function FileFormatIcon({
   format,
   className,
 }: {

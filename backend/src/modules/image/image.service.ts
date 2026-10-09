@@ -23,6 +23,7 @@ class ImageService {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
+        include: { chat: { select: { id: true, title: true } } },
       }),
       prisma.generatedImage.count({ where }),
     ]);

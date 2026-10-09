@@ -26,6 +26,7 @@ import {
 import { parsePdfFromUrl } from "@/utils/pdf.js";
 import {
   maybeGenerateDocumentFromChat,
+  parseRequestedDocumentOptions,
   prepareDocumentTurn,
 } from "@/modules/document/document.chat.js";
 import {
@@ -36,6 +37,8 @@ import {
   resolveCodeChatType,
 } from "@/modules/code-workspace/code-workspace.chat.js";
 import { CODE_CONTINUE_PROMPT } from "@/modules/code-workspace/code-workspace.protocol.js";
+
+import { abortChatStreams, registerStream } from "./chat.streamRegistry.js";
 
 const attachmentService = new AttachmentService();
 
@@ -49,32 +52,34 @@ function isAbortError(error: any) {
   );
 }
 
+/**
+ * Wires a generation to the stop control — NOT to the browser connection.
+ *
+ * This used to abort the generation whenever the client disconnected, so
+ * navigating to another page, switching tab or a network blip stopped a
+ * half-finished answer and saved "Generation stopped by user." Now a dropped
+ * connection leaves the job running: it finishes, is saved to the chat, and is
+ * waiting when the user returns. Only an explicit stop request aborts it (see
+ * stopChatGeneration / chat.streamRegistry.ts).
+ */
 function setupClientAbortTracking(
   req: Request,
   res: Response,
   abortController: AbortController,
 ) {
-  let clientAborted = false;
-  let responseFinished = false;
-  const onResponseFinish = () => {
-    responseFinished = true;
-  };
-  const abortIfDisconnected = () => {
-    if (responseFinished) return;
-    if (!req.aborted && req.complete) return;
-    clientAborted = true;
-    abortController.abort();
-  };
-  const onClientDisconnect = () => {
-    if (responseFinished) return;
-    clientAborted = true;
-    abortController.abort();
-  };
-  req.on("aborted", abortIfDisconnected);
-  req.on("close", abortIfDisconnected);
-  res.on("close", onClientDisconnect);
-  res.on("finish", onResponseFinish);
-  return () => clientAborted || abortController.signal.aborted;
+  const userId = req.user?.id;
+  const chatId = Number(req.params.chatId);
+  if (userId && Number.isFinite(chatId)) {
+    const unregister = registerStream(userId, chatId, abortController);
+    res.on("finish", unregister);
+  }
+  return () => abortController.signal.aborted;
+}
+
+/** POST /chats/:chatId/stop — the user pressed Stop. */
+export async function stopChatGeneration(req: Request, res: Response) {
+  const stopped = abortChatStreams(req.user!.id, Number(req.params.chatId));
+  res.status(200).json({ status: true, data: { stopped }, message: "Stopped" });
 }
 
 async function touchChat(chatId: number) {
@@ -632,6 +637,9 @@ interface SendMessageBody {
   assistantMessageId?: number;
   attachmentIds?: number[];
   replaceModelId?: number;
+  /** Documents studio: output format and visual template picked up front. */
+  documentFormat?: string;
+  documentTheme?: string;
 }
 
 /**
@@ -912,7 +920,13 @@ export async function streamChat(req: Request, res: Response) {
     assistantMessageId,
     attachmentIds,
     replaceModelId,
+    documentFormat,
+    documentTheme,
   } = req.body as SendMessageBody;
+  const requestedDocument = parseRequestedDocumentOptions(
+    documentFormat,
+    documentTheme,
+  );
   // The "Code" pill arrives as chatType CODE; from here on the turn is a
   // STANDARD turn plus a forceCode flag (see code-workspace.chat.ts).
   const { chatType, forceCode } = resolveCodeChatType(requestedChatType);
@@ -1271,6 +1285,7 @@ export async function streamChat(req: Request, res: Response) {
           chatId,
           userPrompt: content,
           lastAssistantAnswer,
+          requested: requestedDocument,
         });
 
     if (documentTurn) {
@@ -1903,6 +1918,13 @@ export async function streamChat(req: Request, res: Response) {
       assistantAnswer: fullContent,
       intent: documentTurn?.intent ?? null,
       effectiveFormat: documentTurn?.effectiveFormat,
+      // Only honoured when the rendered format matches the one the template was
+      // chosen for (a substituted format must not inherit a foreign template).
+      theme:
+        requestedDocument?.theme &&
+        documentTurn?.effectiveFormat === requestedDocument.format
+          ? requestedDocument.theme
+          : undefined,
     });
     if (generatedDocument) {
       res.write(

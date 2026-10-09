@@ -14,6 +14,9 @@ export const chatService = {
   }) => api.post("/chats", data),
   list: (params?: Record<string, string>) => api.get("/chats", { params }),
   getById: (id: number) => api.get(`/chats/${id}`),
+  // Explicit Stop: generations keep running if the page is left, so aborting
+  // the request alone no longer stops them.
+  stop: (id: number) => api.post(`/chats/${id}/stop`),
   archive: (id: number) => api.patch(`/chats/${id}/archive`),
   pin: (id: number) => api.patch(`/chats/${id}/pin`),
   share: (id: number) => api.patch(`/chats/${id}/share`),
@@ -59,12 +62,23 @@ export const modelResponseService = {
 };
 
 export const folderService = {
-  create: (data: { name: string; description?: string | null }) =>
-    api.post("/folders", data),
+  create: (data: {
+    name: string;
+    description?: string | null;
+    icon?: string | null;
+    color?: string | null;
+  }) => api.post("/folders", data),
   list: (params?: Record<string, string>) => api.get("/folders", { params }),
   getById: (id: number) => api.get(`/folders/${id}`),
-  update: (id: number, data: { name: string; description?: string | null }) =>
-    api.put(`/folders/${id}`, data),
+  update: (
+    id: number,
+    data: {
+      name: string;
+      description?: string | null;
+      icon?: string | null;
+      color?: string | null;
+    },
+  ) => api.put(`/folders/${id}`, data),
   delete: (id: number, deleteChats: boolean) =>
     api.delete(`/folders/${id}`, {
       params: { deleteChats: deleteChats ? "true" : "false" },
@@ -210,6 +224,7 @@ export const documentService = {
   retry: (id: number) => api.post(`/documents/${id}/retry`),
   delete: (id: number) => api.delete(`/documents/${id}`),
   getSpec: (id: number) => api.get(`/documents/${id}/spec`),
+  templates: () => api.get("/documents/templates"),
   updateStyle: (id: number, data: { title?: string; theme?: string }) =>
     api.patch(`/documents/${id}`, data),
 };
@@ -237,6 +252,23 @@ export const imageService = {
   list: (params?: Record<string, string>) => api.get("/images", { params }),
   getById: (id: number) => api.get(`/images/${id}`),
   delete: (id: number) => api.delete(`/images/${id}`),
+};
+
+export const studioTemplateService = {
+  list: (type: "IMAGE" | "VIDEO") => api.get("/studio-templates", { params: { type } }),
+  adminList: () => api.get("/studio-templates", { params: { all: "true" } }),
+  create: (data: Record<string, unknown>) => api.post("/studio-templates", data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/studio-templates/${id}`, data),
+  delete: (id: number) => api.delete(`/studio-templates/${id}`),
+  recordUse: (id: number) => api.post(`/studio-templates/${id}/use`),
+};
+
+export const demoRequestService = {
+  list: (params?: Record<string, string>) => api.get("/demo-requests", { params }),
+  update: (id: number, data: { status?: string; adminNotes?: string | null }) =>
+    api.patch(`/demo-requests/${id}`, data),
+  delete: (id: number) => api.delete(`/demo-requests/${id}`),
 };
 
 export const voiceService = {

@@ -6,6 +6,8 @@ import * as documentController from "./document.controller.js";
 const router = Router();
 
 router.get("/", auth("USER", "ADMIN", "SUPERADMIN"), documentController.listDocuments);
+// Must stay above "/:id" or "templates" would be read as a document id.
+router.get("/templates", auth("USER", "ADMIN", "SUPERADMIN"), documentController.listTemplates);
 router.get("/:id", auth("USER", "ADMIN", "SUPERADMIN"), documentController.getDocumentById);
 router.get("/:id/spec", auth("USER", "ADMIN", "SUPERADMIN"), documentController.getDocumentSpec);
 router.post(

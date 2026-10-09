@@ -2,29 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { motion, type Variants } from "framer-motion";
 import { chatService, messageService, modelService, assistantService, folderService, videoService } from "@/lib/services";
 import * as LucideIcons from "lucide-react";
 import { ChatInput } from "@/components/chat/chat-input";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
-import { MessageSquare, Sparkles, Folder } from "lucide-react";
+import { Sparkles, Folder, Columns2, Globe, Film, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { AssistantHero, lift } from "@/components/chat/assistant-hero";
+import { getAssistantLook } from "@/components/chat/assistant-theme";
+import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
-import { ChatHyperspeedBackground } from "@/components/chat/ChatHyperspeedBackground";
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 14 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const } },
-};
-
-const wordContainer: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.15 } },
-};
-
-const wordFadeUp: Variants = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] as const } },
 };
 
 interface Model {
@@ -39,6 +30,7 @@ interface Model {
 export function NewChatPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModels, setSelectedModels] = useState<number[]>([]);
@@ -46,14 +38,37 @@ export function NewChatPage() {
   const [isSending, setIsSending] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState<string | undefined>(undefined);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  // Lets a suggestion row preselect a capability in the composer.
+  const [suggestedType, setSuggestedType] = useState<"STANDARD" | "WEB_SEARCH" | "IMAGE_GENERATION" | "DEEP_RESEARCH" | undefined>(undefined);
 
   const [assistant, setAssistant] = useState<any | null>(null);
   const [activeFolder, setActiveFolder] = useState<{ name: string; description?: string | null } | null>(null);
 
-  const SUGGESTED_PROMPTS = [
-    { text: "Brainstorm ideas for...", value: "Brainstorm ideas for ", icon: Sparkles, className: "w-3.5 h-3.5 inline mr-2" },
-    { text: "Help me write a...", value: "Help me write a ", icon: MessageSquare, className: "w-3.5 h-3.5 inline mr-2" },
-    { text: "Explain how...", value: "Explain how ", icon: MessageSquare, className: "w-3.5 h-3.5 inline mr-2 inline-block transform scale-x-[-1]" },
+  const DEFAULT_SUGGESTIONS: { text: string; hint: string; icon: LucideIcon; onSelect: () => void }[] = [
+    {
+      text: "Compare models on a hard question",
+      hint: "Side by side",
+      icon: Columns2,
+      onSelect: () => {
+        window.dispatchEvent(new CustomEvent("ai-colab:mode-change", { detail: { mode: "multiple" } }));
+        setInitialPrompt("Compare models on a hard question: ");
+      },
+    },
+    {
+      text: "Research with live web results",
+      hint: "Cites sources",
+      icon: Globe,
+      onSelect: () => {
+        setSuggestedType("WEB_SEARCH");
+        setInitialPrompt("Research ");
+      },
+    },
+    {
+      text: "Make a 5-second product clip",
+      hint: "Video Studio",
+      icon: Film,
+      onSelect: () => setVideoDialogOpen(true),
+    },
   ];
 
   const handleModelChange = (ids: number[]) => {
@@ -254,28 +269,30 @@ export function NewChatPage() {
     return res.data.data;
   };
 
-  let welcomeTitle = user?.firstName ? `Hi ${user.firstName}` : "Hi there";
-  let welcomeSubtitle = "What's on your mind today?";
-  let ActiveIcon: React.ElementType = Sparkles;
-  let activePrompts = SUGGESTED_PROMPTS;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  let welcomeTitle = user?.firstName ? `${greeting}, ${user.firstName}` : greeting;
+  let welcomeSubtitle = "Ask one model, or compare up to 4 side by side.";
+  let ActiveIcon: React.ElementType | null = null;
+  let suggestions = DEFAULT_SUGGESTIONS;
 
   if (assistant) {
     welcomeTitle = assistant.name;
     welcomeSubtitle = assistant.description || "How can I help you today?";
-    const IconComponent = (LucideIcons as any)[assistant.icon] as React.ElementType;
-    if (IconComponent) ActiveIcon = IconComponent;
+    ActiveIcon = ((LucideIcons as any)[assistant.icon] as React.ElementType) || Sparkles;
 
     if (assistant.suggestedPrompts && assistant.suggestedPrompts.length > 0) {
-      activePrompts = assistant.suggestedPrompts.map((p: string, i: number) => ({
+      suggestions = assistant.suggestedPrompts.slice(0, 3).map((p: string) => ({
         text: p,
-        value: p,
-        icon: MessageSquare,
-        className: "w-3.5 h-3.5 inline mr-2",
+        hint: "",
+        icon: ArrowUpRight,
+        onSelect: () => setInitialPrompt(p),
       }));
     }
   } else if (activeFolder) {
-    // Same hero treatment as an Assistant — just driven by the active project
-    // instead, so chats started here remember what the project is about.
+    // Same hero treatment as an Assistant, driven by the active project instead,
+    // so chats started here remember what the project is about.
     welcomeTitle = activeFolder.name;
     welcomeSubtitle = activeFolder.description || "Chats here belong to this project.";
     ActiveIcon = Folder;
@@ -283,74 +300,44 @@ export function NewChatPage() {
 
   return (
     <div className="relative flex flex-col h-full overflow-y-auto">
-      {/* <ChatHyperspeedBackground /> */}
+      {/* Soft accent wash behind the hero */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{ background: "radial-gradient(60% 45% at 50% 28%, var(--cl-accent-soft), transparent 70%)", opacity: 0.7 }}
+      />
 
-      {/* Ambient glow behind the centered hero + input, à la Gemini's start screen */}
-      <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
-        <div className="h-[420px] w-[720px] max-w-[90vw] rounded-full bg-primary/10 dark:bg-primary/25 blur-[110px]" />
-      </div>
-
-      {/* Center hero + input, grouped so they stay together mid-screen at start */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-6 p-4">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-7 px-4 py-10">
         <motion.div
           initial="hidden"
           animate="visible"
           variants={{ visible: { transition: { staggerChildren: 0.08 } } }}
-          className="text-center space-y-4 max-w-xl w-full"
+          className="text-center space-y-2.5 max-w-xl w-full"
         >
-          <motion.div
-            variants={fadeUp}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-border/50 bg-background/70 backdrop-blur-sm shadow-sm text-xs font-medium text-muted-foreground"
-          >
-            <Image src="/black.webp" alt="" width={16} height={16} className="dark:hidden h-4 w-auto opacity-90" />
-            <Image src="/white.webp" alt="" width={16} height={16} className="hidden dark:block h-4 w-auto opacity-90" />
-            Colab AI · Multi-model AI platform
-          </motion.div>
-
-          <motion.div variants={fadeUp} className="flex items-center justify-center gap-3">
-            <div className={`w-10 h-10 shrink-0 ${assistant || activeFolder ? "bg-primary/10" : "bg-gradient-to-br from-primary/20 to-primary/5"} rounded-xl flex items-center justify-center shadow-sm`}>
-              {assistant || activeFolder ? (
-                <ActiveIcon className="w-5 h-5 text-primary/80" />
-              ) : (
-                <Image src="/icons/Colab Infinite.png" alt="" width={22} height={22} className="w-[22px] h-[22px] object-contain" />
-              )}
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground text-balance">{welcomeTitle}</h1>
-          </motion.div>
-
-          <motion.p
-            variants={wordContainer}
-            className="text-foreground/70 text-base sm:text-lg font-normal italic max-w-md mx-auto text-balance"
-          >
-            {welcomeSubtitle.split(" ").map((word, i) => (
-              <motion.span key={i} variants={wordFadeUp} className="inline-block mr-[0.28em] last:mr-0">
-                {word}
-              </motion.span>
-            ))}
-          </motion.p>
-
-          {activePrompts.length > 0 && (
-            <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              {activePrompts.slice(0, 3).map((prompt, index) => {
-                const Icon = prompt.icon;
-                return (
-                  <motion.button
-                    key={index}
-                    whileHover={{ scale: 1.03, y: -1 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setInitialPrompt(prompt.value)}
-                    className="px-4 py-2 text-sm bg-background/80 hover:bg-background rounded-full transition-colors text-muted-foreground hover:text-foreground border border-border/40 shadow-[0_2px_12px_-3px_hsl(var(--primary)/0.25),0_0_0_1px_hsl(var(--primary)/0.06)] dark:shadow-[0_2px_14px_-3px_hsl(var(--primary)/0.35),0_0_0_1px_hsl(var(--primary)/0.12)] cursor-pointer"
-                  >
-                    <Icon className={prompt.className} />
-                    {prompt.text}
-                  </motion.button>
-                );
-              })}
+          {assistant && ActiveIcon ? (
+            <motion.div variants={fadeUp}>
+              <AssistantHero assistant={assistant} Icon={ActiveIcon} />
             </motion.div>
+          ) : (
+            <>
+              <motion.div variants={fadeUp} className="flex items-center justify-center gap-3">
+                {ActiveIcon && (
+                  <div className="w-10 h-10 shrink-0 bg-accent-soft rounded-xl flex items-center justify-center">
+                    <ActiveIcon className="w-5 h-5 text-accent-ink" />
+                  </div>
+                )}
+                <h1 className="text-[28px] sm:text-[32px] leading-tight font-semibold tracking-tight text-foreground text-balance">
+                  {welcomeTitle}
+                </h1>
+              </motion.div>
+
+              <motion.p variants={fadeUp} className="text-muted-foreground text-[15px] max-w-md mx-auto text-balance">
+                {welcomeSubtitle}
+              </motion.p>
+            </>
           )}
         </motion.div>
 
-        <div className="relative z-10 w-full max-w-2xl">
+        <div className="relative z-10 w-full max-w-3xl">
           <ChatInput
             models={models}
             selectedModels={selectedModels}
@@ -362,10 +349,57 @@ export function NewChatPage() {
             isSending={isSending}
             supportsCodeMode={Boolean(assistant?.supportsCodeMode)}
             forceReset={true}
+            chatType={suggestedType}
+            onCapabilityChange={setSuggestedType}
+            // With an assistant selected, the Chat / Web search / Image / Video pills
+            // (and the Assistants link) are hidden; only its own Code pill remains.
+            compact={Boolean(assistant)}
+            placeholder={assistant ? `Message ${assistant.name}\u2026` : undefined}
+            assistantChip={
+              assistant && ActiveIcon
+                ? {
+                    name: assistant.name,
+                    Icon: ActiveIcon,
+                    color: lift(getAssistantLook(assistant).color, theme === "dark"),
+                    onClear: () => {
+                      // Same reset the sidebar's "New chat" does: leave the assistant.
+                      localStorage.removeItem("selectedAssistantId");
+                      window.dispatchEvent(new Event("assistant-selected"));
+                    },
+                  }
+                : undefined
+            }
+            onAssistantsClick={assistant ? undefined : () => window.dispatchEvent(new Event("ai-colab:open-assistants"))}
             initialPrompt={initialPrompt}
             onPromptClear={() => setInitialPrompt(undefined)}
             draftStorageKey="chat_draft_new"
           />
+
+          {suggestions.length > 0 && (
+            <motion.ul
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              className="mx-4 mt-2 border-t border-border"
+            >
+              {suggestions.map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <li key={i} className="border-b border-border">
+                    <button
+                      type="button"
+                      onClick={item.onSelect}
+                      className="w-full flex items-center gap-3 px-3 py-3 text-left text-[13.5px] text-foreground hover:bg-sidebar-accent transition-colors cursor-pointer"
+                    >
+                      <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 truncate">{item.text}</span>
+                      {item.hint && <span className="text-xs text-faint shrink-0">{item.hint}</span>}
+                    </button>
+                  </li>
+                );
+              })}
+            </motion.ul>
+          )}
         </div>
       </div>
       <VideoGenerateDialog

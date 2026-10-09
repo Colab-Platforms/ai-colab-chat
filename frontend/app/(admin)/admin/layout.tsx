@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import {
   LayoutDashboard, Users, Bot, Building, CreditCard as PlansIcon,
-  BarChart3, LifeBuoy, ArrowLeft, Menu, X,
+  BarChart3, LifeBuoy, ArrowLeft, Menu, X, Sparkles, Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,8 @@ const adminNav = [
   { label: "Plans", href: "/admin/plans", icon: PlansIcon },
   { label: "Models", href: "/admin/models", icon: Bot },
   { label: "Assistants", href: "/admin/assistants", icon: Bot },
+  { label: "Templates", href: "/admin/templates", icon: Sparkles },
+  { label: "Demo requests", href: "/admin/demo-requests", icon: Inbox },
   { label: "Providers", href: "/admin/providers", icon: Building },
   { label: "Usage", href: "/admin/usage", icon: BarChart3 },
   { label: "Support", href: "/admin/support", icon: LifeBuoy },
@@ -175,7 +177,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex h-screen relative bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40 text-foreground">
+    <div className="flex h-screen relative bg-background text-foreground">
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center px-3 bg-background/80 backdrop-blur-md border-b border-border/50 justify-between">
         <Button
           variant="ghost"

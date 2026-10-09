@@ -8,6 +8,7 @@ import {
   prepareEditMulti,
   editAndResend,
   continueChatStream,
+  stopChatGeneration,
 } from "./chat.stream.js";
 
 const router = Router();
@@ -60,6 +61,7 @@ router.delete(
   chatController.deleteChat,
 );
 router.post("/:chatId/send", auth("USER", "ADMIN", "SUPERADMIN"), streamChat);
+router.post("/:chatId/stop", auth("USER", "ADMIN", "SUPERADMIN"), stopChatGeneration);
 router.post(
   "/:chatId/prepare-multi",
   auth("USER", "ADMIN", "SUPERADMIN"),

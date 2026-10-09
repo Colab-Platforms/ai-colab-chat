@@ -81,13 +81,13 @@ const DEFAULT_CONSTRAINTS = {
   aspectRatios: ["16:9"],
 };
 
-const constraintsFor = (model: VideoModelOption | undefined) =>
+export const constraintsFor = (model: VideoModelOption | undefined) =>
   (model && MODEL_CONSTRAINTS[model.externalId]) || DEFAULT_CONSTRAINTS;
 
 // All 3 current models support image-to-video via first/last frame — this
 // stays a per-model flag (rather than assumed universal) since it comes
 // from each model's own supported_frame_images in OpenRouter's catalogue.
-const IMAGE_TO_VIDEO_MODELS = new Set([
+export const IMAGE_TO_VIDEO_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
   "google/veo-3.1-lite",

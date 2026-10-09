@@ -376,6 +376,11 @@ class VideoService {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
+        // The Assets page shows "<model> · <date>" and links back to the chat.
+        include: {
+          chat: { select: { id: true, title: true } },
+          model: { select: { name: true } },
+        },
       }),
       prisma.generatedVideo.count({ where }),
     ]);

@@ -7,7 +7,10 @@ type RouteUiState = {
   isVoiceRoute: boolean;
   isAssetsRoute: boolean;
   isProjectsRoute: boolean;
+  studio: StudioRoute;
 };
+
+export type StudioRoute = "image" | "video" | "documents" | null;
 
 const state: RouteUiState = {
   activeChatId: null,
@@ -16,6 +19,7 @@ const state: RouteUiState = {
   isVoiceRoute: false,
   isAssetsRoute: false,
   isProjectsRoute: false,
+  studio: null,
 };
 
 const listeners = new Set<() => void>();
@@ -31,8 +35,16 @@ export function setRouteUiFromPathname(pathname: string) {
   const nextIsStarredRoute = pathname === "/starred";
   const nextIsVoiceRoute = pathname === "/voice";
   const nextIsAssetsRoute = pathname === "/assets";
-  const nextIsProjectsRoute = pathname === "/projects";
+  const nextIsProjectsRoute = pathname === "/projects" || pathname.startsWith("/projects/");
   const nextIsDraftRoute = pathname === "/" || pathname === "/new";
+  const nextStudio: StudioRoute =
+    pathname === "/image-studio"
+      ? "image"
+      : pathname === "/video-studio"
+        ? "video"
+        : pathname === "/documents"
+          ? "documents"
+          : null;
 
   if (
     state.activeChatId === nextActiveChatId &&
@@ -40,7 +52,8 @@ export function setRouteUiFromPathname(pathname: string) {
     state.isStarredRoute === nextIsStarredRoute &&
     state.isVoiceRoute === nextIsVoiceRoute &&
     state.isAssetsRoute === nextIsAssetsRoute &&
-    state.isProjectsRoute === nextIsProjectsRoute
+    state.isProjectsRoute === nextIsProjectsRoute &&
+    state.studio === nextStudio
   ) {
     return;
   }
@@ -51,6 +64,7 @@ export function setRouteUiFromPathname(pathname: string) {
   state.isVoiceRoute = nextIsVoiceRoute;
   state.isAssetsRoute = nextIsAssetsRoute;
   state.isProjectsRoute = nextIsProjectsRoute;
+  state.studio = nextStudio;
   emit();
 }
 
@@ -93,3 +107,7 @@ export function useIsProjectsRoute() {
   return useSyncExternalStore(subscribeRouteUi, () => state.isProjectsRoute, () => false);
 }
 
+
+export function useActiveStudio() {
+  return useSyncExternalStore(subscribeRouteUi, () => state.studio, () => null);
+}

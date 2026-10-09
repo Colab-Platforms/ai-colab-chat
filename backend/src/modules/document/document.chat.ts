@@ -8,10 +8,39 @@ import { runPendingDocumentJobs } from "./document.generation.service.js";
 import { dlog, dlogBlock, dlogError } from "./document.logger.js";
 import { resolveRenderableFormat } from "./document.renderers.js";
 import {
+  DOCUMENT_FORMATS,
+  DOCUMENT_THEMES,
   MAX_SOURCE_TEXT_CHARS,
   MAX_TITLE_CHARS,
+  PPTX_TEMPLATES,
   type DocumentFormat,
 } from "./document.types.js";
+
+/**
+ * Format + template the user picked explicitly (Documents studio). Both come
+ * from a request body, so they are validated here rather than trusted.
+ */
+export interface RequestedDocumentOptions {
+  format: DocumentFormat;
+  theme?: string;
+}
+
+export function parseRequestedDocumentOptions(
+  format: unknown,
+  theme: unknown,
+): RequestedDocumentOptions | null {
+  if (typeof format !== "string") return null;
+  const upper = format.toUpperCase() as DocumentFormat;
+  if (!DOCUMENT_FORMATS.includes(upper)) return null;
+  // `theme` names a PPTX template for decks and a document theme for the
+  // rest — an unknown or mismatched value is dropped, never passed on.
+  const allowed: readonly string[] =
+    upper === "PPTX" ? PPTX_TEMPLATES : DOCUMENT_THEMES;
+  return {
+    format: upper,
+    theme: typeof theme === "string" && allowed.includes(theme) ? theme : undefined,
+  };
+}
 
 // Above this, a user message is carrying pasted material rather than just an
 // instruction, and should be treated as the document's source.
@@ -43,6 +72,8 @@ export async function prepareDocumentTurn(params: {
   chatId: number;
   userPrompt: string;
   lastAssistantAnswer?: string | null;
+  /** The user chose a format explicitly — it overrides what the classifier infers. */
+  requested?: RequestedDocumentOptions | null;
 }): Promise<{
   intent: DocumentIntent;
   /** What will actually be rendered — may differ from `intent.format`. */
@@ -50,10 +81,25 @@ export async function prepareDocumentTurn(params: {
   systemNote: string;
 } | null> {
   try {
-    const intent = await detectDocumentIntent(
+    let intent = await detectDocumentIntent(
       params.userPrompt,
       params.lastAssistantAnswer,
     );
+    if (params.requested) {
+      // An explicit pick always yields a document, even when the wording of the
+      // message alone would not have tripped the classifier.
+      intent =
+        intent.intent === "NONE"
+          ? {
+              intent: "REPLACE",
+              format: params.requested.format,
+              title: "",
+              useLastAnswer: false,
+              confidence: 1,
+              requiresCurrentData: false,
+            }
+          : { ...intent, format: params.requested.format };
+    }
     if (intent.intent === "NONE") return null;
 
     // Length is the same signal the enqueue uses, so the note and the source

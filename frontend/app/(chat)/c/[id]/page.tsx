@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { notFound, useParams } from "next/navigation";
 import { chatService, modelService, messageService, assistantService, folderService } from "@/lib/services";
 import { MessageList } from "@/components/chat/message-list";
+import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ProjectBanner } from "@/components/chat/project-banner";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
@@ -92,6 +93,9 @@ export default function ChatPage() {
   const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string; supportsCodeMode?: boolean } | null>(null);
   const codePanelOpen = useCodeWorkspace((s) => s.isOpen);
   const [folder, setFolder] = useState<{ name: string; description?: string | null } | null>(null);
+  const [chatTitle, setChatTitle] = useState("");
+  // Documents studio: format/template chosen up front, sent with the first message only.
+  const documentOptionsRef = useRef<{ documentFormat: string; documentTheme?: string } | null>(null);
   const folderIdRef = useRef<number | null>(null);
   const firstMessageSent = useRef(false);
   const isStreamingRef = useRef(false);
@@ -168,8 +172,11 @@ export default function ChatPage() {
   const stopStreaming = useCallback(() => {
     stopRequestedRef.current = true;
     streamAbortControllersRef.current.forEach((controller) => controller.abort());
+    // Closing the connection no longer stops the server-side job (so that
+    // leaving the page doesn't), so tell it explicitly.
+    void chatService.stop(chatId).catch(() => {});
     toast.info("Generation stopped");
-  }, []);
+  }, [chatId]);
 
   const fetchChat = useCallback(async (force = false) => {
     const now = Date.now();
@@ -185,6 +192,7 @@ export default function ChatPage() {
     try {
       const res = await chatService.getById(chatId);
       const chat = res.data.data;
+      setChatTitle(chat.title || "");
 
       if (chat.assistantId) {
         try {
@@ -328,7 +336,10 @@ export default function ChatPage() {
             firstMessageSent.current = true;
             sessionStorage.removeItem(`pending_chat_${chatId}`);
             try {
-              const { content, modelIds, chatType, attachmentIds, attachmentObjects } = JSON.parse(raw);
+              const { content, modelIds, chatType, attachmentIds, attachmentObjects, documentFormat, documentTheme } = JSON.parse(raw);
+              documentOptionsRef.current = documentFormat
+                ? { documentFormat, ...(documentTheme ? { documentTheme } : {}) }
+                : null;
               const targetIds = Array.isArray(modelIds) && modelIds.length > 0 ? modelIds : resolvedModelIds;
               setSelectedModels(targetIds);
               void (async () => {
@@ -373,6 +384,19 @@ export default function ChatPage() {
       localStorage.setItem("preferredModelId", String(ids[0]));
     }
   };
+
+  // "Use this" on a multi-model answer: continue with that model alone.
+  useEffect(() => {
+    const onUseModel = (e: Event) => {
+      const id = (e as CustomEvent).detail?.modelId;
+      if (typeof id !== "number") return;
+      setMaxModels(1);
+      void handleModelChange([id]);
+    };
+    window.addEventListener("ai-colab:use-model", onUseModel);
+    return () => window.removeEventListener("ai-colab:use-model", onUseModel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   const handleCapabilityChange = async (type: string) => {
     setChatCapability(type);
@@ -453,6 +477,7 @@ export default function ChatPage() {
         assistantMessageId,
         ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
         ...(replaceModelId ? { replaceModelId } : {}),
+        ...(documentOptionsRef.current ?? {}),
       }),
       signal,
     }).then(async (response) => {
@@ -1562,6 +1587,29 @@ export default function ChatPage() {
     }
   };
 
+  // A generation keeps running on the server when the page is left (tab
+  // switch, navigation, reload). Coming back, the answer may still be in
+  // flight, so keep checking until it lands instead of showing a blank reply.
+  const awaitingServerResult = useMemo(() => {
+    if (isStreaming) return false;
+    const TEN_MINUTES = 10 * 60 * 1000;
+    return messages.some((m: any) => {
+      if (m.role !== "ASSISTANT" || !m.createdAt) return false;
+      const age = Date.now() - new Date(m.createdAt).getTime();
+      if (!(age >= 0 && age < TEN_MINUTES)) return false;
+      const responses = m.modelResponses || [];
+      return responses.length === 0 || responses.some((r: any) => r.status === "STREAMING" || r.status === "PENDING");
+    });
+  }, [messages, isStreaming]);
+
+  useEffect(() => {
+    if (!awaitingServerResult) return;
+    const timer = window.setInterval(() => {
+      void fetchChat(true);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [awaitingServerResult, fetchChat]);
+
   if (isNotFound) {
     notFound();
     return null;
@@ -1569,6 +1617,12 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-full">
+      <ChatHeader
+        chatId={chatId}
+        title={chatTitle}
+        models={models.filter((m) => selectedModels.includes(m.id))}
+        onTitleChange={setChatTitle}
+      />
       {folder && <ProjectBanner name={folder.name} />}
       <MessageList
         messages={messages}
@@ -1600,10 +1654,15 @@ export default function ChatPage() {
         selectedModels={selectedModels}
         onModelChange={handleModelChange}
         maxModels={maxModels}
-        onSend={(content, attachmentIds, chatType, attachmentObjects) => sendMessage(content, attachmentIds, undefined, chatType, attachmentObjects)}
+        onSend={(content, attachmentIds, chatType, attachmentObjects) => {
+          documentOptionsRef.current = null;
+          sendMessage(content, attachmentIds, undefined, chatType, attachmentObjects);
+        }}
         onGenerateVideoClick={() => setVideoDialogOpen(true)}
         onEnhancePrompt={handleEnhancePrompt}
-        isSending={isSending}
+        // Also "sending" while the server is still generating a reply this page
+        // did not start (came back after leaving) — so the Stop button shows.
+        isSending={isSending || awaitingServerResult}
         onStopStreaming={stopStreaming}
         initialPrompt={initialPrompt}
         onPromptClear={() => setInitialPrompt("")}
@@ -1611,7 +1670,9 @@ export default function ChatPage() {
         chatType={chatCapability}
         draftStorageKey={`chat_draft_${chatId}`}
         supportsCodeMode={Boolean(assistant?.supportsCodeMode)}
-        placeholder={assistant?.supportsCodeMode && codePanelOpen ? "Ask AI to change the code…" : undefined}
+        placeholder={assistant?.supportsCodeMode && codePanelOpen ? "Ask AI to change the code…" : "Ask a follow-up…"}
+        compact
+        footerNote={selectedModels.length > 1 ? "Models can disagree. Compare the answers before acting on important ones." : undefined}
       />
     </div>
   );

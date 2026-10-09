@@ -2,9 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SettingsCard, SettingsHeader } from "@/components/settings/settings-ui";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { subscriptionService, planService, paymentService, creditWalletService } from "@/lib/services";
 import { openSubscriptionCheckout, openPaymentCheckout } from "@/lib/cashfree";
 import { getPlanFeatureLines } from "@/lib/planFeatures";
@@ -397,11 +396,8 @@ export default function SubscriptionPage() {
   })();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Subscription</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage your plan and billing</p>
-      </div>
+    <div>
+      <SettingsHeader title="Subscription" description="Manage your plan and billing." />
 
       {(() => {
         if (!planToConfirm) return null;
@@ -487,74 +483,85 @@ export default function SubscriptionPage() {
       })()}
 
       {subscription ? (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{subscription.plan?.name} Plan</CardTitle>
-                <CardDescription>{subscription.billingCycle} billing</CardDescription>
+        <SettingsCard className="mb-6 overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">{subscription.plan?.name}</h2>
+                <span
+                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                    subscription.status === "ACTIVE" ? "bg-ok/15 text-ok" : "bg-sunken text-muted-foreground"
+                  }`}
+                >
+                  {String(subscription.status).charAt(0) + String(subscription.status).slice(1).toLowerCase()}
+                </span>
               </div>
-              <Badge variant={subscription.status === "ACTIVE" ? "default" : "secondary"}>
-                {subscription.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {subscription.expiresAt && (
-              <p className="text-sm text-muted-foreground">
-                Expires: {new Date(subscription.expiresAt).toLocaleDateString()}
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {Number(subscription.plan?.monthlyPrice ?? 0) > 0
+                  ? `₹${Number(subscription.plan.monthlyPrice).toLocaleString("en-IN")}/month + GST · `
+                  : ""}
+                Billed {String(subscription.billingCycle || "monthly").toLowerCase()}
               </p>
+            </div>
+            {subscription.expiresAt && (
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Expires on</p>
+                <p className="text-sm font-semibold">
+                  {new Date(subscription.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
             )}
-            {subscription.status === "ACTIVE" && (
-              <Button variant="destructive" size="sm" onClick={handleCancel} disabled={cancellingSubscription}>
-                {cancellingSubscription ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cancel subscription"}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+
+          {Number(subscription?.plan?.monthlyPrice ?? 0) > 0 && subscription.status === "ACTIVE" && (
+            <div className="flex items-center justify-between gap-4 border-t border-border px-5 py-4">
+              <div>
+                <p className="text-sm font-medium">AutoPay for renewals</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Turn AutoPay on or off anytime. Your current cycle stays active either way.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2.5">
+                <span className="text-xs text-muted-foreground">{subscription.autoRenew ? "On" : "Off"}</span>
+                <Switch
+                  checked={Boolean(subscription.autoRenew)}
+                  onCheckedChange={handleToggleAutoPay}
+                  disabled={autoPayUpdating || subscribingPlanId !== null}
+                />
+              </div>
+            </div>
+          )}
+
+          {subscription.status === "ACTIVE" && (
+            <div className="border-t border-border px-5 py-4">
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={cancellingSubscription}
+                className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-medium text-destructive hover:underline disabled:opacity-60"
+              >
+                {cancellingSubscription && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Cancel subscription
+              </button>
+            </div>
+          )}
+        </SettingsCard>
       ) : (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">No active plans</p>
-          </CardContent>
-        </Card>
+        <SettingsCard className="mb-6 px-5 py-4">
+          <p className="text-sm text-muted-foreground">No active plan.</p>
+        </SettingsCard>
       )}
 
-      {subscription
-        && Number(subscription?.plan?.monthlyPrice ?? 0) > 0
-        && subscription.status === "ACTIVE" && (
-          <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-            <CardHeader>
-              <CardTitle>AutoPay for renewals</CardTitle>
-              <CardDescription>
-                Turn AutoPay on/off anytime. Your current cycle remains active either way.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">
-                {subscription.autoRenew ? "Enabled" : "Disabled"}
-              </p>
-              <Switch
-                checked={Boolean(subscription.autoRenew)}
-                onCheckedChange={handleToggleAutoPay}
-                disabled={autoPayUpdating || subscribingPlanId !== null}
-              />
-            </CardContent>
-          </Card>
-        )}
-
       {pendingSubscription && (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{pendingSubscription.plan?.name} Plan</CardTitle>
-                <CardDescription>{pendingSubscription.billingCycle} billing</CardDescription>
-              </div>
-              <Badge variant="secondary">PENDING</Badge>
+        <SettingsCard className="mb-6 space-y-4 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold">{pendingSubscription.plan?.name} plan</h2>
+              <p className="text-xs text-muted-foreground">{String(pendingSubscription.billingCycle).toLowerCase()} billing</p>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            <span className="rounded-md bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">Pending</span>
+          </div>
+          <div className="space-y-4">
             <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/20">
               <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                 Payment authorization pending
@@ -592,88 +599,83 @@ export default function SubscriptionPage() {
                 </p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsCard>
       )}
 
-      <Card className="border-border/30 bg-card/90 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Available Plans</CardTitle>
-          <CardDescription>Choose the plan that works for you</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {plans.map((plan: any) => (
-              <div key={plan.id} className="border border-border/40 rounded-xl p-5 space-y-3 bg-card/80 hover:shadow-md transition-shadow">
+      <h2 className="text-base font-semibold">Plans</h2>
+      <p className="mb-4 mt-0.5 text-xs text-muted-foreground">Prices are per month, plus GST.</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {[...plans]
+          .sort((x: any, y: any) => Number(x.monthlyPrice ?? 0) - Number(y.monthlyPrice ?? 0))
+          .map((plan: any) => {
+            const isCurrentPlan = !!subscription && subscription.planId === plan.id;
+            const isFreePlan = Number(plan.monthlyPrice) === 0;
+            const isAlreadyTakenFree = isFreePlan && freePlanTaken && !isCurrentPlan;
+            const hasCurrentPlan = Boolean(subscription);
+            const { included, excluded } = getPlanFeatureLines(plan);
+            const price = Number(plan.monthlyPrice ?? 0);
+
+            return (
+              <div
+                key={plan.id}
+                className={`flex flex-col rounded-2xl border bg-surface p-5 ${
+                  isCurrentPlan ? "border-primary shadow-cl" : "border-border"
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">{plan.name}</h3>
-                  <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    {plan.monthlyPrice === 0 ? "Free" : `₹${plan.monthlyPrice}/mo + GST`}
-                  </span>
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                  {isCurrentPlan && (
+                    <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-ink">Current</span>
+                  )}
                 </div>
-                <div className="text-sm space-y-1">
-                  {(() => {
-                    const { included, excluded } = getPlanFeatureLines(plan);
-                    return (
-                      <>
-                        {included.map((line) => (
-                          <p key={line} className="flex items-center gap-1.5 text-muted-foreground">
-                            <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            {line}
-                          </p>
-                        ))}
-                        {excluded.map((line) => (
-                          <p key={line} className="flex items-center gap-1.5 text-muted-foreground/50">
-                            <X className="w-3.5 h-3.5 shrink-0" />
-                            {line}
-                          </p>
-                        ))}
-                      </>
-                    );
-                  })()}
+                <p className="mt-3">
+                  <span className="text-[28px] font-semibold tracking-tight">₹{price.toLocaleString("en-IN")}</span>
+                  <span className="ml-1 text-xs text-muted-foreground">/mo</span>
+                </p>
+
+                {isCurrentPlan ? (
+                  <button disabled className="mt-4 h-10 w-full cursor-default rounded-xl bg-sunken text-sm font-medium text-muted-foreground">
+                    Your current plan
+                  </button>
+                ) : isAlreadyTakenFree ? (
+                  <button disabled className="mt-4 h-10 w-full cursor-default rounded-xl bg-sunken text-sm font-medium text-muted-foreground">
+                    Already used
+                  </button>
+                ) : (
+                  <Button
+                    className="mt-4 h-10 w-full rounded-xl"
+                    disabled={subscribingPlanId !== null}
+                    onClick={() => setPlanToConfirm(plan)}
+                  >
+                    {subscribingPlanId === plan.id
+                      ? "Starting..."
+                      : isFreePlan
+                        ? "Start free"
+                        : hasCurrentPlan
+                          ? `Switch to ${plan.name}`
+                          : "Pay now"}
+                  </Button>
+                )}
+
+                <div className="mt-4 space-y-2 border-t border-border pt-4 text-[13px]">
+                  {included.map((line: string) => (
+                    <p key={line} className="flex items-center gap-2.5">
+                      <Check className="h-3.5 w-3.5 shrink-0 text-ok" />
+                      {line}
+                    </p>
+                  ))}
+                  {excluded.map((line: string) => (
+                    <p key={line} className="flex items-center gap-2.5 text-faint">
+                      <X className="h-3.5 w-3.5 shrink-0" />
+                      {line}
+                    </p>
+                  ))}
                 </div>
-                {(() => {
-                  const isCurrentPlan = !!subscription && subscription.planId === plan.id;
-                  const isFreePlan = Number(plan.monthlyPrice) === 0;
-                  const isAlreadyTakenFree = isFreePlan && freePlanTaken && !isCurrentPlan;
-                  const currentMonthlyPrice = Number(subscription?.plan?.monthlyPrice ?? 0);
-                  const planMonthlyPrice = Number(plan.monthlyPrice ?? 0);
-                  const hasCurrentPlan = Boolean(subscription);
-                  const isUpgrade = hasCurrentPlan && planMonthlyPrice > currentMonthlyPrice;
-                  const currentIsFree = Number(subscription?.plan?.monthlyPrice ?? 0) === 0;
-
-                  if (isCurrentPlan) {
-                    return <Badge className="w-full justify-center">Current plan</Badge>;
-                  }
-
-                  if (isAlreadyTakenFree) {
-                    return <Badge variant="secondary" className="w-full justify-center">Already taken</Badge>;
-                  }
-
-                  return (
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      disabled={subscribingPlanId !== null}
-                      onClick={() => setPlanToConfirm(plan)}
-                    >
-                      {subscribingPlanId === plan.id
-                        ? "Starting..."
-                        : isFreePlan
-                          ? "Start Free"
-                          : isUpgrade
-                            ? "Upgrade"
-                            : hasCurrentPlan
-                              ? "Change plan"
-                              : "Pay now"}
-                    </Button>
-                  );
-                })()}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+      </div>
     </div>
   );
 }

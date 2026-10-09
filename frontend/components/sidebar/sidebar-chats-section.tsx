@@ -1,20 +1,43 @@
 "use client";
 
-import { memo, type Dispatch, type SetStateAction } from "react";
-import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
+import { memo, useMemo, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ChevronRight, Star, AudioLines, FolderArchive } from "lucide-react";
 import { ChatItem } from "@/components/sidebar/sidebar-chat-item";
-import { SIDEBAR_SECTION_HEADER_ROW, SIDEBAR_SECTION_TITLE } from "@/components/sidebar/sidebar-section-styles";
 import type { Chat, FolderItem } from "@/components/sidebar/sidebar-types";
-import { useIsStarredRoute, useIsVoiceRoute, useIsAssetsRoute } from "@/lib/route-ui-store";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Buckets chats (already newest-first) into sidebar date groups. */
+function groupChatsByDate(chats: Chat[]) {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const today = startOfToday.getTime();
+
+  const order = ["Pinned", "Today", "Yesterday", "Previous 7 days", "Previous 30 days", "Older"];
+  const buckets = new Map<string, Chat[]>(order.map((label) => [label, []]));
+
+  for (const chat of chats) {
+    let label: string;
+    if (chat.isPinned) {
+      label = "Pinned";
+    } else {
+      const t = new Date(chat.updatedAt).getTime();
+      if (Number.isNaN(t) || t >= today) label = "Today";
+      else if (t >= today - DAY_MS) label = "Yesterday";
+      else if (t >= today - 7 * DAY_MS) label = "Previous 7 days";
+      else if (t >= today - 30 * DAY_MS) label = "Previous 30 days";
+      else label = "Older";
+    }
+    buckets.get(label)!.push(chat);
+  }
+
+  return order
+    .map((label) => ({ label, chats: buckets.get(label)! }))
+    .filter((g) => g.chats.length > 0);
+}
 
 export const ChatsSection = memo(function ChatsSection({
-  chatsExpanded,
-  setChatsExpanded,
   onMobileClose,
-  router,
   unfoldered,
   localFolders,
   setDeleteTarget,
@@ -31,10 +54,7 @@ export const ChatsSection = memo(function ChatsSection({
   hasMore,
   onLoadMore,
 }: {
-  chatsExpanded: boolean;
-  setChatsExpanded: Dispatch<SetStateAction<boolean>>;
   onMobileClose: () => void;
-  router: AppRouterInstance;
   unfoldered: Chat[];
   localFolders: FolderItem[];
   setDeleteTarget: Dispatch<SetStateAction<number | null>>;
@@ -51,70 +71,13 @@ export const ChatsSection = memo(function ChatsSection({
   hasMore?: boolean;
   onLoadMore?: () => void;
 }) {
-  const isStarredRoute = useIsStarredRoute();
-  const isVoiceRoute = useIsVoiceRoute();
-  const isAssetsRoute = useIsAssetsRoute();
+  const groups = useMemo(() => groupChatsByDate(unfoldered), [unfoldered]);
   return (
     <>
-      <div className={`${SIDEBAR_SECTION_HEADER_ROW}`}>
-        <button
-          type="button"
-          className="min-w-0 flex-1 py-2.5 px-3 text-left"
-          onClick={() => setChatsExpanded((p) => !p)}
-        >
-          <span className={`block w-full text-left ${SIDEBAR_SECTION_TITLE}`}>Chats</span>
-        </button>
-        <button
-          type="button"
-          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/80"
-          onClick={() => setChatsExpanded((p) => !p)}
-          aria-expanded={chatsExpanded}
-          aria-label={chatsExpanded ? "Collapse chats" : "Expand chats"}
-        >
-          <ChevronRight
-            className={`h-3 w-3 transition-transform ${chatsExpanded ? "rotate-90" : ""}`}
-          />
-        </button>
-      </div>
-      {chatsExpanded && (
-        <>
-          <button
-            onClick={() => { onMobileClose(); router.push("/starred"); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-              isStarredRoute
-                ? "bg-gradient-to-r from-yellow-500/20 to-yellow-500/10 text-foreground font-medium"
-                : "text-foreground hover:bg-sidebar-accent"
-            }`}
-          >
-            <Star className={`w-4 h-4 ${isStarredRoute ? "fill-current text-yellow-500" : "text-muted-foreground"}`} />
-            <span>Starred Messages</span>
-          </button>
-          <button
-            onClick={() => { onMobileClose(); router.push("/voice"); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-              isVoiceRoute
-                ? "bg-gradient-to-r from-primary/20 to-primary/10 text-foreground font-medium"
-                : "text-foreground hover:bg-sidebar-accent"
-            }`}
-          >
-            <AudioLines className={`w-4 h-4 ${isVoiceRoute ? "text-primary" : "text-muted-foreground"}`} />
-            <span>Voice Chats</span>
-            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 rounded-md">
-              Beta
-            </Badge>
-          </button>
-          <button
-            onClick={() => { onMobileClose(); router.push("/assets"); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-              isAssetsRoute
-                ? "bg-gradient-to-r from-primary/20 to-primary/10 text-foreground font-medium"
-                : "text-foreground hover:bg-sidebar-accent"
-            }`}
-          >
-            <FolderArchive className={`w-4 h-4 ${isAssetsRoute ? "text-primary" : "text-muted-foreground"}`} />
-            <span>Assets Vault</span>
-          </button>
-          {unfoldered.map((chat) => (
+      {groups.map((group) => (
+        <div key={group.label} className="pb-2">
+          <div className="px-3 pt-2 pb-1 text-[11px] font-medium text-faint">{group.label}</div>
+          {group.chats.map((chat) => (
             <ChatItem
               key={chat.id}
               chat={chat}
@@ -132,22 +95,21 @@ export const ChatsSection = memo(function ChatsSection({
               onPendingMoveConsumed={() => { setPendingMoveForChat(null); setPendingMoveNewFolderId(null); }}
             />
           ))}
+        </div>
+      ))}
 
-          {hasMore && (
-            <Button
-              variant="ghost"
-              className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground h-8 cursor-pointer"
-              onClick={onLoadMore}
-            >
-              Load More Chats
-            </Button>
-          )}
-        </>
+      {hasMore && (
+        <Button
+          variant="ghost"
+          className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground h-8 cursor-pointer"
+          onClick={onLoadMore}
+        >
+          Load More Chats
+        </Button>
       )}
     </>
   );
 }, (prev, next) => {
-  if (prev.chatsExpanded !== next.chatsExpanded) return false;
   if (Boolean(prev.hasMore) !== Boolean(next.hasMore)) return false;
   if (prev.pendingMoveForChat !== next.pendingMoveForChat) return false;
   if (prev.pendingMoveNewFolderId !== next.pendingMoveNewFolderId) return false;
@@ -162,7 +124,8 @@ export const ChatsSection = memo(function ChatsSection({
       a.title !== b.title ||
       a.folderId !== b.folderId ||
       a.isPinned !== b.isPinned ||
-      a.isArchived !== b.isArchived
+      a.isArchived !== b.isArchived ||
+      a.updatedAt !== b.updatedAt
     ) {
       return false;
     }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { Menu, Moon, Sun, X } from "lucide-react";
 import {
@@ -15,17 +16,29 @@ import { Button } from "../../ui/button";
 import { useTheme } from "@/context/theme-context";
 import { EASE } from "@/components/landing/components/motionVariants";
 
-export function Navbar() {
-  const [isScrolled, setIsScrolled] = useState(false);
+export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
+  const [windowScrolled, setIsScrolled] = useState(false);
+  // Pages whose content scrolls inside a frame (e.g. /business) report their
+  // own scroll state so the navbar floats the same way as on the landing page.
+  const isScrolled = scrolled ?? windowScrolled;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const pathname = usePathname();
   const { scrollY } = useScroll();
   const navLinks = [
     { href: "#about", label: "About" },
+    { href: "/business", label: "Business" },
     { href: "#pricing", label: "Pricing" },
     { href: "#faq", label: "FAQs" },
     { href: "#testimonials", label: "Testimonials" },
-  ];
+  ].map((link) => ({
+    ...link,
+    // Section links live on the landing page; from /business, go back there.
+    href: link.href.startsWith("#") && pathname !== "/" ? `/${link.href}` : link.href,
+  }));
+  // A plain <a> on purpose: from /business it changes only the hash, which the
+  // embedded business page listens for to scroll to its lead form.
+  const demoHref = "/business#demo";
 
   useMotionValueEvent(scrollY, "change", (latest) => {
     if (latest > 50) {
@@ -96,6 +109,12 @@ export function Navbar() {
               <Moon className="w-5 h-5 text-gray-800 dark:hidden" />
               <Sun className="w-5 h-5 text-gray-200 hidden dark:block" />
             </button>
+            <a
+              href={demoHref}
+              className="hidden lg:inline-flex h-9 items-center rounded-full bg-black px-5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+            >
+              Book a demo
+            </a>
             <Link href="/login" className="hidden lg:block">
               <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-6 transition-all duration-300">
                 Log in
@@ -145,6 +164,15 @@ export function Navbar() {
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <a
+                    href={demoHref}
+                    className="block rounded-2xl px-4 py-2.5 text-sm font-semibold text-landing-primary hover:bg-gray-100/80 dark:hover:bg-gray-900/70 transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Book a demo
+                  </a>
+                </li>
               </ul>
             </div>
           </motion.div>

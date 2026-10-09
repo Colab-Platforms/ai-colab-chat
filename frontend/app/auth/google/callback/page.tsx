@@ -80,7 +80,7 @@ export default function GoogleAuthCallbackPage() {
   }, [completeGoogleLogin, errorCode, errorMessage, isNewUser, redirectPath, router, token]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-3xl border border-border/60 bg-background/90 backdrop-blur-sm p-8 text-center shadow-2xl">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-landing-primary/10 text-landing-primary">
           <Loader2 className={`h-7 w-7 ${isProcessing ? "animate-spin" : ""}`} />

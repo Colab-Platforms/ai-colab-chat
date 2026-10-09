@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import {
   Dialog,
@@ -22,9 +21,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Search, Star, AudioLines, FolderArchive, Folder } from "lucide-react";
+import { Plus, Search, Star, AudioLines, FolderArchive, Folder, SquarePen, FileText, ImageIcon, Clapperboard, type LucideIcon } from "lucide-react";
 import { chatService, folderService } from "@/lib/services";
-import { getRouteUiSnapshot, subscribeRouteUi, useIsStarredRoute, useIsVoiceRoute, useIsAssetsRoute, useIsProjectsRoute } from "@/lib/route-ui-store";
+import { getRouteUiSnapshot, subscribeRouteUi, useIsStarredRoute, useIsVoiceRoute, useIsAssetsRoute, useIsProjectsRoute, useActiveStudio } from "@/lib/route-ui-store";
 import { toast } from "@/lib/toast";
 import { startNewChatInFolder } from "@/lib/newChat";
 import { AppSidebar } from "./app-sidebar";
@@ -47,6 +46,44 @@ interface SidebarProps {
   onLoadMore?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+}
+
+function NavRow({
+  icon: Icon,
+  label,
+  active,
+  badge,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  badge?: "New" | "Beta";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] transition-colors cursor-pointer ${
+        active
+          ? "bg-accent-soft text-accent-ink font-medium"
+          : "text-foreground hover:bg-sidebar-accent"
+      }`}
+    >
+      <Icon className={`w-4 h-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`} />
+      <span className="truncate">{label}</span>
+      {badge && (
+        <span
+          className={`ml-auto text-[10px] font-semibold ${
+            badge === "New" ? "text-accent-ink" : "text-faint"
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
 }
 
 function SidebarInner({
@@ -87,27 +124,24 @@ function SidebarInner({
   const isVoiceRoute = useIsVoiceRoute();
   const isAssetsRoute = useIsAssetsRoute();
   const isProjectsRoute = useIsProjectsRoute();
+  const activeStudio = useActiveStudio();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState(searchQuery);
-  const [assistantsExpanded, setAssistantsExpanded] = useState(true);
-  const [chatsExpanded, setChatsExpanded] = useState(true);
+  const [assistantsExpanded, setAssistantsExpanded] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const TOP_ACCORDION_STORAGE_KEY = "sidebarTopAccordionState_v1";
+  const TOP_ACCORDION_STORAGE_KEY = "sidebarTopAccordionState_v2";
   const [hasHydratedTopAccordion, setHasHydratedTopAccordion] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(TOP_ACCORDION_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<{
-        assistantsExpanded: boolean;
-        chatsExpanded: boolean;
-      }>;
+      const parsed = JSON.parse(raw) as Partial<{ assistantsExpanded: boolean }>;
 
       if (typeof parsed.assistantsExpanded === "boolean") setAssistantsExpanded(parsed.assistantsExpanded);
-      if (typeof parsed.chatsExpanded === "boolean") setChatsExpanded(parsed.chatsExpanded);
     } catch {
       // ignore invalid localStorage payload
     } finally {
@@ -120,15 +154,12 @@ function SidebarInner({
     try {
       localStorage.setItem(
         TOP_ACCORDION_STORAGE_KEY,
-        JSON.stringify({
-          assistantsExpanded,
-          chatsExpanded,
-        }),
+        JSON.stringify({ assistantsExpanded }),
       );
     } catch {
       // ignore quota / private browsing errors
     }
-  }, [hasHydratedTopAccordion, assistantsExpanded, chatsExpanded]);
+  }, [hasHydratedTopAccordion, assistantsExpanded]);
 
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -149,6 +180,23 @@ function SidebarInner({
   useEffect(() => {
     setSearch(searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+    };
+    const onOpenAssistants = () => setAssistantsExpanded(true);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("ai-colab:open-assistants", onOpenAssistants);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("ai-colab:open-assistants", onOpenAssistants);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -358,6 +406,7 @@ function SidebarInner({
             className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded-lg cursor-pointer"
             onClick={() => {
               if (onToggleCollapse) onToggleCollapse();
+              setSearchOpen(true);
               setTimeout(() => {
                 searchInputRef.current?.focus();
               }, 100);
@@ -452,49 +501,58 @@ function SidebarInner({
       onLogout={onLogout}
       collapsedIcons={collapsedIcons}
     >
-      <div className="p-3 pb-2 space-y-2">
-        <Button
+      <div className="px-3 pb-2 flex items-center gap-2">
+        <button
+          type="button"
           onClick={() => handleNewChat()}
-          className="w-full justify-start gap-2 h-10 bg-violet-200/70 hover:bg-violet-200 text-violet-900 dark:bg-violet-500/20 dark:hover:bg-violet-500/30 dark:text-violet-200 border-0 shadow-sm transition-colors cursor-pointer"
+          className="flex-1 h-10 flex items-center gap-2 px-3 rounded-lg border border-border bg-surface text-[13.5px] font-medium text-foreground shadow-cl hover:border-line-strong transition-colors cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
-          New Chat
-        </Button>
+          <SquarePen className="w-4 h-4 text-primary" />
+          New chat
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSearchOpen((o) => !o);
+            setTimeout(() => searchInputRef.current?.focus(), 0);
+          }}
+          aria-label="Search chats"
+          className="h-10 flex items-center gap-1.5 px-3 rounded-lg border border-border bg-surface text-muted-foreground hover:border-line-strong transition-colors cursor-pointer"
+        >
+          <Search className="w-4 h-4" />
+          <span className="text-[11px] text-faint">⌘K</span>
+        </button>
       </div>
 
-      <div className="px-3 pb-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={searchInputRef}
-            placeholder="Search chats..."
-            value={search}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSearch(value);
-              onSearchChange(value);
-            }}
-            className="h-9 border-none bg-sidebar-accent/50 pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
-          />
+      {searchOpen && (
+        <div className="px-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Search chats..."
+              value={search}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearch(value);
+                onSearchChange(value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearch("");
+                  onSearchChange("");
+                  setSearchOpen(false);
+                }
+              }}
+              className="h-9 border-border bg-surface pl-9 text-sm focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:ring-offset-0"
+            />
+          </div>
         </div>
-      </div>
-
-      <Separator className="opacity-50" />
+      )}
 
       <ScrollArea className="flex-1 px-2 min-h-0">
         <div className="py-2 space-y-0.5">
-
-          <button
-            onClick={() => { onMobileClose(); router.push("/projects"); }}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
-              isProjectsRoute
-                ? "bg-gradient-to-r from-primary/20 to-primary/10 text-foreground font-medium"
-                : "text-foreground hover:bg-sidebar-accent"
-            }`}
-          >
-            <Folder className={`w-4 h-4 ${isProjectsRoute ? "text-primary" : "text-muted-foreground"}`} />
-            <span>Projects</span>
-          </button>
+          <NavRow icon={Folder} label="Projects" active={isProjectsRoute} onClick={() => { onMobileClose(); router.push("/projects"); }} />
 
           <AssistantsSection
             assistants={assistants}
@@ -505,11 +563,17 @@ function SidebarInner({
             onAssistantSelected={handleAssistantSelected}
           />
 
+          <NavRow icon={FileText} label="Documents" active={activeStudio === "documents"} onClick={() => { onMobileClose(); router.push("/documents"); }} />
+          <NavRow icon={ImageIcon} label="Image Studio" active={activeStudio === "image"} onClick={() => { onMobileClose(); router.push("/image-studio"); }} />
+          <NavRow icon={Clapperboard} label="Video Studio" badge="New" active={activeStudio === "video"} onClick={() => { onMobileClose(); router.push("/video-studio"); }} />
+          <NavRow icon={FolderArchive} label="Assets" active={isAssetsRoute} onClick={() => { onMobileClose(); router.push("/assets"); }} />
+          <NavRow icon={Star} label="Starred" active={isStarredRoute} onClick={() => { onMobileClose(); router.push("/starred"); }} />
+          <NavRow icon={AudioLines} label="Voice chats" badge="Beta" active={isVoiceRoute} onClick={() => { onMobileClose(); router.push("/voice"); }} />
+
+          <div className="my-3 border-t border-border" />
+
           <ChatsSection
-            chatsExpanded={chatsExpanded}
-            setChatsExpanded={setChatsExpanded}
             onMobileClose={onMobileClose}
-            router={router}
             unfoldered={unfoldered}
             localFolders={localFolders}
             setDeleteTarget={setDeleteTarget}

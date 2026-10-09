@@ -2,10 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Compass, AudioLines } from "lucide-react";
+import { Compass, Sun, Moon, Columns2, Focus } from "lucide-react";
+import { useTheme } from "@/context/theme-context";
+import {
+  SectionLabel,
+  Segmented,
+  SettingRow,
+  SettingsCard,
+  SettingsHeader,
+} from "@/components/settings/settings-ui";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -21,6 +28,20 @@ import { toast } from "@/lib/toast";
 
 export default function PreferencesPage() {
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
+
+  // Multi-model layout lives in localStorage — the chat view reads the same key.
+  const [multiView, setMultiView] = useState<"columns" | "focus">("columns");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ai-colab:multi-view");
+      if (saved === "columns" || saved === "focus") setMultiView(saved);
+    } catch { /* storage unavailable */ }
+  }, []);
+  const changeMultiView = (mode: "columns" | "focus") => {
+    setMultiView(mode);
+    try { localStorage.setItem("ai-colab:multi-view", mode); } catch { /* storage unavailable */ }
+  };
   // ── Preferences state ────────────────────────────────────────────────────
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
   const [loadingPrefs, setLoadingPrefs] = useState(true);
@@ -103,99 +124,84 @@ export default function PreferencesPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-8">
-      {/* ── AI Suggestions ── */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-semibold">AI Suggestions</h2>
-        </div>
+    <div>
+      <SettingsHeader title="Preferences" description="How Colab AI looks, answers and talks to you." />
 
-        <Card className="border-border/30 bg-card/80 backdrop-blur-sm">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium">
-                  Suggested Follow-up Questions
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Automatically generate 4 context-aware questions at the end of
-                  each AI response.
-                </p>
-              </div>
-              <Switch
-                checked={followUpEnabled}
-                onCheckedChange={handleToggleFollowUp}
-                disabled={togglingFollowUp || loadingPrefs}
-                id="follow-up-toggle"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <SectionLabel>Appearance</SectionLabel>
+      <SettingsCard>
+        <SettingRow title="Theme" description="Applies to every screen.">
+          <Segmented
+            value={theme}
+            onChange={(v) => {
+              if (v !== theme) toggleTheme();
+            }}
+            options={[
+              { value: "light", label: "Light", icon: Sun },
+              { value: "dark", label: "Dark", icon: Moon },
+            ]}
+          />
+        </SettingRow>
+      </SettingsCard>
 
-      {/* ── Voice ── */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <AudioLines className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-semibold">Voice</h2>
-        </div>
+      <SectionLabel>Chat</SectionLabel>
+      <SettingsCard>
+        <SettingRow
+          title="Suggested follow-up questions"
+          description="Add 4 context-aware questions at the end of each AI response."
+        >
+          <Switch
+            checked={followUpEnabled}
+            onCheckedChange={handleToggleFollowUp}
+            disabled={togglingFollowUp || loadingPrefs}
+            id="follow-up-toggle"
+          />
+        </SettingRow>
+        <SettingRow title="Multi-model answers" description="How answers appear when you ask more than one model.">
+          <Segmented
+            value={multiView}
+            onChange={changeMultiView}
+            options={[
+              { value: "columns", label: "Columns", icon: Columns2 },
+              { value: "focus", label: "Focus", icon: Focus },
+            ]}
+          />
+        </SettingRow>
+      </SettingsCard>
 
-        <Card className="border-border/30 bg-card/80 backdrop-blur-sm">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium">Assistant Voice</p>
-                <p className="text-xs text-muted-foreground">
-                  Choose the voice ColabAI speaks with during voice calls.
-                </p>
-              </div>
-              <Select
-                value={selectedVoiceId || "default"}
-                onValueChange={handleVoiceChange}
-                disabled={savingVoice || loadingPrefs}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Default" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  {voiceOptions.map((voice) => (
-                    <SelectItem key={voice.id} value={voice.id}>
-                      {voice.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <SectionLabel>Voice</SectionLabel>
+      <SettingsCard>
+        <SettingRow title="Assistant voice" description="The voice Colab AI speaks with during voice chats.">
+          <Select
+            value={selectedVoiceId || "default"}
+            onValueChange={handleVoiceChange}
+            disabled={savingVoice || loadingPrefs}
+          >
+            <SelectTrigger className="w-40 rounded-xl">
+              <SelectValue placeholder="Default" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              {voiceOptions.map((voice) => (
+                <SelectItem key={voice.id} value={voice.id}>
+                  {voice.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </SettingsCard>
 
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Compass className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-semibold">Startup Guide</h2>
-        </div>
-
-        <Card className="border-border/30 bg-card/80 backdrop-blur-sm">
-          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">
-                Interactive onboarding walkthrough
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Re-run the guide anytime to learn chat basics, capabilities,
-                multi-model flow, contexts, assistants, enhancer, files, and
-                mic.
-              </p>
-            </div>
-            <Button onClick={handleStartGuide} className="sm:self-start">
-              Start Guide
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
+      <SectionLabel>Help</SectionLabel>
+      <SettingsCard>
+        <SettingRow
+          title="Startup guide"
+          description="Re-run the walkthrough of chat basics, multi-model answers, contexts, assistants, the prompt enhancer, files and voice."
+        >
+          <Button variant="outline" onClick={handleStartGuide} className="gap-2 rounded-xl">
+            <Compass className="h-4 w-4" /> Start guide
+          </Button>
+        </SettingRow>
+      </SettingsCard>
     </div>
   );
 }

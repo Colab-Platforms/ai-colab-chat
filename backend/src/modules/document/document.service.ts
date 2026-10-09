@@ -113,6 +113,7 @@ class DocumentService {
         // `spec` and `sourceText` can both be large; they are not needed to
         // render a list row.
         omit: { spec: true, sourceText: true },
+        include: { chat: { select: { id: true, title: true } } },
       }),
       prisma.generatedDocument.count({ where }),
     ]);

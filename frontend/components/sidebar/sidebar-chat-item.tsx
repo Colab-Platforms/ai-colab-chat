@@ -25,7 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  MessageSquare,
   MoreHorizontal,
   Edit2,
   CornerUpRight,
@@ -125,19 +124,16 @@ export const ChatItem = memo(function ChatItem({
           }
           onNavigate();
         }}
-        className={`flex w-full min-w-0 items-center gap-2 py-2 pr-10 rounded-lg text-sm transition-colors cursor-pointer ${
+        className={`flex w-full min-w-0 items-center gap-2 py-2 pr-10 rounded-lg text-[13.5px] transition-colors cursor-pointer ${
           indent ? "pl-9" : "pl-3"
         } ${
           isActive
-            ? "bg-gradient-to-r from-primary/15 to-primary/5 text-primary font-medium"
+            ? "bg-accent-soft text-accent-ink font-medium"
             : "hover:bg-sidebar-accent text-foreground"
         }`}
       >
-        <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
         <span className="truncate flex-1" title={chat.title || "New Chat"}>
-          {(chat.title || "New Chat").length > 15
-            ? (chat.title || "New Chat").substring(0, 15) + "..."
-            : (chat.title || "New Chat")}
+          {chat.title || "New Chat"}
         </span>
       </Link>
       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">

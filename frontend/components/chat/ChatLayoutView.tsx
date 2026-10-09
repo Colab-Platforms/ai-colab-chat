@@ -99,7 +99,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const [hasMore, setHasMore] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [assistantsPage, setAssistantsPage] = useState(1);
@@ -282,7 +282,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       const res = await assistantService.list({
         isActive: "true",
         page: pageNum.toString(),
-        pageSize: "4",
+        // The sidebar lists every active assistant — no "load more".
+        pageSize: "100",
       });
       const result = res.data.data;
       const fetched = result?.data || [];
@@ -676,31 +677,6 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
     />
   );
 
-  const resolvedGradient = activeAssistantTheme
-    ? theme === "dark" &&
-      activeAssistantTheme.bgFromDark &&
-      activeAssistantTheme.bgToDark
-      ? {
-          from: activeAssistantTheme.bgFromDark,
-          via:
-            activeAssistantTheme.bgViaDark || activeAssistantTheme.bgFromDark,
-          to: activeAssistantTheme.bgToDark,
-        }
-      : activeAssistantTheme.bgFrom && activeAssistantTheme.bgTo
-        ? {
-            from: activeAssistantTheme.bgFrom,
-            via: activeAssistantTheme.bgVia || activeAssistantTheme.bgFrom,
-            to: activeAssistantTheme.bgTo,
-          }
-        : null
-    : null;
-  const hasAssistantGradient = !!resolvedGradient;
-  const dynamicBackgroundStyle = resolvedGradient
-    ? {
-        background: `linear-gradient(135deg, ${resolvedGradient.from}, ${resolvedGradient.via}, ${resolvedGradient.to})`,
-      }
-    : undefined;
-
   return (
     <>
       <Dialog
@@ -747,25 +723,24 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       </Dialog>
 
       <div
-        className={`h-dvh flex overflow-hidden text-foreground ${
-          hasAssistantGradient
-            ? "bg-background"
-            : "bg-linear-to-br from-white via-pink-50 to-rose-100/70 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40"
-        }`}
-        style={dynamicBackgroundStyle}
+        className="h-dvh flex overflow-hidden text-foreground bg-background"
       >
         <aside
-          className={`hidden md:flex shrink-0 border-r border-border/50 transition-[width] duration-300 ease-in-out ${
-            effectiveSidebarCollapsed ? "w-16" : "w-70"
-          }`}
-          style={{ contain: "layout style paint", willChange: "transform" }}
+          className={`relative hidden md:flex shrink-0 border-r border-border ${
+            // No width animation while dragging, or the sidebar lags the cursor.
+            isResizingSidebar ? "" : "transition-[width] duration-300 ease-in-out"
+          } ${effectiveSidebarCollapsed ? "w-16" : ""}`}
+          style={{
+            contain: "layout style",
+            ...(effectiveSidebarCollapsed ? {} : { width: sidebarWidth }),
+          }}
           data-guide="sidebar"
         >
           {renderSidebar(false)}
           {!sidebarCollapsed && (
             <div
               onMouseDown={handleSidebarResizeStart}
-              className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize z-10 group"
+              className="absolute top-0 right-0 h-full w-2 cursor-col-resize z-10 group"
               role="separator"
               aria-orientation="vertical"
               aria-label="Resize sidebar"
@@ -873,8 +848,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
         {mobileOpen && (
           <aside
             className={`
-              md:hidden fixed z-50 h-full w-70 shrink-0 border-r border-border/40
-              bg-background flex flex-col transition-all duration-300 ease-in-out translate-x-0
+              md:hidden fixed z-50 h-full w-70 shrink-0 border-r border-border
+              bg-sidebar flex flex-col transition-all duration-300 ease-in-out translate-x-0
             `}
             style={{ contain: "layout style paint" }}
             data-guide="sidebar"

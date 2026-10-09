@@ -3,10 +3,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
-  Bot, Copy, ThumbsUp, ThumbsDown, Share2, RefreshCw,
+  Copy, ThumbsUp, ThumbsDown, Share2, RefreshCw,
   ChevronLeft, ChevronRight, Check, Loader2, Pencil, X,
-  FileText, File, Image as ImageIcon, Star, FileSpreadsheet
+  FileText, File, Image as ImageIcon, Star, FileSpreadsheet,
+  Columns2, Focus, CornerUpLeft
 } from "lucide-react";
+import { ModelAvatar } from "./model-avatar";
+import { useResponseLatency } from "./use-response-latency";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { DocumentCard, type GeneratedDocument } from "./document-card";
 import {
@@ -18,7 +21,6 @@ import {
 } from "@/features/code-workspace";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
-import useEmblaCarousel from "embla-carousel-react";
 import { PhotoProvider, PhotoView } from "react-photo-view";
 import "react-photo-view/dist/react-photo-view.css";
 
@@ -27,7 +29,9 @@ interface ModelResponse {
   content: string | null;
   status: string;
   tokensUsed: number | null;
-  model: { id: number; name: string };
+  model: { id: number; name: string; externalId?: string };
+  createdAt?: string;
+  completedAt?: string | null;
   isLiked?: boolean | null;
   isStarred?: boolean;
   finishReason?: string | null;
@@ -300,73 +304,24 @@ export const MessageBubble = React.memo(function MessageBubble({
     }
   };
 
-  // Embla setup
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    align: "start",
-    dragFree: false,
-    containScroll: "trimSnaps",
-    watchDrag: (emblaApi, event) => {
-      if (event.type === "mousedown" || (event as PointerEvent).pointerType === "mouse") {
-        const target = event.target as HTMLElement;
-        const dragHandle = target.closest('[data-drag-handle="true"]');
-        return !!dragHandle;
-      }
-      return true;
-    },
-  });
-
-  const [activeTab, setActiveTab] = useState<number>(uniqueModels[0]?.id ?? 0);
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(false);
-
-  const onSelect = useCallback(() => {
-    if (!emblaApi) return;
-    setCanScrollPrev(emblaApi.canScrollPrev());
-    setCanScrollNext(emblaApi.canScrollNext());
-    
-    const selectedSnap = emblaApi.selectedScrollSnap();
-    const responsesByModel = responses.reduce((acc, resp) => {
-      if (!acc[resp.model.id]) acc[resp.model.id] = [];
-      acc[resp.model.id].push(resp);
-      return acc;
-    }, {} as Record<number, ModelResponse[]>);
-    const uModels = Object.values(responsesByModel).map(arr => arr[0].model);
-    
-    const activeModel = uModels[selectedSnap];
-    if (activeModel) {
-      setActiveTab(activeModel.id);
-    }
-  }, [emblaApi, responses]);
-
+  // Multi-model layout: every answer side by side, or one at a time.
+  const [viewMode, setViewMode] = useState<"columns" | "focus">("columns");
+  const [focusModelId, setFocusModelId] = useState<number | null>(null);
   useEffect(() => {
-    if (!emblaApi) return;
-    onSelect();
-    emblaApi.on("select", onSelect);
-    emblaApi.on("reInit", onSelect);
-  }, [emblaApi, onSelect]);
-
-  const scrollToCard = useCallback((modelId: number) => {
-    if (!emblaApi) return;
-    const index = uniqueModels.findIndex(m => m.id === modelId);
-    if (index !== -1) {
-      emblaApi.scrollTo(index);
-    }
-  }, [emblaApi, uniqueModels]);
-
-  const tabsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!tabsRef.current) return;
-    const activeEl = tabsRef.current.querySelector(`[data-model="${activeTab}"]`) as HTMLElement | null;
-    activeEl?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-  }, [activeTab]);
+    try {
+      const saved = localStorage.getItem("ai-colab:multi-view");
+      if (saved === "columns" || saved === "focus") setViewMode(saved);
+    } catch { /* storage unavailable */ }
+  }, []);
+  const changeViewMode = (mode: "columns" | "focus") => {
+    setViewMode(mode);
+    try { localStorage.setItem("ai-colab:multi-view", mode); } catch { /* storage unavailable */ }
+  };
 
   // Single model setup
   const singleResps = !isMultiModel && uniqueModels[0] ? responsesByModel[uniqueModels[0].id] || [] : [];
   const singleVerIdx = !isMultiModel && uniqueModels[0] ? (versionIndices[uniqueModels[0].id] ?? (singleResps.length - 1)) : 0;
   const singleResp = singleResps[singleVerIdx] || singleResps[0];
-  const parsedSingle = parseFollowUpQuestions(singleResp?.content || "", singleResp?.status === "STREAMING");
-  const singleCodeTurn = singleResp ? codeTurnFromResponse(singleResp) : null;
 
   // Version info
   const hasVersions = editVersions && editVersions.length > 1;
@@ -376,12 +331,12 @@ export const MessageBubble = React.memo(function MessageBubble({
   // ── User message ─────────────────────────────────────────────────────────
   if (isUser) {
     return (
-      <div className={`px-4 py-3 ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""} sm:-mb-3 ${showEdit ? "flex" : "flex justify-end"}`}>
+      <div className={`mx-auto w-full max-w-3xl px-4 py-3 ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""} sm:-mb-3 ${showEdit ? "flex" : "flex justify-end"}`}>
         <div className={showEdit ? "w-full" : "max-w-[95%] sm:max-w-[85%]"}>
           <Attachments message={message} isUser={true} />
           {showEdit ? (
             // Edit mode
-            <div className={`bg-muted dark:bg-muted rounded-2xl rounded-br-md px-4 py-3 border border-border/50 space-y-2 transition-all duration-200 ${
+            <div className={`bg-sunken rounded-2xl px-4 py-3 border border-border space-y-2 transition-all duration-200 ${
               isClosing
                 ? "opacity-0 scale-95 translate-x-2"
                 : "opacity-100 scale-100 translate-x-0 animate-in fade-in-0 zoom-in-95 slide-in-from-right-2 duration-200"
@@ -416,8 +371,8 @@ export const MessageBubble = React.memo(function MessageBubble({
           ) : (
             // Display mode
             <div className="group/user relative">
-              <div className="bg-primary dark:bg-muted dark:border dark:border-border/50 text-primary-foreground dark:text-foreground rounded-2xl rounded-br-md px-4 py-2.5 break-words">
-                <p data-message-text="true" className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <div className="bg-sunken text-foreground rounded-2xl px-4 py-3 break-words">
+                <p data-message-text="true" className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
               </div>
               
               {/* Action buttons below the message - left aligned */}
@@ -476,12 +431,14 @@ export const MessageBubble = React.memo(function MessageBubble({
 
   // ── Assistant: single model ───────────────────────────────────────────────
   if (!isMultiModel) {
+    const singleModel = uniqueModels[0];
     return (
-      <div className={`px-4 py-3 w-full ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""}`}>
-        <div className="w-full space-y-1.5 min-w-0">
+      <div className={`mx-auto w-full max-w-3xl px-4 py-3 ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""}`}>
+        <div className="w-full space-y-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <Bot className="w-4 h-4 text-primary/70 flex-shrink-0" />
-            <span className="text-xs font-medium text-muted-foreground">{uniqueModels[0]?.name || "AI"}</span>
+            <ModelAvatar externalId={singleModel?.externalId} name={singleModel?.name} size={22} />
+            <span className="text-[13px] font-medium text-foreground">{singleModel?.name || "AI"}</span>
+            <LatencyLabel resp={singleResp} />
             {hasSourceChat && sourceChatUrl && (
               <Link
                 href={sourceChatUrl}
@@ -496,97 +453,27 @@ export const MessageBubble = React.memo(function MessageBubble({
           </div>
 
           {/* break-words and overflow-hidden prevent horizontal scrolling on long continuous strings */}
-          <div className=" rounded-2xl rounded-tl-md px-4 py-2.5 break-words overflow-hidden w-full">
-            {singleCodeTurn && !sharedView && <GenerationSteps turn={singleCodeTurn} />}
-            {singleResp ? (
-              singleResp.status === "FAILED" && !isStoppedByUser(singleResp) ? (
-                isPlanRestrictedFailure(singleResp) ? (
-                  <div className="space-y-2">
-                    <p className="text-sm text-destructive">
-                      {singleResp.content?.trim() || "This isn't included in your current plan."}
-                    </p>
-                    {!sharedView && (
-                      <Button variant="outline" size="sm" className="h-8 text-xs" type="button" asChild>
-                        <Link href="/profile/subscription">Upgrade your plan</Link>
-                      </Button>
-                    )}
-                  </div>
-                ) : isInsufficientBalanceFailure(singleResp) ? (
-                  <div className="space-y-2">
-                    <p className="text-sm text-destructive">
-                      {isImageGenerationMessage(message)
-                        ? "You have insufficient balance for the image generation model."
-                        : "You have insufficient balance. Do you want to switch to free models?"}
-                    </p>
-                    {!isImageGenerationMessage(message) && !sharedView && onSwitchToFreeModel && uniqueModels[0] ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        type="button"
-                        onClick={() =>
-                          onSwitchToFreeModel(message.id, uniqueModels[0]!.id)
-                        }
-                      >
-                        Yes
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm text-destructive">
-                      {singleResp.content?.trim() || "Failed to generate a response. Please try again."}
-                    </p>
-                    {!sharedView && onRetryAssistantResponse && uniqueModels[0] ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        type="button"
-                        onClick={() =>
-                          onRetryAssistantResponse(message.id, uniqueModels[0]!.id)
-                        }
-                      >
-                        Try again
-                      </Button>
-                    ) : null}
-                  </div>
-                )
-              ) : parsedSingle.cleanText ? (
-                <div data-message-text="true" className="text-md w-full max-w-full prose-pre:max-w-full prose-pre:overflow-x-auto">
-                  <MarkdownRenderer content={parsedSingle.cleanText} />
-                  {singleResp.status === "STREAMING" && <span className="inline-block w-1.5 h-4 bg-foreground/70 ml-0.5 animate-pulse" />}
-                </div>
-              ) : singleCodeTurn ? null : (
-                <TypingIndicator isImageMode={message.chatType === "IMAGE_GENERATION" || (typeof window !== "undefined" && localStorage.getItem("preferredChatType") === "IMAGE_GENERATION")} />
-              )
-            ) : (
-              <p className="text-sm whitespace-pre-wrap">{parsedSingle.cleanText || message.content}</p>
-            )}
+          <div className="break-words overflow-hidden w-full text-[15px]">
+            <ResponseBody
+              resp={singleResp}
+              message={message}
+              modelId={singleModel?.id}
+              sharedView={sharedView}
+              isLastMessage={isLastMessage}
+              onFollowUpClick={onFollowUpClick}
+              onRetryAssistantResponse={onRetryAssistantResponse}
+              onSwitchToFreeModel={onSwitchToFreeModel}
+            />
           </div>
-
-          {singleResp?.generatedDocuments?.map((generatedDocument) => (
-            <DocumentCard key={generatedDocument.id} document={generatedDocument} />
-          ))}
-
-          {singleCodeTurn && !sharedView && (
-            <div className="px-4">
-              <CodeProjectCard turn={singleCodeTurn} />
-            </div>
-          )}
-
-          {isLastMessage && singleResp?.status === "COMPLETED" && parsedSingle.questions.length > 0 && onFollowUpClick && (
-            <FollowUpTabs questions={parsedSingle.questions} onClick={onFollowUpClick} />
-          )}
 
           {singleResp?.status === "COMPLETED" && singleResp.content && (
             <CardActions
               resp={singleResp}
-              modelId={uniqueModels[0]?.id}
+              modelId={singleModel?.id}
               messageId={message.id}
               modelResps={singleResps}
               verIdx={singleVerIdx}
-              onVersionChange={(d) => uniqueModels[0] && handleVersionChange(uniqueModels[0].id, d)}
+              onVersionChange={(d) => singleModel && handleVersionChange(singleModel.id, d)}
               onFeedback={onFeedback}
               sharedView={sharedView}
               onToggleStar={onToggleStar}
@@ -605,234 +492,165 @@ export const MessageBubble = React.memo(function MessageBubble({
   }
 
   // ── Assistant: multi-model ───────────────────────────────────────────────
+  const latestFor = (modelId: number) => {
+    const list = responsesByModel[modelId] || [];
+    return list[versionIndices[modelId] ?? list.length - 1] || list[0];
+  };
+  const settled = uniqueModels.every((m) => {
+    const s = latestFor(m.id)?.status;
+    return s === "COMPLETED" || s === "FAILED";
+  });
+  const focusModel = uniqueModels.find((m) => m.id === focusModelId) ?? uniqueModels[0];
+  const shownModels = viewMode === "focus" ? [focusModel] : uniqueModels;
+  const gridCols =
+    uniqueModels.length >= 4
+      ? "md:grid-cols-2 2xl:grid-cols-4"
+      : uniqueModels.length === 3
+        ? "lg:grid-cols-3"
+        : "md:grid-cols-2";
+
   return (
-    <div className={`px-4 py-3 w-full ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""} min-w-0`}>
-      <div className="w-full space-y-2 min-w-0">
-
-        {/* Tab bar — scrollable, click jumps to card */}
-        <div className="flex items-center gap-2 min-w-0">
-          <Bot className="w-4 h-4 text-primary/70 flex-shrink-0" />
-          <div className="relative flex-1 min-w-0">
-            {/* Fade hint on right */}
-            <div
-              ref={tabsRef}
-              className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5"
-            >
-              {uniqueModels.map((model) => {
-                const isActive = activeTab === model.id;
-                const mResps = responsesByModel[model.id] || [];
-                const latest = mResps[mResps.length - 1];
-                const isStreaming = latest?.status === "STREAMING" || latest?.status === "PENDING";
-                const isDone = latest?.status === "COMPLETED";
-
-                return (
-                  <button
-                    key={model.id}
-                    data-model={model.id}
-                    onClick={() => scrollToCard(model.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0 transition-all duration-150 ${
-                      isActive
-                        ? "bg-foreground text-background"
-                        : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    <span className="truncate max-w-[90px]">{model.name}</span>
-                    {isStreaming && <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />}
-                    {isDone && !isStreaming && <Check className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
+    <div className={`mx-auto w-full max-w-[1320px] px-4 sm:px-6 py-3 min-w-0 ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""}`}>
+      <div className="w-full space-y-3 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            {!settled && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />}
+            <span>
+              {settled
+                ? `${uniqueModels.length} models answered${sharedView ? "" : " · pick one to continue from"}`
+                : `Comparing ${uniqueModels.length} models…`}
+            </span>
           </div>
-        </div>
-
-        {/* Carousel Container */}
-        <div className="relative group w-full min-w-0">
-          
-          {/* Desktop Prev Button */}
-          {canScrollPrev && (
-            <button 
-              onClick={() => emblaApi?.scrollPrev()}
-              className="hidden sm:flex absolute left-[-16px] top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-full border border-border/50 bg-background/80 hover:bg-background backdrop-blur text-foreground shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Embla Viewport (Hides native scrollbar) */}
-          <div className="overflow-hidden w-full" ref={emblaRef}>
-            <div className="flex -ml-3 touch-pan-y">
-              {uniqueModels.map((model) => {
-                const mResps = responsesByModel[model.id] || [];
-                const verIdx = versionIndices[model.id] ?? (mResps.length - 1);
-                const resp = mResps[verIdx] || mResps[0];
-                const parsedMulti = parseFollowUpQuestions(resp?.content || "", resp?.status === "STREAMING");
-
-                return (
-                  <div
-                    key={model.id}
-                    className="flex-[0_0_85%] sm:flex-[0_0_85%] md:flex-[0_0_85%] min-w-0 pl-3 "
-                  >
-                    <div className="flex flex-col h-full rounded-xl border border-border/40 bg-muted/30 overflow-hidden break-words min-w-0 bg-muted/40">
-                      {/* Card header */}
-                      <div data-drag-handle="true" className="flex items-center gap-2 px-3 pt-2.5 pb-1.5 border-b border-border/30 min-w-0 cursor-grab active:cursor-grabbing">
-                        <span className="text-xs font-semibold text-foreground/80 truncate flex-1 min-w-0">{model.name}</span>
-                        {hasSourceChat && sourceChatUrl && (
-                          <Link
-                            href={sourceChatUrl}
-                            onClick={markStarredNavigation}
-                            className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                            title={sourceChatTitle}
-                          >
-                            <span className="truncate max-w-[120px]">{sourceChatLabel}</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </Link>
-                        )}
-                        {resp?.status === "STREAMING" && <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />}
-                        {resp?.status === "COMPLETED" && resp.content && <Check className="w-3 h-3 text-emerald-500 flex-shrink-0" />}
-                      </div>
-
-                      {/* Card content */}
-                      <div className="flex-1 px-3 py-2.5 text-sm overflow-y-auto max-h-[550px] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted-foreground/20 w-full min-w-0 max-w-full prose-pre:max-w-full prose-pre:overflow-x-auto">
-                        {resp?.status === "FAILED" && !isStoppedByUser(resp) ? (
-                          isPlanRestrictedFailure(resp) ? (
-                            <div className="space-y-2">
-                              <p className="text-sm text-destructive">
-                                {resp.content?.trim() || "This isn't included in your current plan."}
-                              </p>
-                              {!sharedView && (
-                                <Button variant="outline" size="sm" className="h-8 text-xs" type="button" asChild>
-                                  <Link href="/profile/subscription">Upgrade your plan</Link>
-                                </Button>
-                              )}
-                            </div>
-                          ) : isInsufficientBalanceFailure(resp) ? (
-                            <div className="space-y-2">
-                              <p className="text-sm text-destructive">
-                                {isImageGenerationMessage(message)
-                                  ? "You have insufficient balance for the image generation model."
-                                  : "You have insufficient balance. Do you want to switch to free models?"}
-                              </p>
-                              {!isImageGenerationMessage(message) && !sharedView && onSwitchToFreeModel ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 text-xs"
-                                  type="button"
-                                  onClick={() =>
-                                    onSwitchToFreeModel(message.id, model.id)
-                                  }
-                                >
-                                  Yes
-                                </Button>
-                              ) : null}
-                            </div>
-                          ) : (
-                          <div className="space-y-2">
-                            <p className="text-sm text-destructive">
-                              {resp.content?.trim() || "Failed to generate a response. Please try again."}
-                            </p>
-                            {!sharedView && onRetryAssistantResponse ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs"
-                                type="button"
-                                onClick={() =>
-                                  onRetryAssistantResponse(message.id, model.id)
-                                }
-                              >
-                                Try again
-                              </Button>
-                            ) : null}
-                          </div>
-                          )
-                        ) : parsedMulti.cleanText ? (
-                          <>
-                            <div data-message-text="true">
-                              <MarkdownRenderer content={parsedMulti.cleanText} />
-                            </div>
-                            {resp?.status === "STREAMING" && <span className="inline-block w-1.5 h-4 bg-foreground/70 ml-0.5 animate-pulse" />}
-                          </>
-                        ) : resp ? (
-                          <TypingIndicator isImageMode={message.chatType === "IMAGE_GENERATION" || (typeof window !== "undefined" && localStorage.getItem("preferredChatType") === "IMAGE_GENERATION")} />
-                        ) : null}
-                      </div>
-
-                      {resp?.generatedDocuments?.length ? (
-                        <div className="px-3 pb-1">
-                          {resp.generatedDocuments.map((generatedDocument) => (
-                            <DocumentCard
-                              key={generatedDocument.id}
-                              document={generatedDocument}
-                              className="max-w-full"
-                            />
-                          ))}
-                        </div>
-                      ) : null}
-
-                      {isLastMessage && resp?.status === "COMPLETED" && parsedMulti.questions.length > 0 && onFollowUpClick && (
-                        <div className="px-3 pb-2 pt-1">
-                          <FollowUpTabs questions={parsedMulti.questions} onClick={onFollowUpClick} />
-                        </div>
-                      )}
-
-                      {/* Card actions */}
-                      {resp?.status === "COMPLETED" && resp.content && (
-                        <div className="px-2 py-1.5 border-t border-border/20 bg-muted/10 mt-auto">
-                          <CardActions
-                            resp={resp}
-                            modelId={model.id}
-                            messageId={message.id}
-                            modelResps={mResps}
-                            verIdx={verIdx}
-                            onVersionChange={(d) => handleVersionChange(model.id, d)}
-                            onFeedback={onFeedback}
-                            sharedView={sharedView}
-                            onToggleStar={onToggleStar}
-                            onRegenerate={(msgId, mid) => {
-                              setVersionIndices(prev => { const n = { ...prev }; delete n[mid]; return n; });
-                              onRegenerate?.(msgId, mid);
-                            }}
-                            onContinue={onContinue}
-                            isLastMessage={isLastMessage}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Desktop Next Button */}
-          {canScrollNext && (
-            <button 
-              onClick={() => emblaApi?.scrollNext()}
-              className="hidden sm:flex absolute right-[-16px] top-1/2 -translate-y-1/2 z-10 w-8 h-8 items-center justify-center rounded-full border border-border/50 bg-background/80 hover:bg-background backdrop-blur text-foreground shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Mobile Dot Indicator */}
-        {uniqueModels.length > 1 && (
-          <div className="flex items-center justify-center gap-1.5 mt-1 sm:hidden">
-            {uniqueModels.map((model, idx) => (
+          <div className="inline-flex items-center rounded-lg border border-border bg-sunken p-0.5">
+            {([
+              { id: "columns", label: "Columns", Icon: Columns2 },
+              { id: "focus", label: "Focus", Icon: Focus },
+            ] as const).map(({ id, label, Icon }) => (
               <button
-                key={model.id}
-                onClick={() => scrollToCard(model.id)}
-                className={`rounded-full transition-all duration-200 ${
-                  activeTab === model.id
-                    ? "w-4 h-1.5 bg-foreground/60"
-                    : "w-1.5 h-1.5 bg-muted-foreground/25 hover:bg-muted-foreground/40"
+                key={id}
+                type="button"
+                onClick={() => changeViewMode(id)}
+                className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors cursor-pointer ${
+                  viewMode === id
+                    ? "border-border bg-surface text-foreground shadow-sm"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
-              />
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
             ))}
           </div>
+        </div>
+
+        {viewMode === "focus" && (
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+            {uniqueModels.map((model) => {
+              const active = model.id === focusModel.id;
+              const status = latestFor(model.id)?.status;
+              return (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => setFocusModelId(model.id)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                    active
+                      ? "border-border bg-surface text-foreground shadow-sm"
+                      : "border-transparent bg-sunken text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <ModelAvatar externalId={model.externalId} name={model.name} size={16} />
+                  <span className="truncate max-w-[110px]">{model.name}</span>
+                  {(status === "STREAMING" || status === "PENDING") && <Loader2 className="w-3 h-3 animate-spin" />}
+                  {status === "COMPLETED" && <Check className="w-3 h-3 text-ok" />}
+                </button>
+              );
+            })}
+          </div>
         )}
+
+        <div className={viewMode === "focus" ? "mx-auto max-w-3xl w-full" : `grid grid-cols-1 gap-4 ${gridCols}`}>
+          {shownModels.map((model) => {
+            const mResps = responsesByModel[model.id] || [];
+            const verIdx = versionIndices[model.id] ?? (mResps.length - 1);
+            const resp = mResps[verIdx] || mResps[0];
+
+            return (
+              <div
+                key={model.id}
+                className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-surface break-words"
+              >
+                <div className="flex min-w-0 items-center gap-2 border-b border-border px-4 py-3">
+                  <ModelAvatar externalId={model.externalId} name={model.name} size={22} />
+                  <span className="truncate text-[13.5px] font-semibold text-foreground">{model.name}</span>
+                  <LatencyLabel resp={resp} />
+                  {(resp?.status === "STREAMING" || resp?.status === "PENDING") && (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                  )}
+                  {hasSourceChat && sourceChatUrl && (
+                    <Link
+                      href={sourceChatUrl}
+                      onClick={markStarredNavigation}
+                      className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      title={sourceChatTitle}
+                    >
+                      <span className="truncate max-w-[100px]">{sourceChatLabel}</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  )}
+                  <div className="flex-1" />
+                  {!sharedView && resp?.status === "COMPLETED" && resp.content && (
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent("ai-colab:use-model", { detail: { modelId: model.id } }))}
+                      title="Continue the conversation with this model only"
+                      className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs font-medium text-foreground transition-colors hover:border-line-strong hover:bg-sidebar-accent cursor-pointer"
+                    >
+                      <CornerUpLeft className="w-3.5 h-3.5" />
+                      Use this
+                    </button>
+                  )}
+                </div>
+
+                <div className={`flex-1 min-w-0 px-4 py-4 text-[14.5px] overflow-y-auto scrollbar-thin ${viewMode === "focus" ? "" : "max-h-[560px]"}`}>
+                  <ResponseBody
+                    resp={resp}
+                    message={message}
+                    modelId={model.id}
+                    sharedView={sharedView}
+                    isLastMessage={isLastMessage}
+                    onFollowUpClick={onFollowUpClick}
+                    onRetryAssistantResponse={onRetryAssistantResponse}
+                    onSwitchToFreeModel={onSwitchToFreeModel}
+                    compact
+                  />
+                </div>
+
+                {resp?.status === "COMPLETED" && resp.content && (
+                  <div className="mt-auto border-t border-border px-3 py-1.5">
+                    <CardActions
+                      resp={resp}
+                      modelId={model.id}
+                      messageId={message.id}
+                      modelResps={mResps}
+                      verIdx={verIdx}
+                      onVersionChange={(d) => handleVersionChange(model.id, d)}
+                      onFeedback={onFeedback}
+                      sharedView={sharedView}
+                      onToggleStar={onToggleStar}
+                      onRegenerate={(msgId, mid) => {
+                        setVersionIndices(prev => { const n = { ...prev }; delete n[mid]; return n; });
+                        onRegenerate?.(msgId, mid);
+                      }}
+                      onContinue={onContinue}
+                      isLastMessage={isLastMessage}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <Attachments message={message} />
@@ -857,7 +675,7 @@ export const MessageBubble = React.memo(function MessageBubble({
   for (let i = 0; i < pResps.length; i++) {
     const pr = pResps[i];
     const nr = nResps[i];
-    if (pr.id !== nr.id || pr.status !== nr.status || pr.content !== nr.content || pr.isLiked !== nr.isLiked || pr.isStarred !== nr.isStarred || pr.insufficientBalance !== nr.insufficientBalance || pr.planRestricted !== nr.planRestricted || pr.finishReason !== nr.finishReason) {
+    if (pr.id !== nr.id || pr.status !== nr.status || pr.content !== nr.content || pr.isLiked !== nr.isLiked || pr.isStarred !== nr.isStarred || pr.insufficientBalance !== nr.insufficientBalance || pr.planRestricted !== nr.planRestricted || pr.finishReason !== nr.finishReason || pr.completedAt !== nr.completedAt) {
       return false;
     }
   }
@@ -870,6 +688,142 @@ export const MessageBubble = React.memo(function MessageBubble({
 
   return true;
 });
+
+// ── Response rendering shared by single and multi layouts ───────────────────
+
+function LatencyLabel({ resp }: { resp?: ModelResponse | null }) {
+  const latency = useResponseLatency(resp);
+  if (!latency) return null;
+  return <span className="font-mono text-[11.5px] text-faint shrink-0">{latency}</span>;
+}
+
+/**
+ * The body of one model's answer: failure states, markdown (with streaming
+ * cursor), typing indicator, then generated documents / code project /
+ * follow-up suggestions. `compact` is the multi-model card variant, which
+ * has never shown the code-generation steps inline.
+ */
+function ResponseBody({
+  resp, message, modelId, sharedView, isLastMessage, onFollowUpClick,
+  onRetryAssistantResponse, onSwitchToFreeModel, compact = false,
+}: {
+  resp?: ModelResponse | null;
+  message: Message;
+  modelId?: number;
+  sharedView: boolean;
+  isLastMessage?: boolean;
+  onFollowUpClick?: (question: string) => void;
+  onRetryAssistantResponse?: (assistantMessageId: number, modelId: number) => void;
+  onSwitchToFreeModel?: (assistantMessageId: number, modelId: number) => void;
+  compact?: boolean;
+}) {
+  const parsed = parseFollowUpQuestions(resp?.content || "", resp?.status === "STREAMING");
+  const codeTurn = resp && !compact ? codeTurnFromResponse(resp) : null;
+  const isImageMode =
+    message.chatType === "IMAGE_GENERATION" ||
+    (typeof window !== "undefined" && localStorage.getItem("preferredChatType") === "IMAGE_GENERATION");
+
+  let body: React.ReactNode;
+  if (!resp) {
+    // An assistant turn with no saved response yet is still generating on the
+    // server (e.g. the user left the page and came back) — show progress, not a blank.
+    body =
+      parsed.cleanText || message.content ? (
+        <p className="text-sm whitespace-pre-wrap">{parsed.cleanText || message.content}</p>
+      ) : message.role === "ASSISTANT" ? (
+        <TypingIndicator isImageMode={isImageMode} />
+      ) : null;
+  } else if (resp.status === "FAILED" && !isStoppedByUser(resp)) {
+    if (isPlanRestrictedFailure(resp)) {
+      body = (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">
+            {resp.content?.trim() || "This isn't included in your current plan."}
+          </p>
+          {!sharedView && (
+            <Button variant="outline" size="sm" className="h-8 text-xs" type="button" asChild>
+              <Link href="/profile/subscription">Upgrade your plan</Link>
+            </Button>
+          )}
+        </div>
+      );
+    } else if (isInsufficientBalanceFailure(resp)) {
+      body = (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">
+            {isImageGenerationMessage(message)
+              ? "You have insufficient balance for the image generation model."
+              : "You have insufficient balance. Do you want to switch to free models?"}
+          </p>
+          {!isImageGenerationMessage(message) && !sharedView && onSwitchToFreeModel && modelId !== undefined ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              type="button"
+              onClick={() => onSwitchToFreeModel(message.id, modelId)}
+            >
+              Yes
+            </Button>
+          ) : null}
+        </div>
+      );
+    } else {
+      body = (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">
+            {resp.content?.trim() || "Failed to generate a response. Please try again."}
+          </p>
+          {!sharedView && onRetryAssistantResponse && modelId !== undefined ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              type="button"
+              onClick={() => onRetryAssistantResponse(message.id, modelId)}
+            >
+              Try again
+            </Button>
+          ) : null}
+        </div>
+      );
+    }
+  } else if (parsed.cleanText) {
+    body = (
+      <div data-message-text="true" className="w-full max-w-full prose-pre:max-w-full prose-pre:overflow-x-auto">
+        <MarkdownRenderer content={parsed.cleanText} />
+        {resp.status === "STREAMING" && <span className="inline-block w-1.5 h-4 bg-foreground/70 ml-0.5 animate-pulse" />}
+      </div>
+    );
+  } else if (codeTurn) {
+    body = null;
+  } else {
+    body = <TypingIndicator isImageMode={isImageMode} />;
+  }
+
+  return (
+    <>
+      {codeTurn && !sharedView && <GenerationSteps turn={codeTurn} />}
+      {body}
+
+      {resp?.generatedDocuments?.map((generatedDocument) => (
+        <DocumentCard key={generatedDocument.id} document={generatedDocument} className={compact ? "max-w-full" : undefined} />
+      ))}
+
+      {codeTurn && !sharedView && (
+        <div className="px-4">
+          <CodeProjectCard turn={codeTurn} />
+        </div>
+      )}
+
+      {isLastMessage && resp?.status === "COMPLETED" && parsed.questions.length > 0 && onFollowUpClick && (
+        <div className={compact ? "pt-2" : undefined}>
+          <FollowUpTabs questions={parsed.questions} onClick={onFollowUpClick} />
+        </div>
+      )}
+    </>
+  );
+}
 
 // ── Shared action bar ────────────────────────────────────────────────────────
 function CardActions({
@@ -889,9 +843,9 @@ function CardActions({
   isLastMessage?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-0.5 flex-wrap">
+    <div className="flex items-center gap-0.5 flex-wrap text-muted-foreground">
       {modelResps.length > 1 && (
-        <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full mr-1">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground bg-sunken px-2 py-0.5 rounded-full mr-1">
           <button onClick={() => onVersionChange(-1)} disabled={verIdx === 0} className="hover:text-foreground disabled:opacity-30 p-0.5">
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
@@ -901,7 +855,7 @@ function CardActions({
           </button>
         </div>
       )}
-      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/80"
+      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
         onClick={() => { navigator.clipboard.writeText(resp.content!); toast.success("Copied"); }}>
         <Copy className="w-3.5 h-3.5" />
       </Button>
@@ -909,7 +863,7 @@ function CardActions({
         <Button
           variant="ghost"
           size="icon"
-          className={`h-7 w-7 rounded-full ${resp.isStarred ? "text-yellow-500 bg-yellow-500/10" : "text-muted-foreground hover:bg-muted/80"}`}
+          className={`h-7 w-7 rounded-md ${resp.isStarred ? "text-warn bg-sidebar-accent" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"}`}
           onClick={() => onToggleStar?.(resp.id, !resp.isStarred)}
         >
           <Star className={`w-3.5 h-3.5 ${resp.isStarred ? "fill-current" : ""}`} />
@@ -917,19 +871,19 @@ function CardActions({
       )}
       {!sharedView && (
         <Button variant="ghost" size="icon"
-          className={`h-7 w-7 rounded-full ${resp.isLiked === true ? "text-green-500 bg-green-500/10" : "text-muted-foreground hover:bg-muted/80"}`}
+          className={`h-7 w-7 rounded-md ${resp.isLiked === true ? "text-ok bg-sidebar-accent" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"}`}
           onClick={() => onFeedback?.(resp.id, resp.isLiked === true ? null : true)}>
           <ThumbsUp className="w-3.5 h-3.5" />
         </Button>
       )}
       {!sharedView && (
         <Button variant="ghost" size="icon"
-          className={`h-7 w-7 rounded-full ${resp.isLiked === false ? "text-red-500 bg-red-500/10" : "text-muted-foreground hover:bg-muted/80"}`}
+          className={`h-7 w-7 rounded-md ${resp.isLiked === false ? "text-danger bg-sidebar-accent" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"}`}
           onClick={() => onFeedback?.(resp.id, resp.isLiked === false ? null : false)}>
           <ThumbsDown className="w-3.5 h-3.5" />
         </Button>
       )}
-      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/80"
+      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
         onClick={async () => {
           if (navigator.share) { try { await navigator.share({ title: "AI Colab", text: resp.content! }); } catch { /**/ } }
           else { navigator.clipboard.writeText(resp.content!); toast.success("Copied for sharing"); }
@@ -937,7 +891,7 @@ function CardActions({
         <Share2 className="w-3.5 h-3.5" />
       </Button>
       {!sharedView && (
-        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/80"
+        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
           onClick={() => onRegenerate?.(messageId, modelId)}>
           <RefreshCw className="w-3.5 h-3.5" />
         </Button>

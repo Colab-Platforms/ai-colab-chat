@@ -3,8 +3,6 @@
 import { memo, type Dispatch, type ElementType, type SetStateAction } from "react";
 import * as LucideIcons from "lucide-react";
 import { Bot, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { SIDEBAR_SECTION_HEADER_ROW, SIDEBAR_SECTION_TITLE } from "@/components/sidebar/sidebar-section-styles";
 import type { Assistant } from "@/components/sidebar/sidebar-types";
 
 const ASSISTANT_ICON_EMOJI: Record<string, string> = {
@@ -33,26 +31,19 @@ export const AssistantsSection = memo(function AssistantsSection({
 
   return (
     <>
-      <div className={`${SIDEBAR_SECTION_HEADER_ROW}`} data-guide="assistants">
-        <button
-          type="button"
-          className="min-w-0 flex-1 py-2.5 px-3 text-left"
-          onClick={() => setAssistantsExpanded((p) => !p)}
-        >
-          <span className={`block w-full text-left ${SIDEBAR_SECTION_TITLE}`}>Assistants</span>
-        </button>
-        <button
-          type="button"
-          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent/80"
-          onClick={() => setAssistantsExpanded((p) => !p)}
-          aria-expanded={assistantsExpanded}
-          aria-label={assistantsExpanded ? "Collapse assistants" : "Expand assistants"}
-        >
-          <ChevronRight
-            className={`h-3 w-3 transition-transform ${assistantsExpanded ? "rotate-90" : ""}`}
-          />
-        </button>
-      </div>
+      <button
+        type="button"
+        data-guide="assistants"
+        onClick={() => setAssistantsExpanded((p) => !p)}
+        aria-expanded={assistantsExpanded}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] text-foreground transition-colors cursor-pointer hover:bg-sidebar-accent"
+      >
+        <Bot className="w-4 h-4 shrink-0 text-muted-foreground" />
+        <span className="truncate">Assistants</span>
+        <ChevronRight
+          className={`ml-auto h-3.5 w-3.5 text-faint transition-transform ${assistantsExpanded ? "rotate-90" : ""}`}
+        />
+      </button>
       {assistantsExpanded && assistants.map((assistant) => {
         const emoji = ASSISTANT_ICON_EMOJI[assistant.icon];
         const IconComponent =
@@ -62,7 +53,7 @@ export const AssistantsSection = memo(function AssistantsSection({
           <button
             key={assistant.id}
             onClick={() => onAssistantSelected(assistant)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer hover:bg-sidebar-accent text-foreground"
+            className="w-full flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer hover:bg-sidebar-accent text-foreground"
             title={assistant.description || assistant.name}
           >
             {emoji ? (
@@ -76,15 +67,6 @@ export const AssistantsSection = memo(function AssistantsSection({
           </button>
         );
       })}
-      {assistantsExpanded && assistantsHasMore && (
-        <Button
-          variant="ghost"
-          className="w-full mt-1 text-xs text-muted-foreground hover:text-foreground h-8 cursor-pointer"
-          onClick={onLoadMoreAssistants}
-        >
-          Load More Assistants
-        </Button>
-      )}
     </>
   );
 }, (prev, next) => {

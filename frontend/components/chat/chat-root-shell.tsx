@@ -29,6 +29,8 @@ export function ChatRootShell({ children }: { children: ReactNode }) {
     pathname.startsWith("/register") ||
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/share/") ||
+    // Public marketing page — never inside the chat layout, signed in or not.
+    pathname.startsWith("/business") ||
     pathname.startsWith("/code-preview/") ||
     pathname.startsWith("/admin");
 
