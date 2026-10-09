@@ -109,12 +109,12 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
               <Moon className="w-5 h-5 text-gray-800 dark:hidden" />
               <Sun className="w-5 h-5 text-gray-200 hidden dark:block" />
             </button>
-            <a
+            {/* <a
               href={demoHref}
               className="hidden lg:inline-flex h-9 items-center rounded-full bg-black px-5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
             >
               Book a demo
-            </a>
+            </a> */}
             <Link href="/login" className="hidden lg:block">
               <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-6 transition-all duration-300">
                 Log in
