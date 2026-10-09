@@ -3,14 +3,10 @@
 import { memo, type Dispatch, type ElementType, type SetStateAction } from "react";
 import * as LucideIcons from "lucide-react";
 import { Bot, ChevronRight } from "lucide-react";
+import { useTheme } from "@/context/theme-context";
 import type { Assistant } from "@/components/sidebar/sidebar-types";
-
-const ASSISTANT_ICON_EMOJI: Record<string, string> = {
-  Code2: "💻",
-  PenLine: "🎨",
-  Scale: "⚖️",
-  Megaphone: "🚀",
-};
+import { getAssistantLook } from "@/components/chat/assistant-theme";
+import { lift } from "@/components/chat/assistant-hero";
 
 export const AssistantsSection = memo(function AssistantsSection({
   assistants,
@@ -27,6 +23,8 @@ export const AssistantsSection = memo(function AssistantsSection({
   onLoadMoreAssistants?: () => void;
   onAssistantSelected: (assistant: Assistant) => void;
 }) {
+  const { theme } = useTheme();
+
   if (assistants.length === 0) return null;
 
   return (
@@ -45,9 +43,9 @@ export const AssistantsSection = memo(function AssistantsSection({
         />
       </button>
       {assistantsExpanded && assistants.map((assistant) => {
-        const emoji = ASSISTANT_ICON_EMOJI[assistant.icon];
         const IconComponent =
           (LucideIcons as unknown as Record<string, ElementType>)[assistant.icon] || Bot;
+        const iconColor = lift(getAssistantLook(assistant).color, theme === "dark");
 
         return (
           <button
@@ -56,13 +54,11 @@ export const AssistantsSection = memo(function AssistantsSection({
             className="w-full flex items-center gap-2 pl-9 pr-3 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer hover:bg-sidebar-accent text-foreground"
             title={assistant.description || assistant.name}
           >
-            {emoji ? (
-              <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-sm leading-none">
-                {emoji}
-              </span>
-            ) : (
-              <IconComponent className="w-4 h-4 flex-shrink-0 text-primary" />
-            )}
+            <IconComponent
+              className="w-4 h-4 flex-shrink-0"
+              style={{ color: iconColor }}
+              aria-hidden="true"
+            />
             <span className="truncate flex-1 text-left">{assistant.name}</span>
           </button>
         );

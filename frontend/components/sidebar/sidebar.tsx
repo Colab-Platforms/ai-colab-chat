@@ -43,6 +43,7 @@ interface SidebarProps {
   onMobileClose: () => void;
   onLogout?: () => void;
   hasMore?: boolean;
+  loadingMoreChats?: boolean;
   onLoadMore?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -72,10 +73,10 @@ function NavRow({
       }`}
     >
       <Icon className={`w-4 h-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`} />
-      <span className="truncate">{label}</span>
+      <span className="min-w-0 truncate">{label}</span>
       {badge && (
         <span
-          className={`ml-auto text-[10px] font-semibold ${
+          className={`shrink-0 whitespace-nowrap text-[10px] font-semibold ${
             badge === "New" ? "text-accent-ink" : "text-faint"
           }`}
         >
@@ -98,6 +99,7 @@ function SidebarInner({
   onMobileClose,
   onLogout,
   hasMore,
+  loadingMoreChats,
   onLoadMore,
   collapsed,
   onToggleCollapse,
@@ -588,6 +590,7 @@ function SidebarInner({
             setPendingMoveForChat={setPendingMoveForChat}
             setPendingMoveNewFolderId={setPendingMoveNewFolderId}
             hasMore={hasMore}
+            loadingMoreChats={loadingMoreChats}
             onLoadMore={onLoadMore}
           />
         </div>

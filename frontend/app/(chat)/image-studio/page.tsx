@@ -16,6 +16,7 @@ import {
   StudioHero,
   StudioTabs,
   TemplateStrip,
+  TemplatesComingSoon,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
 import { IMAGE_ASPECTS, IMAGE_TEMPLATES } from "@/components/studio/studio-templates";
@@ -223,8 +224,12 @@ export default function ImageStudioPage() {
     }
     let text = t.prompt;
     if (photo) {
-      text +=
-        "\n\nUse the attached photo as the subject: recreate this style with the person or object in that photo, keeping their face, identity and key features recognisable.";
+      // Identity rules go first and last: image models weight the start of a
+      // prompt most, and a style-heavy template otherwise drifts to a lookalike.
+      text =
+        "Edit the attached photo. The person in it is the subject and must remain the SAME real person: keep their exact face, facial structure, skin tone, age, hair colour, facial hair and expression recognisable. Do not replace them with a different or generic person. Change only the clothing, styling, setting, lighting and photo style as described below.\n\n" +
+        text +
+        "\n\nFinal check: the result must clearly look like the person in the attached photo, not a lookalike.";
     }
     if (extra) text += `\n\nAdditional details: ${extra}`;
     if (typeof t.id === "number") void studioTemplateService.recordUse(t.id).catch(() => {});
@@ -305,15 +310,11 @@ export default function ImageStudioPage() {
           ]}
           active={tab}
           onChange={setTab}
-          action={
-            tab === "templates" ? (
-              <LinkAction onClick={() => setExpanded((e) => !e)}>{expanded ? "Show fewer" : "Browse all templates"}</LinkAction>
-            ) : undefined
-          }
         />
 
+        {/* Templates are hidden for now — restore the LinkAction + TemplateStrip when they launch. */}
         {tab === "templates" ? (
-          <TemplateStrip templates={templates} expanded={expanded} variant="image" onPick={pickTemplate} />
+          <TemplatesComingSoon variant="image" />
         ) : mine.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">No images yet — generate your first one above.</p>
         ) : (

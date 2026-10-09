@@ -3,7 +3,18 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ArrowUp, ChevronDown, ChevronRight, Loader2, Play, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  ChevronDown,
+  ChevronRight,
+  Clapperboard,
+  Image as ImageIcon,
+  Loader2,
+  Play,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -377,6 +388,29 @@ function VideoTemplateCard({ t }: { t: StudioTemplate }) {
         <div className="truncate text-[13px] font-medium text-foreground">{t.title}</div>
         <div className="truncate text-[11.5px] text-faint">{t.meta}</div>
       </div>
+    </div>
+  );
+}
+
+/** Placeholder shown in place of the template strip until templates launch. */
+export function TemplatesComingSoon({ variant }: { variant: "image" | "video" }) {
+  const Icon = variant === "image" ? ImageIcon : Clapperboard;
+  return (
+    <div className="relative mx-auto flex w-full max-w-[680px] flex-col items-center overflow-hidden rounded-2xl border border-dashed border-border bg-card/60 px-6 py-12 text-center">
+      <div className="pointer-events-none absolute -top-16 left-1/2 h-40 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+      <div className="relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
+        <Icon className="h-6 w-6" />
+        <Sparkles className="absolute -right-1.5 -top-1.5 h-4 w-4 text-primary" />
+      </div>
+      <span className="mb-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+        Coming soon
+      </span>
+      <h3 className="text-base font-semibold text-foreground">Templates are on the way</h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+        {variant === "image"
+          ? "Ready-made styles to turn one idea into a polished image. Until then, describe what you want above."
+          : "Ready-made shots and reel formats you can start from in one click. Until then, describe your shot above."}
+      </p>
     </div>
   );
 }

@@ -97,6 +97,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMoreChats, setLoadingMoreChats] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(256);
@@ -125,6 +126,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   pageRef.current = page;
   const hasMoreRef = useRef(hasMore);
   hasMoreRef.current = hasMore;
+  const loadingMoreChatsRef = useRef(false);
   const assistantsPageRef = useRef(assistantsPage);
   assistantsPageRef.current = assistantsPage;
   const assistantsHasMoreRef = useRef(assistantsHasMore);
@@ -206,6 +208,12 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const isProfileRoute = pathname.startsWith("/profile");
 
   const fetchChats = useCallback(async (pageNum = 1, searchTerm?: string) => {
+    if (pageNum > 1 && loadingMoreChatsRef.current) return;
+    if (pageNum > 1) {
+      loadingMoreChatsRef.current = true;
+      setLoadingMoreChats(true);
+    }
+
     const effectiveSearch = searchTerm ?? chatSearchRef.current;
     try {
       const res = await chatService.list({
@@ -251,6 +259,11 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       setHasMore(Boolean(result?.hasNextPage));
     } catch {
       /* ignore */
+    } finally {
+      if (pageNum > 1) {
+        loadingMoreChatsRef.current = false;
+        setLoadingMoreChats(false);
+      }
     }
   }, []);
 
@@ -667,6 +680,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       onRefresh={handleSidebarRefresh}
       onMobileClose={handleMobileClose}
       hasMore={hasMore}
+      loadingMoreChats={loadingMoreChats}
       onLoadMore={handleLoadMoreChats}
       searchQuery={chatSearch}
       onSearchChange={setChatSearch}

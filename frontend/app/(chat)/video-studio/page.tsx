@@ -21,6 +21,7 @@ import {
   StudioHero,
   StudioTabs,
   TemplateStrip,
+  TemplatesComingSoon,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
 import { VIDEO_TEMPLATES } from "@/components/studio/studio-templates";
@@ -367,15 +368,11 @@ export default function VideoStudioPage() {
           ]}
           active={tab}
           onChange={setTab}
-          action={
-            tab === "templates" ? (
-              <LinkAction onClick={() => setExpanded((e) => !e)}>{expanded ? "Show fewer" : "Browse all templates"}</LinkAction>
-            ) : undefined
-          }
         />
 
+        {/* Templates are hidden for now — restore the LinkAction + TemplateStrip when they launch. */}
         {tab === "templates" ? (
-          <TemplateStrip templates={templates} expanded={expanded} variant="video" onPick={pickTemplate} />
+          <TemplatesComingSoon variant="video" />
         ) : mine.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">No videos yet — describe a shot above to make one.</p>
         ) : (

@@ -2,6 +2,7 @@
 
 import { memo, useMemo, type Dispatch, type SetStateAction } from "react";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { ChatItem } from "@/components/sidebar/sidebar-chat-item";
 import type { Chat, FolderItem } from "@/components/sidebar/sidebar-types";
 
@@ -52,6 +53,7 @@ export const ChatsSection = memo(function ChatsSection({
   setPendingMoveForChat,
   setPendingMoveNewFolderId,
   hasMore,
+  loadingMoreChats,
   onLoadMore,
 }: {
   onMobileClose: () => void;
@@ -69,6 +71,7 @@ export const ChatsSection = memo(function ChatsSection({
   setPendingMoveForChat: Dispatch<SetStateAction<number | null>>;
   setPendingMoveNewFolderId: Dispatch<SetStateAction<number | null>>;
   hasMore?: boolean;
+  loadingMoreChats?: boolean;
   onLoadMore?: () => void;
 }) {
   const groups = useMemo(() => groupChatsByDate(unfoldered), [unfoldered]);
@@ -99,18 +102,32 @@ export const ChatsSection = memo(function ChatsSection({
       ))}
 
       {hasMore && (
-        <Button
-          variant="ghost"
-          className="w-full mt-2 text-xs text-muted-foreground hover:text-foreground h-8 cursor-pointer"
-          onClick={onLoadMore}
-        >
-          Load More Chats
-        </Button>
+        <div className="mt-2 flex w-full min-w-0 justify-start px-1">
+          <Button
+            variant="ghost"
+            className="h-auto min-h-8 w-full max-w-full min-w-0 cursor-pointer justify-start whitespace-normal break-words px-2 py-1.5 text-left text-xs leading-tight text-muted-foreground hover:text-foreground"
+            onClick={onLoadMore}
+            disabled={loadingMoreChats}
+          >
+            {loadingMoreChats ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <span className="block whitespace-normal break-words">
+                Load More Chats
+              </span>
+            )}
+          </Button>
+        </div>
       )}
     </>
   );
 }, (prev, next) => {
   if (Boolean(prev.hasMore) !== Boolean(next.hasMore)) return false;
+  if (Boolean(prev.loadingMoreChats) !== Boolean(next.loadingMoreChats)) return false;
+  if (prev.onLoadMore !== next.onLoadMore) return false;
   if (prev.pendingMoveForChat !== next.pendingMoveForChat) return false;
   if (prev.pendingMoveNewFolderId !== next.pendingMoveNewFolderId) return false;
   if (prev.unfoldered.length !== next.unfoldered.length) return false;
