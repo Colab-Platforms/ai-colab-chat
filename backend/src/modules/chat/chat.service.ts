@@ -11,15 +11,10 @@ import { buildPrismaQuery } from "prisma-qb";
 
 class ChatService {
   private async getDefaultContextIdsForChat(userId: number, folderId?: number | null) {
-    const globalContextsQuery = folderId
-      ? prisma.contextMemory.findMany({
-        where: { userId, type: "GLOBAL", isAutoSelected: true, isDeleted: false },
-        select: { id: true },
-      })
-      : prisma.contextMemory.findMany({
-        where: { userId, type: "GLOBAL", isDeleted: false },
-        select: { id: true },
-      });
+    const globalContextsQuery = prisma.contextMemory.findMany({
+      where: { userId, type: "GLOBAL", isAutoSelected: true, isDeleted: false },
+      select: { id: true },
+    });
 
     const folderContextsQuery = folderId
       ? prisma.contextMemory.findMany({
@@ -110,10 +105,12 @@ class ChatService {
       filterFields: [
         { key: "folderId", field: "folderId", type: "number" },
         { key: "isArchived", field: "isArchived", type: "boolean" },
+        { key: "capability", field: "capability", type: "string" },
       ],
       sortFields: [
         { key: "updatedAt", field: "updatedAt" },
         { key: "createdAt", field: "createdAt" },
+        { key: "title", field: "title" },
       ],
       defaultSort: { key: "updatedAt", order: "desc" },
       softDelete: { field: "isDeleted", value: false },
@@ -126,6 +123,13 @@ class ChatService {
       where.folderId = null;
     }
 
+    // Voice chats live in their own tab (see voice.service.ts / /voice
+    // page) and shouldn't clutter the regular sidebar/chat list — only
+    // include them when explicitly requested via ?capability=VOICE.
+    if (!query.capability) {
+      where.capability = { not: "VOICE" };
+    }
+
     const [chats, totalRecords] = await Promise.all([
       prisma.chat.findMany({
         where,
@@ -134,6 +138,7 @@ class ChatService {
         orderBy,
         include: {
           assistant: { select: { id: true, name: true, icon: true } },
+          _count: { select: { messages: true } },
         },
       }),
       prisma.chat.count({ where }),
@@ -146,6 +151,21 @@ class ChatService {
     const chat = await prisma.chat.findFirst({
       where: { id: chatId, userId, isDeleted: false },
       include: {
+        generatedDocuments: {
+          where: { isDeleted: false },
+          select: {
+            id: true,
+            status: true,
+            format: true,
+            title: true,
+            fileName: true,
+            fileUrl: true,
+            fileSize: true,
+            lastError: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
         messages: {
           where: { isDeleted: false },
           orderBy: { createdAt: "asc" },
@@ -154,6 +174,45 @@ class ChatService {
             modelResponses: {
               include: {
                 model: { select: { id: true, name: true, externalId: true } },
+                // Generation outlives the SSE stream, so a document must come
+                // back with the chat — otherwise a refresh mid-generation
+                // loses the card entirely.
+                generatedDocuments: {
+                  where: { isDeleted: false },
+                  select: {
+                    id: true,
+                    status: true,
+                    format: true,
+                    title: true,
+                    fileName: true,
+                    fileUrl: true,
+                    fileSize: true,
+                    lastError: true,
+                  },
+                  orderBy: { createdAt: "asc" },
+                },
+                // Code workspace turn → the project card + steps under the
+                // bubble (see modules/code-workspace). The file snapshot
+                // itself is fetched on demand when the panel opens.
+                codeVersions: {
+                  where: { project: { isDeleted: false } },
+                  select: {
+                    version: true,
+                    plan: true,
+                    changedPaths: true,
+                    project: {
+                      select: {
+                        id: true,
+                        title: true,
+                        framework: true,
+                        previewable: true,
+                        status: true,
+                      },
+                    },
+                  },
+                  orderBy: { version: "desc" },
+                  take: 1,
+                },
               },
             },
           },

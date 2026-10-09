@@ -95,6 +95,11 @@ export const createOpenRouterStream = async (
       n: chatType === "IMAGE_GENERATION" ? 1 : undefined,
       stream: true,
       stream_options: { include_usage: true },
+      // OpenRouter-specific (not part of the OpenAI SDK's types, hence the
+      // `as any` cast on the whole call) — adds `usage.cost` (real $ charged
+      // by OpenRouter for this request) to the final usage chunk, on top of
+      // the standard token counts stream_options.include_usage already gives.
+      usage: { include: true },
       modalities: chatType === "IMAGE_GENERATION" ? ["image"] : undefined,
       plugins: allPlugins.length > 0 ? allPlugins : undefined,
     } as any,

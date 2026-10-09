@@ -3,8 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { useTheme } from "@/context/theme-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SettingsCard, SettingsHeader } from "@/components/settings/settings-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,12 +18,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Save, Loader2, Sun, Moon, Trash2, AlertTriangle, Camera } from "lucide-react";
-import { toast } from "react-toastify";
+import { Loader2, Trash2, AlertTriangle, Camera, CheckCircle2 } from "lucide-react";
+import { toast } from "@/lib/toast";
 
 export default function AccountPage() {
   const { user, logout, refreshUser } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,107 +106,101 @@ export default function AccountPage() {
 
   const displayImage = previewUrl || user?.profileImage;
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">My Account</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage your profile and settings</p>
-      </div>
+  const dirty =
+    !!selectedFile ||
+    firstName !== (user?.firstName || "") ||
+    lastName !== (user?.lastName || "") ||
+    phoneNumber !== (user?.phoneNumber || "");
 
-      {/* Profile info */}
-      <Card className="border-border/30">
-        <CardHeader>
-          <CardTitle className="text-base">Personal Information</CardTitle>
-          <CardDescription>Update your name, photo and contact details</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Profile Image */}
-          <div className="flex items-center gap-5">
-            <div className="relative group">
-              <Avatar className="w-20 h-20 border-2 border-border/50 shadow-sm">
-                {displayImage ? (
-                  <AvatarImage src={displayImage} alt="Profile" className="object-cover" />
-                ) : null}
-                <AvatarFallback className="bg-primary/10 text-primary text-xl font-semibold">
+  const labelCls = "mb-1.5 block text-[13px] font-medium text-foreground";
+  const inputCls = "h-10 rounded-xl border-border bg-surface px-3 text-sm";
+
+  return (
+    <div>
+      <SettingsHeader title="Account" description="Your profile and sign-in details." />
+
+      <SettingsCard className="p-6">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="block cursor-pointer rounded-full"
+              title="Change photo"
+            >
+              <Avatar className="h-16 w-16">
+                {displayImage ? <AvatarImage src={displayImage} alt="Profile" className="object-cover" /> : null}
+                <AvatarFallback className="bg-accent-soft text-xl font-semibold text-accent-ink">
                   {user?.firstName?.[0]}{user?.lastName?.[0]}
                 </AvatarFallback>
               </Avatar>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-              >
-                <Camera className="w-5 h-5 text-white" />
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Profile photo</p>
-              <p className="text-xs text-muted-foreground">
-                Click the avatar to upload a new photo. Max 10MB.
-              </p>
-              {selectedFile && (
-                <p className="text-xs text-primary font-medium">{selectedFile.name}</p>
-              )}
-            </div>
+            </button>
+            <span className="pointer-events-none absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface shadow-cl">
+              <Camera className="h-3 w-3 text-muted-foreground" />
+            </span>
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
           </div>
+          <div>
+            <p className="text-sm font-medium">Profile photo</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Click the avatar to upload a new photo. Max 10 MB.</p>
+            {selectedFile && <p className="mt-0.5 text-xs font-medium text-accent-ink">{selectedFile.name}</p>}
+          </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">First name</label>
-              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className={labelCls}>First name</label>
+            <Input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>Last name</label>
+            <Input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>Email</label>
+            <div className="flex h-10 items-center justify-between gap-2 rounded-xl bg-sunken px-3 text-sm text-muted-foreground">
+              <span className="truncate">{user?.email || ""}</span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-ok">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Verified
+              </span>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Last name</label>
-              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </div>
+            <p className="mt-1.5 text-[11px] text-faint">Used to sign in. Contact support to change it.</p>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Email</label>
-            <Input value={user?.email || ""} disabled className="opacity-50" />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Phone number</label>
-            <Input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+1234567890" />
-          </div>
-          <Button onClick={handleSave} disabled={saving} className="gap-2">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        </div>
+
+        <div className="mt-4 sm:max-w-[calc(33.333%-0.67rem)]">
+          <label className={labelCls}>Phone number</label>
+          <Input
+            className={inputCls}
+            value={phoneNumber}
+            onChange={(e) => setPhoneNumber(e.target.value)}
+            placeholder="+1234567890"
+          />
+        </div>
+
+        <div className="mt-6 flex justify-end border-t border-border pt-5">
+          <Button onClick={handleSave} disabled={saving || !dirty} className="gap-2 rounded-xl px-5">
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Save changes
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsCard>
 
-      {/* Appearance */}
-      <Card className="border-border/30">
-        <CardHeader>
-          <CardTitle className="text-base">Appearance</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" className="gap-2" onClick={toggleTheme}>
-            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            Switch to {theme === "dark" ? "light" : "dark"} mode
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Danger Zone */}
-      <Card className="border-destructive/30">
-        <CardHeader>
-          <CardTitle className="text-base text-destructive">Danger Zone</CardTitle>
-          <CardDescription>Permanently delete your account and all associated data</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" className="gap-2" onClick={() => setShowStep1(true)}>
-            <Trash2 className="w-4 h-4" /> Delete Account
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-destructive/30 bg-surface px-5 py-4">
+        <div>
+          <p className="text-sm font-medium">Delete account</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Permanently delete your account and all associated data. This can&apos;t be undone.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2 rounded-xl border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={() => setShowStep1(true)}
+        >
+          <Trash2 className="h-4 w-4" /> Delete account
+        </Button>
+      </div>
 
       {/* Step 1: Data loss warning */}
       <AlertDialog open={showStep1} onOpenChange={setShowStep1}>

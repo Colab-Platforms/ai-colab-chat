@@ -32,7 +32,9 @@ class UserPreferenceService {
       updateData.enableFollowUpQuestions = data.enableFollowUpQuestions;
     }
 
-
+    if (data.voiceId !== undefined) {
+      updateData.voiceId = data.voiceId;
+    }
 
     const preference = await prisma.userPreference.upsert({
       where: { userId },
@@ -40,6 +42,7 @@ class UserPreferenceService {
       create: {
         userId,
         enableFollowUpQuestions: data.enableFollowUpQuestions ?? true,
+        voiceId: data.voiceId ?? null,
       },
     });
 

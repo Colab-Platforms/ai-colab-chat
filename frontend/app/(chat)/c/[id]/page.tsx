@@ -1,11 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { notFound, useParams } from "next/navigation";
-import { chatService, modelService, messageService, assistantService } from "@/lib/services";
+import { chatService, modelService, messageService, assistantService, folderService } from "@/lib/services";
 import { MessageList } from "@/components/chat/message-list";
+import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
-import { toast } from "react-toastify";
+import { ProjectBanner } from "@/components/chat/project-banner";
+import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
+import { videoService } from "@/lib/services";
+import type { GeneratedVideo } from "@/components/chat/video-card";
+import { toast } from "@/lib/toast";
+import { createSmoothRevealer } from "@/lib/smoothReveal";
+import {
+  affectsCodeTurn,
+  codeWorkspace,
+  isCodeStreamEvent,
+  reduceCodeTurn,
+  useCodeWorkspace,
+} from "@/features/code-workspace";
 import * as LucideIcons from "lucide-react";
 import { Bot, Sparkles, MessageSquare } from "lucide-react";
 
@@ -22,6 +35,16 @@ interface Model {
   externalId?: string;
   isDefault?: boolean;
   defaultForCapabilities?: string[];
+  isFreeModel?: boolean;
+}
+
+const DEFAULT_FREE_MODEL_NAME = "Nemotron 3 Nano Omni (Free)";
+
+function findDefaultFreeModel(models: Model[]): Model | undefined {
+  return (
+    models.find((m) => m.isFreeModel && m.name === DEFAULT_FREE_MODEL_NAME) ||
+    models.find((m) => m.isFreeModel)
+  );
 }
 
 interface Message {
@@ -67,7 +90,13 @@ export default function ChatPage() {
   const [editVersionIndices, setEditVersionIndices] = useState<Record<number, number>>({});
   const [isNotFound, setIsNotFound] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
-  const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string } | null>(null);
+  const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string; supportsCodeMode?: boolean } | null>(null);
+  const codePanelOpen = useCodeWorkspace((s) => s.isOpen);
+  const [folder, setFolder] = useState<{ name: string; description?: string | null } | null>(null);
+  const [chatTitle, setChatTitle] = useState("");
+  // Documents studio: format/template chosen up front, sent with the first message only.
+  const documentOptionsRef = useRef<{ documentFormat: string; documentTheme?: string } | null>(null);
+  const folderIdRef = useRef<number | null>(null);
   const firstMessageSent = useRef(false);
   const isStreamingRef = useRef(false);
   const fetchChatInFlightRef = useRef<Promise<void> | null>(null);
@@ -76,6 +105,35 @@ export default function ChatPage() {
   const streamAbortControllersRef = useRef<AbortController[]>([]);
   const stopRequestedRef = useRef(false);
   const [chatCapability, setChatCapability] = useState<any>("STANDARD");
+  const [videoDialogOpen, setVideoDialogOpen] = useState(false);
+  const [videos, setVideos] = useState<GeneratedVideo[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    videoService
+      .list({ chatId: String(chatId) })
+      .then((res) => {
+        if (!cancelled && res.data?.data?.items) setVideos(res.data.data.items);
+      })
+      .catch(() => {
+        /* no videos yet, or a transient failure — either way, start empty */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId]);
+
+  const handleGenerateVideo = useCallback(
+    async (params: VideoGenerateParams) => {
+      const res = await videoService.create({ ...params, chatId });
+      if (res.data?.data) setVideos((prev) => [...prev, res.data.data]);
+    },
+    [chatId],
+  );
+
+  const handleVideoDeleted = useCallback((id: number) => {
+    setVideos((prev) => prev.filter((v) => v.id !== id));
+  }, []);
   const [maxModels, setMaxModels] = useState<number>(1); // 1 = single mode (default)
 
   useEffect(() => {
@@ -114,8 +172,11 @@ export default function ChatPage() {
   const stopStreaming = useCallback(() => {
     stopRequestedRef.current = true;
     streamAbortControllersRef.current.forEach((controller) => controller.abort());
+    // Closing the connection no longer stops the server-side job (so that
+    // leaving the page doesn't), so tell it explicitly.
+    void chatService.stop(chatId).catch(() => {});
     toast.info("Generation stopped");
-  }, []);
+  }, [chatId]);
 
   const fetchChat = useCallback(async (force = false) => {
     const now = Date.now();
@@ -131,6 +192,7 @@ export default function ChatPage() {
     try {
       const res = await chatService.getById(chatId);
       const chat = res.data.data;
+      setChatTitle(chat.title || "");
 
       if (chat.assistantId) {
         try {
@@ -139,6 +201,21 @@ export default function ChatPage() {
         } catch { /* ignore */ }
       } else {
         setAssistant(null);
+      }
+
+      if (chat.folderId) {
+        if (folderIdRef.current !== chat.folderId) {
+          folderIdRef.current = chat.folderId;
+          try {
+            const fRes = await folderService.getById(chat.folderId);
+            setFolder(fRes.data.data);
+          } catch {
+            setFolder(null);
+          }
+        }
+      } else if (folderIdRef.current !== null) {
+        folderIdRef.current = null;
+        setFolder(null);
       }
 
       setMessages((prev) => {
@@ -259,7 +336,10 @@ export default function ChatPage() {
             firstMessageSent.current = true;
             sessionStorage.removeItem(`pending_chat_${chatId}`);
             try {
-              const { content, modelIds, chatType, attachmentIds, attachmentObjects } = JSON.parse(raw);
+              const { content, modelIds, chatType, attachmentIds, attachmentObjects, documentFormat, documentTheme } = JSON.parse(raw);
+              documentOptionsRef.current = documentFormat
+                ? { documentFormat, ...(documentTheme ? { documentTheme } : {}) }
+                : null;
               const targetIds = Array.isArray(modelIds) && modelIds.length > 0 ? modelIds : resolvedModelIds;
               setSelectedModels(targetIds);
               void (async () => {
@@ -304,6 +384,19 @@ export default function ChatPage() {
       localStorage.setItem("preferredModelId", String(ids[0]));
     }
   };
+
+  // "Use this" on a multi-model answer: continue with that model alone.
+  useEffect(() => {
+    const onUseModel = (e: Event) => {
+      const id = (e as CustomEvent).detail?.modelId;
+      if (typeof id !== "number") return;
+      setMaxModels(1);
+      void handleModelChange([id]);
+    };
+    window.addEventListener("ai-colab:use-model", onUseModel);
+    return () => window.removeEventListener("ai-colab:use-model", onUseModel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   const handleCapabilityChange = async (type: string) => {
     setChatCapability(type);
@@ -367,6 +460,7 @@ export default function ChatPage() {
     attachmentIds?: number[],
     signal?: AbortSignal,
     tempUserMsgId?: number,
+    replaceModelId?: number,
   ) => {
     return fetch(`${apiUrl}/chats/${chatId}/send`, {
       method: "POST",
@@ -382,12 +476,16 @@ export default function ChatPage() {
         userMessageId,
         assistantMessageId,
         ...(attachmentIds && attachmentIds.length > 0 ? { attachmentIds } : {}),
+        ...(replaceModelId ? { replaceModelId } : {}),
+        ...(documentOptionsRef.current ?? {}),
       }),
       signal,
     }).then(async (response) => {
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to send message");
+        const err: any = new Error(errData.message || "Failed to send message");
+        err.code = errData.code;
+        throw err;
       }
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -396,9 +494,27 @@ export default function ChatPage() {
       let currentMsgId = streamingMsgId;
       let lastDonePayload: any = null;
       let streamEndedWithError = false;
+      const revealer = createSmoothRevealer({
+        disabled: chatType === "IMAGE_GENERATION",
+        onUpdate: (text) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === currentMsgId
+                ? {
+                    ...msg,
+                    modelResponses: msg.modelResponses?.map((mr: any) =>
+                      mr.model.id === mid
+                        ? { ...mr, content: text, status: "STREAMING" }
+                        : mr
+                    ),
+                  }
+                : msg
+            )
+          );
+        },
+      });
+      try {
       if (reader) {
-        let lastUpdate = Date.now();
-        const THROTTLE_MS = 60;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -432,27 +548,13 @@ export default function ChatPage() {
                 currentMsgId = aId;
               } else if (parsed.type === "token") {
                 accumulated += parsed.content;
-                const now = Date.now();
-                if (now - lastUpdate > THROTTLE_MS) {
-                  lastUpdate = now;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === currentMsgId
-                        ? {
-                            ...msg,
-                            modelResponses: msg.modelResponses?.map((mr: any) =>
-                              mr.model.id === mid
-                                ? { ...mr, content: accumulated, status: "STREAMING" }
-                                : mr
-                            ),
-                          }
-                        : msg
-                    )
-                  );
-                }
+                revealer.push(accumulated);
               } else if (parsed.type === "error") {
                 streamEndedWithError = true;
+                revealer.stop();
                 const errorMessage = parsed.message || FAILED_GENERATION_COPY;
+                const insufficientBalance = parsed.code === "INSUFFICIENT_BALANCE";
+                const planRestricted = parsed.code === "PLAN_RESTRICTED";
                 accumulated = errorMessage;
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -461,7 +563,7 @@ export default function ChatPage() {
                           ...msg,
                           modelResponses: msg.modelResponses?.map((mr: any) =>
                             mr.model.id === mid
-                              ? { ...mr, content: errorMessage, status: "FAILED" }
+                              ? { ...mr, content: errorMessage, status: "FAILED", insufficientBalance, planRestricted }
                               : mr
                           ),
                         }
@@ -471,35 +573,71 @@ export default function ChatPage() {
                 toast.error(
                   `${modelsRef.current.find((m) => m.id === mid)?.name || "Model"}: ${errorMessage}`,
                 );
+              } else if (parsed.type === "document_started") {
+                // Generation outlives this SSE connection, so we only attach a
+                // PENDING placeholder here — DocumentCard polls it to completion
+                // on its own, leaving the user free to keep chatting.
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === currentMsgId
+                      ? {
+                          ...msg,
+                          modelResponses: msg.modelResponses?.map((mr: any) =>
+                            mr.model.id === mid
+                              ? {
+                                  ...mr,
+                                  generatedDocuments: [
+                                    ...(mr.generatedDocuments || []).filter(
+                                      (d: any) => d.id !== parsed.documentId,
+                                    ),
+                                    {
+                                      id: parsed.documentId,
+                                      status: "PENDING",
+                                      format: parsed.format || "PDF",
+                                      title: parsed.title || "Document",
+                                    },
+                                  ],
+                                }
+                              : mr,
+                          ),
+                        }
+                      : msg,
+                  ),
+                );
               } else if (parsed.type === "done") {
                 // Capture final usage/meta; actual state update happens after stream ends.
                 lastDonePayload = parsed;
+              } else if (isCodeStreamEvent(parsed)) {
+                // Code workspace turn: the files go to the panel (store), the
+                // bubble only tracks the steps + project card (codeTurn).
+                codeWorkspace.applyStreamEvent(parsed, chatId);
+                if (affectsCodeTurn(parsed)) {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === currentMsgId
+                        ? {
+                            ...msg,
+                            modelResponses: msg.modelResponses?.map((mr: any) =>
+                              mr.model.id === mid ? { ...mr, codeTurn: reduceCodeTurn(mr.codeTurn, parsed) } : mr,
+                            ),
+                          }
+                        : msg,
+                    ),
+                  );
+                }
               }
             } catch { /* ignore parse errors */ }
           }
         }
       }
 
-      if (accumulated) {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === currentMsgId
-              ? {
-                  ...msg,
-                  modelResponses: msg.modelResponses?.map((mr: any) =>
-                    mr.model.id === mid
-                      ? { ...mr, content: accumulated, status: "STREAMING" }
-                      : mr
-                  ),
-                }
-              : msg
-          )
-        );
-      }
-
       if (streamEndedWithError) {
         return;
       }
+
+      // Let the smooth reveal catch up to the fully received text before
+      // finalizing status, so the tail of the response doesn't jump-cut in.
+      await revealer.finish();
 
       // After the stream ends, decide how to finalize based on accumulated content.
       const trimmed = accumulated.trim();
@@ -549,15 +687,29 @@ export default function ChatPage() {
             : msg
         )
       );
+      } finally {
+        revealer.stop();
+        // No-op unless the stream died mid-project (stop / network drop).
+        codeWorkspace.endStream();
+      }
     });
   };
 
-  const retryFailedAssistant = async (assistantMessageId: number, modelId: number) => {
+  // Regenerates a failed assistant response, optionally switching to a
+  // different model (e.g. the free fallback). `oldModelId` is unpersisted
+  // (see below) when the original attempt failed before the turn's
+  // messages were ever created server-side (the pre-stream balance check),
+  // in which case we must resend as a brand-new turn rather than retry
+  // in place against ids the backend has never heard of.
+  const regenerateWithModel = async (assistantMessageId: number, oldModelId: number, newModelId: number) => {
     if (isSending) return;
     const idx = messages.findIndex((m) => m.id === assistantMessageId);
     if (idx <= 0) return;
     const userMsg = messages[idx - 1];
     if (userMsg.role !== "USER") return;
+    const assistantRow = messages[idx];
+    const failedResp = assistantRow.modelResponses?.find((mr: any) => mr.model.id === oldModelId);
+    const isUnpersisted = Boolean((failedResp as any)?.unpersisted);
 
     stopRequestedRef.current = false;
     clearStreamAbortControllers();
@@ -565,14 +717,25 @@ export default function ChatPage() {
     setIsStreaming(true);
     isStreamingRef.current = true;
 
+    const newModelMeta = modelsRef.current.find((m) => m.id === newModelId);
+
     setMessages((prev) =>
       prev.map((msg) =>
         msg.id === assistantMessageId
           ? {
               ...msg,
               modelResponses: msg.modelResponses?.map((mr: any) =>
-                mr.model.id === modelId
-                  ? { ...mr, content: "", status: "STREAMING", tokensUsed: null }
+                mr.model.id === oldModelId
+                  ? {
+                      ...mr,
+                      model: newModelMeta ? { id: newModelMeta.id, name: newModelMeta.name } : mr.model,
+                      content: "",
+                      status: "STREAMING",
+                      tokensUsed: null,
+                      insufficientBalance: false,
+                      planRestricted: false,
+                      unpersisted: false,
+                    }
                   : mr
               ),
             }
@@ -582,7 +745,6 @@ export default function ChatPage() {
 
     const token = localStorage.getItem("token") || "";
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-    const assistantRow = messages.find((m) => m.id === assistantMessageId);
     const chatType =
       assistantRow?.chatType ||
       (typeof window !== "undefined"
@@ -595,23 +757,64 @@ export default function ChatPage() {
 
     try {
       const controller = createStreamAbortController();
-      await streamSingleModel(
-        modelId,
-        assistantMessageId,
-        token,
-        apiUrl,
-        userMsg.content,
-        chatType,
-        userMsg.id,
-        assistantMessageId,
-        attachmentIds,
-        controller.signal,
-        undefined,
-      );
+      if (isUnpersisted) {
+        // Nothing was ever saved for this turn — resend fresh, reusing the
+        // same local bubble ids so the UI doesn't jump.
+        await streamSingleModel(
+          newModelId,
+          assistantMessageId,
+          token,
+          apiUrl,
+          userMsg.content,
+          chatType,
+          0,
+          0,
+          attachmentIds,
+          controller.signal,
+          userMsg.id,
+        );
+      } else {
+        await streamSingleModel(
+          newModelId,
+          assistantMessageId,
+          token,
+          apiUrl,
+          userMsg.content,
+          chatType,
+          userMsg.id,
+          assistantMessageId,
+          attachmentIds,
+          controller.signal,
+          undefined,
+          oldModelId,
+        );
+      }
       window.setTimeout(() => fetchChat(true), 2000);
     } catch (err: any) {
       if (isAbortError(err) || stopRequestedRef.current) {
         syncChatAfterStop();
+      } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === assistantMessageId
+              ? {
+                  ...msg,
+                  modelResponses: msg.modelResponses?.map((mr: any) =>
+                    mr.model.id === newModelId
+                      ? {
+                          ...mr,
+                          status: "FAILED",
+                          content: err.message || "Insufficient balance.",
+                          insufficientBalance: err.code === "INSUFFICIENT_BALANCE",
+                          planRestricted: err.code === "PLAN_RESTRICTED",
+                          unpersisted: isUnpersisted,
+                        }
+                      : mr
+                  ),
+                }
+              : msg
+          )
+        );
       } else {
         toast.error(err.message || "Retry failed");
       }
@@ -622,6 +825,24 @@ export default function ChatPage() {
       setIsStreaming(false);
       stopRequestedRef.current = false;
     }
+  };
+
+  const retryFailedAssistant = (assistantMessageId: number, modelId: number) =>
+    regenerateWithModel(assistantMessageId, modelId, modelId);
+
+  const handleSwitchToFreeModel = (assistantMessageId: number, oldModelId: number) => {
+    const freeModel = findDefaultFreeModel(modelsRef.current);
+    if (!freeModel) {
+      toast.error("No free model is currently available");
+      return;
+    }
+    // Carry the switch forward: make the free model the chat's active
+    // selection so the next message doesn't hit the same paid model and
+    // re-trigger this same prompt.
+    if (selectedModelsRef.current.length <= 1 || selectedModelsRef.current.includes(oldModelId)) {
+      handleModelChange([freeModel.id]);
+    }
+    regenerateWithModel(assistantMessageId, oldModelId, freeModel.id);
   };
 
   const sendMessage = async (content: string, attachmentIds?: number[], modelIds?: number[], chatType?: string, attachmentObjects?: any[]) => {
@@ -638,12 +859,15 @@ export default function ChatPage() {
       setIsStreaming(false);
       return;
     }
-    if (chatType) {
-      setChatCapability(chatType);
+    // "CODE" (code-workspace pill) is sent for this turn only — it is not a
+    // capability and must not be saved on the chat.
+    const capability = chatType === "CODE" ? "STANDARD" : chatType;
+    if (capability) {
+      setChatCapability(capability);
     }
     // Do not block streaming on metadata update.
     chatService
-      .update(chatId, { modelIds: targetModelIds, capability: chatType || "STANDARD" })
+      .update(chatId, { modelIds: targetModelIds, capability: capability || "STANDARD" })
       .catch(() => { /* ignore */ });
     const tempUserMsgId = Date.now();
     setMessages((prev) => [...prev.filter(m => m.id !== -1), {
@@ -720,7 +944,7 @@ export default function ChatPage() {
                   ? {
                       ...msg,
                       modelResponses: msg.modelResponses?.map((mr: any) =>
-                        mr.model.id === mid ? { ...mr, status: "FAILED", content: mr.content || "Generation stopped by user." } : mr
+                        mr.model.id === mid ? { ...mr, status: "FAILED", content: mr.content || "Generation stopped by user.", finishReason: "user_aborted" } : mr
                       ),
                     }
                   : msg
@@ -734,7 +958,15 @@ export default function ChatPage() {
                 ? {
                     ...msg,
                     modelResponses: msg.modelResponses?.map((mr: any) =>
-                      mr.model.id === mid ? { ...mr, status: "FAILED", content: result.reason?.message || "Failed" } : mr
+                      mr.model.id === mid
+                        ? {
+                            ...mr,
+                            status: "FAILED",
+                            content: result.reason?.message || "Failed",
+                            insufficientBalance: result.reason?.code === "INSUFFICIENT_BALANCE",
+                            planRestricted: result.reason?.code === "PLAN_RESTRICTED",
+                          }
+                        : mr
                     ),
                   }
                 : msg
@@ -761,7 +993,7 @@ export default function ChatPage() {
               ? {
                   ...msg,
                   modelResponses: msg.modelResponses?.map((mr: any) =>
-                    mr.status === "STREAMING" ? { ...mr, status: "FAILED", content: mr.content || "Generation stopped by user." } : mr
+                    mr.status === "STREAMING" ? { ...mr, status: "FAILED", content: mr.content || "Generation stopped by user.", finishReason: "user_aborted" } : mr
                   ),
                 }
               : msg
@@ -769,6 +1001,27 @@ export default function ChatPage() {
         );
         isStreamingRef.current = false;
         syncChatAfterStop();
+      } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
+        // Nothing was persisted server-side yet (the balance check runs
+        // before the turn's messages are created) — keep the local bubble
+        // so the user can still choose to switch to a free model or upgrade.
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === streamingMsgId
+              ? {
+                  ...msg,
+                  modelResponses: msg.modelResponses?.map((mr: any) => ({
+                    ...mr,
+                    status: "FAILED",
+                    content: err.message || "Insufficient balance.",
+                    insufficientBalance: err.code === "INSUFFICIENT_BALANCE",
+                    planRestricted: err.code === "PLAN_RESTRICTED",
+                    unpersisted: true,
+                  })),
+                }
+              : msg
+          )
+        );
       } else {
         toast.error(err.message || "Failed to send message");
         setMessages((prev) => prev.filter((m) => m.id !== tempUserMsgId && m.id !== streamingMsgId));
@@ -817,6 +1070,7 @@ export default function ChatPage() {
       return msg;
     }));
     setActiveModelTabs((prev) => ({ ...prev, [messageId]: modelId }));
+    let revealer: ReturnType<typeof createSmoothRevealer> | null = null;
     try {
       const token = localStorage.getItem("token");
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -829,12 +1083,31 @@ export default function ChatPage() {
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to regenerate message");
+        const err: any = new Error(errData.message || "Failed to regenerate message");
+        err.code = errData.code;
+        throw err;
       }
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
       let buffer = "";
+      revealer = createSmoothRevealer({
+        disabled: localStorage.getItem("preferredChatType") === "IMAGE_GENERATION",
+        onUpdate: (text) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId
+                ? {
+                    ...msg,
+                    modelResponses: msg.modelResponses?.map((mr: any) =>
+                      mr.id === streamingRespId ? { ...mr, content: text, status: "STREAMING" } : mr
+                    ),
+                  }
+                : msg
+            )
+          );
+        },
+      });
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
@@ -868,19 +1141,9 @@ export default function ChatPage() {
                 });
               } else if (parsed.type === "token") {
                 accumulated += parsed.content;
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === messageId
-                      ? {
-                          ...msg,
-                          modelResponses: msg.modelResponses?.map((mr: any) =>
-                            mr.id === streamingRespId ? { ...mr, content: accumulated, status: "STREAMING" } : mr
-                          ),
-                        }
-                      : msg
-                  )
-                );
+                revealer.push(accumulated);
               } else if (parsed.type === "error") {
+                revealer.stop();
                 const errorMessage = parsed.message || "Generation failed";
                 accumulated = errorMessage;
                 setMessages((prev) =>
@@ -889,7 +1152,15 @@ export default function ChatPage() {
                       ? {
                           ...msg,
                           modelResponses: msg.modelResponses?.map((mr: any) =>
-                            mr.id === streamingRespId ? { ...mr, content: errorMessage, status: "FAILED" } : mr
+                            mr.id === streamingRespId
+                              ? {
+                                  ...mr,
+                                  content: errorMessage,
+                                  status: "FAILED",
+                                  insufficientBalance: parsed.code === "INSUFFICIENT_BALANCE",
+                                  planRestricted: parsed.code === "PLAN_RESTRICTED",
+                                }
+                              : mr
                           ),
                         }
                       : msg
@@ -897,21 +1168,22 @@ export default function ChatPage() {
                 );
                 toast.error(errorMessage);
               } else if (parsed.type === "done") {
+                await revealer.finish();
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === messageId
                       ? {
                           ...msg,
                           modelResponses: msg.modelResponses?.map((mr: any) =>
-                            mr.id === streamingRespId 
-                              ? { 
-                                  ...mr, 
+                            mr.id === streamingRespId
+                              ? {
+                                  ...mr,
                                   id: parsed.modelResponseId || mr.id,
-                                  content: accumulated, 
-                                  status: "COMPLETED", 
+                                  content: accumulated,
+                                  status: "COMPLETED",
                                   finishReason: parsed.finishReason,
                                   tokensUsed: parsed.totalTokens,
-                                } 
+                                }
                               : mr
                           ),
                         }
@@ -932,7 +1204,7 @@ export default function ChatPage() {
           return {
             ...msg,
             modelResponses: msg.modelResponses?.map((mr: any) =>
-              mr.id === streamingRespId ? { ...mr, status: "FAILED", content: mr.content || "Generation stopped by user." } : mr
+              mr.id === streamingRespId ? { ...mr, status: "FAILED", content: mr.content || "Generation stopped by user.", finishReason: "user_aborted" } : mr
             )
           };
         }));
@@ -948,6 +1220,7 @@ export default function ChatPage() {
         }));
       }
     } finally {
+      revealer?.stop();
       clearStreamAbortControllers();
       isStreamingRef.current = false;
       setIsSending(false);
@@ -1078,7 +1351,7 @@ export default function ChatPage() {
                   ? {
                       ...msg,
                       modelResponses: msg.modelResponses?.map((mr: any) =>
-                        mr.model.id === mid ? { ...mr, content: mr.content || "Generation stopped by user.", status: "FAILED" } : mr
+                        mr.model.id === mid ? { ...mr, content: mr.content || "Generation stopped by user.", status: "FAILED", finishReason: "user_aborted" } : mr
                       ),
                     }
                   : msg
@@ -1092,7 +1365,15 @@ export default function ChatPage() {
                 ? {
                     ...msg,
                     modelResponses: msg.modelResponses?.map((mr: any) =>
-                      mr.model.id === mid ? { ...mr, content: res.reason.message || "Failed", status: "FAILED" } : mr
+                      mr.model.id === mid
+                        ? {
+                            ...mr,
+                            content: res.reason.message || "Failed",
+                            status: "FAILED",
+                            insufficientBalance: res.reason?.code === "INSUFFICIENT_BALANCE",
+                            planRestricted: res.reason?.code === "PLAN_RESTRICTED",
+                          }
+                        : mr
                     ),
                   }
                 : msg
@@ -1145,6 +1426,7 @@ export default function ChatPage() {
       return msg;
     }));
     setActiveModelTabs((prev) => ({ ...prev, [messageId]: modelId }));
+    let revealer: ReturnType<typeof createSmoothRevealer> | null = null;
     try {
       const token = localStorage.getItem("token");
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -1157,15 +1439,33 @@ export default function ChatPage() {
       });
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || "Failed to continue message");
+        const err: any = new Error(errData.message || "Failed to continue message");
+        err.code = errData.code;
+        throw err;
       }
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
       let buffer = "";
+      revealer = createSmoothRevealer({
+        initialShown: existingContent,
+        disabled: localStorage.getItem("preferredChatType") === "IMAGE_GENERATION",
+        onUpdate: (text) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === messageId
+                ? {
+                    ...msg,
+                    modelResponses: msg.modelResponses?.map((r: any) =>
+                      r.model.id === modelId ? { ...r, content: text, status: "STREAMING" } : r
+                    ),
+                  }
+                : msg
+            )
+          );
+        },
+      });
       if (reader) {
-        let lastUpdate = Date.now();
-        const THROTTLE_MS = 60;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -1197,23 +1497,9 @@ export default function ChatPage() {
                 });
               } else if (parsed.type === "token") {
                 accumulated += parsed.content;
-                const now = Date.now();
-                if (now - lastUpdate > THROTTLE_MS) {
-                  lastUpdate = now;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === messageId
-                        ? {
-                            ...msg,
-                            modelResponses: msg.modelResponses?.map((r: any) =>
-                              r.model.id === modelId ? { ...r, content: existingContent + accumulated, status: "STREAMING" } : r
-                            ),
-                          }
-                        : msg
-                    )
-                  );
-                }
+                revealer.push(existingContent + accumulated);
               } else if (parsed.type === "error") {
+                revealer.stop();
                 const errorMessage = parsed.message || "Generation failed";
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -1221,7 +1507,15 @@ export default function ChatPage() {
                       ? {
                           ...msg,
                           modelResponses: msg.modelResponses?.map((r: any) =>
-                            r.model.id === modelId ? { ...r, content: existingContent + accumulated, status: "FAILED" } : r
+                            r.model.id === modelId
+                              ? {
+                                  ...r,
+                                  content: existingContent + accumulated,
+                                  status: "FAILED",
+                                  insufficientBalance: parsed.code === "INSUFFICIENT_BALANCE",
+                                  planRestricted: parsed.code === "PLAN_RESTRICTED",
+                                }
+                              : r
                           ),
                         }
                       : msg
@@ -1229,20 +1523,21 @@ export default function ChatPage() {
                 );
                 toast.error(errorMessage);
               } else if (parsed.type === "done") {
+                await revealer.finish();
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === messageId
                       ? {
                           ...msg,
                           modelResponses: msg.modelResponses?.map((r: any) =>
-                            r.model.id === modelId 
-                              ? { 
-                                  ...r, 
-                                  content: existingContent + accumulated, 
-                                  status: "COMPLETED", 
+                            r.model.id === modelId
+                              ? {
+                                  ...r,
+                                  content: existingContent + accumulated,
+                                  status: "COMPLETED",
                                   finishReason: parsed.finishReason,
                                   tokensUsed: (r.tokensUsed || 0) + (parsed.completionTokens || 0),
-                                } 
+                                }
                               : r
                           ),
                         }
@@ -1260,20 +1555,30 @@ export default function ChatPage() {
       if (isAbortError(err) || stopRequestedRef.current) {
         setMessages((prev) => prev.map(msg => {
           if (msg.id !== messageId) return msg;
-          return { ...msg, modelResponses: msg.modelResponses?.map((r: any) => r.model.id === modelId ? { ...r, status: "FAILED" } : r) };
+          return { ...msg, modelResponses: msg.modelResponses?.map((r: any) => r.model.id === modelId ? { ...r, status: "FAILED", finishReason: "user_aborted" } : r) };
         }));
         isStreamingRef.current = false;
         syncChatAfterStop();
       } else {
         toast.error(err.message || "Failed to continue message");
+        const insufficientBalance = err.code === "INSUFFICIENT_BALANCE";
+        const planRestricted = err.code === "PLAN_RESTRICTED";
         setMessages((prev) => prev.map(msg => {
           if (msg.id === messageId) {
-             return { ...msg, modelResponses: msg.modelResponses?.map((r: any) => r.model.id === modelId ? { ...r, status: "FAILED" } : r) };
+             return {
+               ...msg,
+               modelResponses: msg.modelResponses?.map((r: any) =>
+                 r.model.id === modelId
+                   ? { ...r, status: "FAILED", content: (insufficientBalance || planRestricted) ? err.message : r.content, insufficientBalance, planRestricted }
+                   : r
+               ),
+             };
           }
           return msg;
         }));
       }
     } finally {
+      revealer?.stop();
       clearStreamAbortControllers();
       isStreamingRef.current = false;
       setIsSending(false);
@@ -1282,6 +1587,29 @@ export default function ChatPage() {
     }
   };
 
+  // A generation keeps running on the server when the page is left (tab
+  // switch, navigation, reload). Coming back, the answer may still be in
+  // flight, so keep checking until it lands instead of showing a blank reply.
+  const awaitingServerResult = useMemo(() => {
+    if (isStreaming) return false;
+    const TEN_MINUTES = 10 * 60 * 1000;
+    return messages.some((m: any) => {
+      if (m.role !== "ASSISTANT" || !m.createdAt) return false;
+      const age = Date.now() - new Date(m.createdAt).getTime();
+      if (!(age >= 0 && age < TEN_MINUTES)) return false;
+      const responses = m.modelResponses || [];
+      return responses.length === 0 || responses.some((r: any) => r.status === "STREAMING" || r.status === "PENDING");
+    });
+  }, [messages, isStreaming]);
+
+  useEffect(() => {
+    if (!awaitingServerResult) return;
+    const timer = window.setInterval(() => {
+      void fetchChat(true);
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [awaitingServerResult, fetchChat]);
+
   if (isNotFound) {
     notFound();
     return null;
@@ -1289,6 +1617,13 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-full">
+      <ChatHeader
+        chatId={chatId}
+        title={chatTitle}
+        models={models.filter((m) => selectedModels.includes(m.id))}
+        onTitleChange={setChatTitle}
+      />
+      {folder && <ProjectBanner name={folder.name} />}
       <MessageList
         messages={messages}
         activeModelTabs={activeModelTabs}
@@ -1302,24 +1637,42 @@ export default function ChatPage() {
         onToggleStar={handleToggleStar}
         onContinue={handleContinueGeneration}
         onRetryAssistantResponse={retryFailedAssistant}
+        onSwitchToFreeModel={handleSwitchToFreeModel}
         bottomAnchorId="chat-bottom-anchor"
         forceScrollToBottom={shouldForceScrollFromStarred}
         scrollContainerId="chat-scroll-container"
+        videos={videos}
+        onVideoDeleted={handleVideoDeleted}
+      />
+      <VideoGenerateDialog
+        open={videoDialogOpen}
+        onOpenChange={setVideoDialogOpen}
+        onSubmit={handleGenerateVideo}
       />
       <ChatInput
         models={models}
         selectedModels={selectedModels}
         onModelChange={handleModelChange}
         maxModels={maxModels}
-        onSend={(content, attachmentIds, chatType, attachmentObjects) => sendMessage(content, attachmentIds, undefined, chatType, attachmentObjects)}
+        onSend={(content, attachmentIds, chatType, attachmentObjects) => {
+          documentOptionsRef.current = null;
+          sendMessage(content, attachmentIds, undefined, chatType, attachmentObjects);
+        }}
+        onGenerateVideoClick={() => setVideoDialogOpen(true)}
         onEnhancePrompt={handleEnhancePrompt}
-        isSending={isSending}
+        // Also "sending" while the server is still generating a reply this page
+        // did not start (came back after leaving) — so the Stop button shows.
+        isSending={isSending || awaitingServerResult}
         onStopStreaming={stopStreaming}
         initialPrompt={initialPrompt}
         onPromptClear={() => setInitialPrompt("")}
         onCapabilityChange={handleCapabilityChange}
         chatType={chatCapability}
         draftStorageKey={`chat_draft_${chatId}`}
+        supportsCodeMode={Boolean(assistant?.supportsCodeMode)}
+        placeholder={assistant?.supportsCodeMode && codePanelOpen ? "Ask AI to change the code…" : "Ask a follow-up…"}
+        compact
+        footerNote={selectedModels.length > 1 ? "Models can disagree. Compare the answers before acting on important ones." : undefined}
       />
     </div>
   );

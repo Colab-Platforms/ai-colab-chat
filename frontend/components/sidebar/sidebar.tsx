@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import {
   Dialog,
@@ -22,14 +21,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Search, Star } from "lucide-react";
+import { Plus, Search, Star, AudioLines, FolderArchive, Folder, SquarePen, FileText, ImageIcon, Clapperboard, type LucideIcon } from "lucide-react";
 import { chatService, folderService } from "@/lib/services";
-import { getRouteUiSnapshot, subscribeRouteUi, useIsStarredRoute } from "@/lib/route-ui-store";
-import { toast } from "react-toastify";
+import { getRouteUiSnapshot, subscribeRouteUi, useIsStarredRoute, useIsVoiceRoute, useIsAssetsRoute, useIsProjectsRoute, useActiveStudio } from "@/lib/route-ui-store";
+import { toast } from "@/lib/toast";
+import { startNewChatInFolder } from "@/lib/newChat";
 import { AppSidebar } from "./app-sidebar";
 import type { Assistant, Chat, FolderItem } from "./sidebar-types";
-import { ProjectsSection } from "./sidebar-projects-section";
-import { ContextsSectionContainer } from "./sidebar-contexts-section";
 import { AssistantsSection } from "./sidebar-assistants-section";
 import { ChatsSection } from "./sidebar-chats-section";
 
@@ -45,9 +43,48 @@ interface SidebarProps {
   onMobileClose: () => void;
   onLogout?: () => void;
   hasMore?: boolean;
+  loadingMoreChats?: boolean;
   onLoadMore?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+}
+
+function NavRow({
+  icon: Icon,
+  label,
+  active,
+  badge,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  active: boolean;
+  badge?: "New" | "Beta";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] transition-colors cursor-pointer ${
+        active
+          ? "bg-accent-soft text-accent-ink font-medium"
+          : "text-foreground hover:bg-sidebar-accent"
+      }`}
+    >
+      <Icon className={`w-4 h-4 shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`} />
+      <span className="min-w-0 truncate">{label}</span>
+      {badge && (
+        <span
+          className={`shrink-0 whitespace-nowrap text-[10px] font-semibold ${
+            badge === "New" ? "text-accent-ink" : "text-faint"
+          }`}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
 }
 
 function SidebarInner({
@@ -62,6 +99,7 @@ function SidebarInner({
   onMobileClose,
   onLogout,
   hasMore,
+  loadingMoreChats,
   onLoadMore,
   collapsed,
   onToggleCollapse,
@@ -85,46 +123,32 @@ function SidebarInner({
     routerRef.current = router;
   }, [router]);
   const isStarredRoute = useIsStarredRoute();
+  const isVoiceRoute = useIsVoiceRoute();
+  const isAssetsRoute = useIsAssetsRoute();
+  const isProjectsRoute = useIsProjectsRoute();
+  const activeStudio = useActiveStudio();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState(searchQuery);
-  const [expandedFolders, setExpandedFolders] = useState<Set<number>>(new Set());
-
-  const getDraftFolderScope = () => {
-    const arr = Array.from(expandedFolders);
-    if (arr.length === 1) return arr[0];
-    return null;
-  };
-  const [projectsExpanded, setProjectsExpanded] = useState(false);
-  const [contextsExpanded, setContextsExpanded] = useState(false);
-  const [assistantsExpanded, setAssistantsExpanded] = useState(true);
-  const [chatsExpanded, setChatsExpanded] = useState(true);
+  const [assistantsExpanded, setAssistantsExpanded] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const TOP_ACCORDION_STORAGE_KEY = "sidebarTopAccordionState_v1";
+  const TOP_ACCORDION_STORAGE_KEY = "sidebarTopAccordionState_v2";
   const [hasHydratedTopAccordion, setHasHydratedTopAccordion] = useState(false);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(TOP_ACCORDION_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<{
-        projectsExpanded: boolean;
-        contextsExpanded: boolean;
-        assistantsExpanded: boolean;
-        chatsExpanded: boolean;
-      }>;
+      const parsed = JSON.parse(raw) as Partial<{ assistantsExpanded: boolean }>;
 
-      if (typeof parsed.projectsExpanded === "boolean") setProjectsExpanded(parsed.projectsExpanded);
-      if (typeof parsed.contextsExpanded === "boolean") setContextsExpanded(parsed.contextsExpanded);
       if (typeof parsed.assistantsExpanded === "boolean") setAssistantsExpanded(parsed.assistantsExpanded);
-      if (typeof parsed.chatsExpanded === "boolean") setChatsExpanded(parsed.chatsExpanded);
     } catch {
       // ignore invalid localStorage payload
     } finally {
       setHasHydratedTopAccordion(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -132,30 +156,20 @@ function SidebarInner({
     try {
       localStorage.setItem(
         TOP_ACCORDION_STORAGE_KEY,
-        JSON.stringify({
-          projectsExpanded,
-          contextsExpanded,
-          assistantsExpanded,
-          chatsExpanded,
-        }),
+        JSON.stringify({ assistantsExpanded }),
       );
     } catch {
       // ignore quota / private browsing errors
     }
-  }, [hasHydratedTopAccordion, projectsExpanded, contextsExpanded, assistantsExpanded, chatsExpanded]);
+  }, [hasHydratedTopAccordion, assistantsExpanded]);
 
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [renameFolderTarget, setRenameFolderTarget] = useState<{ id: number; name: string } | null>(null);
-
-  const [deleteFolderTarget, setDeleteFolderTarget] = useState<number | null>(null);
 
   const [pendingMoveForChat, setPendingMoveForChat] = useState<number | null>(null);
   const [pendingMoveNewFolderId, setPendingMoveNewFolderId] = useState<number | null>(null);
   const sidebarRenderCountRef = useRef(0);
   const chatFolderByIdRef = useRef<Map<number, number | null>>(new Map());
-  const pendingNewChatContextsKey = "pending_new_chat_context_ids";
-  const pendingNewChatFolderIdKey = "pending_new_chat_folder_id";
 
   const safeFolders = useMemo(() => (Array.isArray(folders) ? folders : []), [folders]);
   const [localFolders, setLocalFolders] = useState<FolderItem[]>(safeFolders);
@@ -168,6 +182,23 @@ function SidebarInner({
   useEffect(() => {
     setSearch(searchQuery);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+    };
+    const onOpenAssistants = () => setAssistantsExpanded(true);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("ai-colab:open-assistants", onOpenAssistants);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("ai-colab:open-assistants", onOpenAssistants);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = () => {
@@ -237,35 +268,8 @@ function SidebarInner({
   };
 
   const handleNewChat = (folderId?: number | null) => {
-    const nextFolderId = folderId && folderId > 0 ? folderId : null;
-
     onMobileClose();
-    localStorage.removeItem("selectedAssistantId");
-    localStorage.removeItem(pendingNewChatContextsKey);
-    localStorage.removeItem(pendingNewChatFolderIdKey);
-    if (nextFolderId) {
-      localStorage.setItem(pendingNewChatFolderIdKey, String(nextFolderId));
-    }
-    window.dispatchEvent(new Event("assistant-selected"));
-
-    window.dispatchEvent(
-      new CustomEvent("pending-new-chat-folder-updated", {
-        detail: { folderId: nextFolderId },
-      }),
-    );
-    // HomeFolderScopeSync (app/(chat)/home/page.tsx) treats the URL's
-    // `folderId` param as the source of truth and clears localStorage whenever
-    // it's absent — so navigating to a bare "/home" would immediately wipe the
-    // value just set above. Carry it through the URL too so the two stay in sync.
-    const homeHref = nextFolderId ? `/home?folderId=${nextFolderId}` : "/home";
-    if (routeUiRef.current.isDraftRoute) {
-      // Already on the new-chat screen, so no navigation (and thus no
-      // HomeFolderScopeSync re-run) will happen. Update the URL in place
-      // anyway so it can't go stale and later resync localStorage backwards.
-      router.replace(homeHref);
-      return;
-    }
-    router.push(homeHref);
+    startNewChatInFolder(router, folderId, { isDraftRoute: routeUiRef.current.isDraftRoute });
   };
 
   const handleDeleteChat = async () => {
@@ -317,32 +321,6 @@ function SidebarInner({
     }
   };
 
-  const handleRenameFolder = async (folderId: number, newName: string) => {
-    try {
-      await folderService.update(folderId, { name: newName });
-      toast.success("Folder renamed");
-      onRefresh();
-      setRenameFolderTarget(null);
-    } catch {
-      toast.error("Failed to rename folder");
-    }
-  };
-
-  const handleDeleteFolder = async (deleteChats: boolean) => {
-    if (!deleteFolderTarget) return;
-    setDeleting(true);
-    try {
-      await folderService.delete(deleteFolderTarget, deleteChats);
-      toast.success(deleteChats ? "Folder and chats deleted" : "Folder deleted, chats moved out");
-      onRefresh();
-      setDeleteFolderTarget(null);
-    } catch {
-      toast.error("Failed to delete folder");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   const handleMoveChat = async (chatId: number, folderId: number | null) => {
     try {
       await chatService.update(chatId, { folderId });
@@ -382,53 +360,6 @@ function SidebarInner({
     }
   };
 
-  const syncDraftFolderScope = (nextFolderId: number | null) => {
-    try {
-      if (nextFolderId && nextFolderId > 0) {
-        localStorage.setItem(pendingNewChatFolderIdKey, String(nextFolderId));
-      } else {
-        localStorage.removeItem(pendingNewChatFolderIdKey);
-      }
-    } catch {
-      // localStorage can fail in some environments; accordion must still work.
-    }
-
-    try {
-      localStorage.removeItem(pendingNewChatContextsKey);
-    } catch {
-      // ignore
-    }
-
-    window.dispatchEvent(
-      new CustomEvent("pending-new-chat-folder-updated", {
-        detail: { folderId: nextFolderId },
-      }),
-    );
-  };
-
-  const toggleFolder = (folderId: number) => {
-    const isCurrentlyExpanded = expandedFolders.has(folderId);
-    const nextScopeFolderId: number | null = isCurrentlyExpanded ? null : folderId;
-
-    setExpandedFolders((prev) => {
-      const next = new Set<number>();
-      if (prev.has(folderId)) return next;
-      next.add(folderId);
-      return next;
-    });
-
-    // Always sync pending folder for new chat — not only when isDraftRoute. Otherwise
-    // switching folder 1 → 2 on /new (previously not "draft") or brief route/store lag
-    // leaves stale pending_new_chat_folder_id; NewChatPage reads LS at send time.
-    syncDraftFolderScope(nextScopeFolderId);
-  };
-
-  useEffect(() => {
-    if (projectsExpanded) return;
-    setExpandedFolders(new Set());
-    syncDraftFolderScope(null);
-  }, [projectsExpanded]);
-
   const handleOpenCreateFolderForMove = (chatId: number) => {
     setPendingMoveForChat(chatId);
     setPendingMoveNewFolderId(null);
@@ -461,7 +392,7 @@ function SidebarInner({
             variant="ghost"
             size="icon"
             className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded-lg cursor-pointer"
-            onClick={() => handleNewChat(getDraftFolderScope())}
+            onClick={() => handleNewChat()}
           >
             <Plus className="w-5 h-5" />
           </Button>
@@ -477,6 +408,7 @@ function SidebarInner({
             className="h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent rounded-lg cursor-pointer"
             onClick={() => {
               if (onToggleCollapse) onToggleCollapse();
+              setSearchOpen(true);
               setTimeout(() => {
                 searchInputRef.current?.focus();
               }, 100);
@@ -505,6 +437,60 @@ function SidebarInner({
         </TooltipTrigger>
         <TooltipContent side="right">Starred Messages</TooltipContent>
       </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-9 w-9 rounded-lg cursor-pointer ${
+              isVoiceRoute
+                ? "text-primary bg-primary/10 hover:bg-primary/15"
+                : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+            }`}
+            onClick={() => { onMobileClose(); router.push("/voice"); }}
+          >
+            <AudioLines className="w-4 h-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Voice Chats</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-9 w-9 rounded-lg cursor-pointer ${
+              isAssetsRoute
+                ? "text-primary bg-primary/10 hover:bg-primary/15"
+                : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+            }`}
+            onClick={() => { onMobileClose(); router.push("/assets"); }}
+          >
+            <FolderArchive className="w-4 h-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Assets Vault</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-9 w-9 rounded-lg cursor-pointer ${
+              isProjectsRoute
+                ? "text-primary bg-primary/10 hover:bg-primary/15"
+                : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+            }`}
+            onClick={() => { onMobileClose(); router.push("/projects"); }}
+          >
+            <Folder className="w-4 h-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Projects</TooltipContent>
+      </Tooltip>
     </>
   );
 
@@ -517,73 +503,58 @@ function SidebarInner({
       onLogout={onLogout}
       collapsedIcons={collapsedIcons}
     >
-      <div className="p-3 pb-2 space-y-2">
-        <Button
-          onClick={() => handleNewChat(getDraftFolderScope())}
-          className="w-full justify-start gap-2 h-10 bg-violet-200/70 hover:bg-violet-200 text-violet-900 dark:bg-violet-500/20 dark:hover:bg-violet-500/30 dark:text-violet-200 border-0 shadow-sm transition-colors cursor-pointer"
+      <div className="px-3 pb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => handleNewChat()}
+          className="flex-1 h-10 flex items-center gap-2 px-3 rounded-lg border border-border bg-surface text-[13.5px] font-medium text-foreground shadow-cl hover:border-line-strong transition-colors cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
-          New Chat
-        </Button>
+          <SquarePen className="w-4 h-4 text-primary" />
+          New chat
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSearchOpen((o) => !o);
+            setTimeout(() => searchInputRef.current?.focus(), 0);
+          }}
+          aria-label="Search chats"
+          className="h-10 flex items-center gap-1.5 px-3 rounded-lg border border-border bg-surface text-muted-foreground hover:border-line-strong transition-colors cursor-pointer"
+        >
+          <Search className="w-4 h-4" />
+          <span className="text-[11px] text-faint">⌘K</span>
+        </button>
       </div>
 
-      <div className="px-3 pb-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={searchInputRef}
-            placeholder="Search chats..."
-            value={search}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSearch(value);
-              onSearchChange(value);
-            }}
-            className="h-9 border-none bg-sidebar-accent/50 pl-9 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
-          />
+      {searchOpen && (
+        <div className="px-3 pb-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Search chats..."
+              value={search}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSearch(value);
+                onSearchChange(value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearch("");
+                  onSearchChange("");
+                  setSearchOpen(false);
+                }
+              }}
+              className="h-9 border-border bg-surface pl-9 text-sm focus-visible:ring-1 focus-visible:ring-primary/30 focus-visible:ring-offset-0"
+            />
+          </div>
         </div>
-      </div>
-
-      <Separator className="opacity-50" />
+      )}
 
       <ScrollArea className="flex-1 px-2 min-h-0">
         <div className="py-2 space-y-0.5">
-
-          <ProjectsSection
-            projectsExpanded={projectsExpanded}
-            setProjectsExpanded={setProjectsExpanded}
-            safeFolders={safeFolders}
-            expandedFolders={expandedFolders}
-            toggleFolder={toggleFolder}
-            search={search}
-            onRefresh={onRefresh}
-            onMobileClose={onMobileClose}
-            handleArchiveChat={handleArchiveChat}
-            handlePinChat={handlePinChat}
-            handleRenameChat={handleRenameChat}
-            handleMoveChat={handleMoveChat}
-            handleShareChat={handleShareChat}
-            handleOpenCreateFolderForMove={handleOpenCreateFolderForMove}
-            localFolders={localFolders}
-            pendingMoveForChat={pendingMoveForChat}
-            pendingMoveNewFolderId={pendingMoveNewFolderId}
-            setPendingMoveForChat={setPendingMoveForChat}
-            setPendingMoveNewFolderId={setPendingMoveNewFolderId}
-            setRenameFolderTarget={setRenameFolderTarget}
-            setDeleteFolderTarget={setDeleteFolderTarget}
-            setDeleteTarget={setDeleteTarget}
-            filteredChats={filteredChats}
-            setCreateFolderOpen={setCreateFolderOpen}
-            onNewChatInFolder={(folderId: number) => handleNewChat(folderId)}
-          />
-
-          <ContextsSectionContainer
-            contextsExpanded={contextsExpanded}
-            setContextsExpanded={setContextsExpanded}
-            localFolders={localFolders}
-            pendingNewChatFolderIdKey={pendingNewChatFolderIdKey}
-            pendingNewChatContextsKey={pendingNewChatContextsKey}
-          />
+          <NavRow icon={Folder} label="Projects" active={isProjectsRoute} onClick={() => { onMobileClose(); router.push("/projects"); }} />
 
           <AssistantsSection
             assistants={assistants}
@@ -594,11 +565,17 @@ function SidebarInner({
             onAssistantSelected={handleAssistantSelected}
           />
 
+          <NavRow icon={FileText} label="Documents" active={activeStudio === "documents"} onClick={() => { onMobileClose(); router.push("/documents"); }} />
+          <NavRow icon={ImageIcon} label="Image Studio" active={activeStudio === "image"} onClick={() => { onMobileClose(); router.push("/image-studio"); }} />
+          <NavRow icon={Clapperboard} label="Video Studio" badge="New" active={activeStudio === "video"} onClick={() => { onMobileClose(); router.push("/video-studio"); }} />
+          <NavRow icon={FolderArchive} label="Assets" active={isAssetsRoute} onClick={() => { onMobileClose(); router.push("/assets"); }} />
+          <NavRow icon={Star} label="Starred" active={isStarredRoute} onClick={() => { onMobileClose(); router.push("/starred"); }} />
+          <NavRow icon={AudioLines} label="Voice chats" badge="Beta" active={isVoiceRoute} onClick={() => { onMobileClose(); router.push("/voice"); }} />
+
+          <div className="my-3 border-t border-border" />
+
           <ChatsSection
-            chatsExpanded={chatsExpanded}
-            setChatsExpanded={setChatsExpanded}
             onMobileClose={onMobileClose}
-            router={router}
             unfoldered={unfoldered}
             localFolders={localFolders}
             setDeleteTarget={setDeleteTarget}
@@ -613,6 +590,7 @@ function SidebarInner({
             setPendingMoveForChat={setPendingMoveForChat}
             setPendingMoveNewFolderId={setPendingMoveNewFolderId}
             hasMore={hasMore}
+            loadingMoreChats={loadingMoreChats}
             onLoadMore={onLoadMore}
           />
         </div>
@@ -653,64 +631,6 @@ function SidebarInner({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!renameFolderTarget} onOpenChange={(open) => !open && setRenameFolderTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Project</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              value={renameFolderTarget?.name || ""}
-              onChange={(e) => setRenameFolderTarget(prev => prev ? { ...prev, name: e.target.value } : null)}
-              autoFocus
-              onKeyDown={(e) => { if (e.key === "Enter" && renameFolderTarget) handleRenameFolder(renameFolderTarget.id, renameFolderTarget.name); }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameFolderTarget(null)}>Cancel</Button>
-            <Button onClick={() => renameFolderTarget && handleRenameFolder(renameFolderTarget.id, renameFolderTarget.name)} disabled={!renameFolderTarget?.name.trim()}>Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!deleteFolderTarget} onOpenChange={(open) => !open && setDeleteFolderTarget(null)}>
-        <DialogContent className="w-[94vw] max-w-[calc(100vw-2rem)] sm:max-w-[720px] p-6">
-          <DialogHeader>
-            <DialogTitle>Delete Project</DialogTitle>
-          </DialogHeader>
-          <div className="py-3 text-sm text-muted-foreground text-center sm:text-left">
-            What would you like to do with the chats and contexts inside this project?
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2 sm:justify-between sm:flex-nowrap">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteFolderTarget(null)}
-              disabled={deleting}
-              className="w-full sm:w-auto"
-            >
-              Cancel
-            </Button>
-            <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:flex-nowrap">
-            <Button
-              variant="outline"
-              onClick={() => handleDeleteFolder(false)}
-              disabled={deleting}
-              className="w-full sm:w-auto border-primary/40 text-primary hover:bg-primary/5 text-xs sm:text-sm"
-            >
-              {deleting ? "Moving..." : "Move chats & contexts out"}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => handleDeleteFolder(true)}
-              disabled={deleting}
-              className="w-full sm:w-auto text-xs sm:text-sm"
-            >
-              {deleting ? "Deleting..." : "Delete chats & contexts"}
-            </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppSidebar>
   );
 }

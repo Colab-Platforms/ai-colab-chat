@@ -17,6 +17,10 @@ interface CreatePaymentAndInvoiceParams {
   providerPaymentId?: string | null;
   providerSubscriptionId?: string | null;
   amount: number;
+  /** Tax breakdown of `amount`, when known — see the matching comment on Payment in schema.prisma. */
+  baseAmount?: number | null;
+  taxPercent?: number | null;
+  taxAmount?: number | null;
   currency?: string;
   metadata?: any;
 }
@@ -97,6 +101,9 @@ class BillingService {
           data: {
             status: "COMPLETED",
             amount: params.amount,
+            baseAmount: params.baseAmount ?? existing.baseAmount,
+            taxPercent: params.taxPercent ?? existing.taxPercent,
+            taxAmount: params.taxAmount ?? existing.taxAmount,
             currency,
             providerPaymentId: params.providerPaymentId ?? existing.providerPaymentId,
             providerSubscriptionId: params.providerSubscriptionId ?? existing.providerSubscriptionId,
@@ -114,6 +121,9 @@ class BillingService {
             providerPaymentId: params.providerPaymentId ?? undefined,
             providerSubscriptionId: params.providerSubscriptionId ?? undefined,
             amount: params.amount,
+            baseAmount: params.baseAmount ?? undefined,
+            taxPercent: params.taxPercent ?? undefined,
+            taxAmount: params.taxAmount ?? undefined,
             currency,
             status: "COMPLETED",
             metadata: params.metadata ?? undefined,

@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { StartupGuide } from "./startup-guide";
+import { DocumentPanel } from "./document-panel";
+import { CodePanel, useCodeWorkspace } from "@/features/code-workspace";
 
 interface Chat {
   id: number;
@@ -69,6 +71,9 @@ interface Folder {
   name: string;
 }
 
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 480;
+
 export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const { user, isLoading, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -92,8 +97,11 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [loadingMoreChats, setLoadingMoreChats] = useState(false);
   const [chatSearch, setChatSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [assistantsPage, setAssistantsPage] = useState(1);
   const [assistantsHasMore, setAssistantsHasMore] = useState(false);
@@ -118,6 +126,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   pageRef.current = page;
   const hasMoreRef = useRef(hasMore);
   hasMoreRef.current = hasMore;
+  const loadingMoreChatsRef = useRef(false);
   const assistantsPageRef = useRef(assistantsPage);
   assistantsPageRef.current = assistantsPage;
   const assistantsHasMoreRef = useRef(assistantsHasMore);
@@ -127,7 +136,49 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const saved = localStorage.getItem("sidebarCollapsed");
     if (saved === "true") setSidebarCollapsed(true);
+
+    const savedWidth = localStorage.getItem("sidebarWidth");
+    if (savedWidth) {
+      const parsed = Number(savedWidth);
+      if (!Number.isNaN(parsed)) {
+        setSidebarWidth(Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, parsed)));
+      }
+    }
   }, []);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    if (sidebarCollapsed) return;
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "col-resize";
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const next = Math.min(
+        SIDEBAR_MAX_WIDTH,
+        Math.max(SIDEBAR_MIN_WIDTH, startWidth + (moveEvent.clientX - startX)),
+      );
+      setSidebarWidth(next);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSidebar(false);
+      document.body.style.userSelect = "";
+      document.body.style.cursor = "";
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      setSidebarWidth((current) => {
+        localStorage.setItem("sidebarWidth", String(current));
+        return current;
+      });
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [sidebarCollapsed, sidebarWidth]);
 
   const toggleSidebarCollapsed = useCallback(() => {
     setSidebarCollapsed((prev) => {
@@ -137,9 +188,32 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // The code workspace needs the room: collapse the sidebar to icons while it
+  // is open (without touching the saved preference) and give it back after.
+  const codePanelOpen = useCodeWorkspace((s) => s.isOpen);
+  const [collapsedForCode, setCollapsedForCode] = useState(false);
+  useEffect(() => {
+    setCollapsedForCode(codePanelOpen);
+  }, [codePanelOpen]);
+  const effectiveSidebarCollapsed = sidebarCollapsed || collapsedForCode;
+  const handleToggleSidebar = useCallback(() => {
+    if (collapsedForCode) {
+      setCollapsedForCode(false);
+      if (sidebarCollapsed) toggleSidebarCollapsed();
+      return;
+    }
+    toggleSidebarCollapsed();
+  }, [collapsedForCode, sidebarCollapsed, toggleSidebarCollapsed]);
+
   const isProfileRoute = pathname.startsWith("/profile");
 
   const fetchChats = useCallback(async (pageNum = 1, searchTerm?: string) => {
+    if (pageNum > 1 && loadingMoreChatsRef.current) return;
+    if (pageNum > 1) {
+      loadingMoreChatsRef.current = true;
+      setLoadingMoreChats(true);
+    }
+
     const effectiveSearch = searchTerm ?? chatSearchRef.current;
     try {
       const res = await chatService.list({
@@ -185,6 +259,11 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       setHasMore(Boolean(result?.hasNextPage));
     } catch {
       /* ignore */
+    } finally {
+      if (pageNum > 1) {
+        loadingMoreChatsRef.current = false;
+        setLoadingMoreChats(false);
+      }
     }
   }, []);
 
@@ -216,7 +295,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       const res = await assistantService.list({
         isActive: "true",
         page: pageNum.toString(),
-        pageSize: "4",
+        // The sidebar lists every active assistant — no "load more".
+        pageSize: "100",
       });
       const result = res.data.data;
       const fetched = result?.data || [];
@@ -600,40 +680,16 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       onRefresh={handleSidebarRefresh}
       onMobileClose={handleMobileClose}
       hasMore={hasMore}
+      loadingMoreChats={loadingMoreChats}
       onLoadMore={handleLoadMoreChats}
       searchQuery={chatSearch}
       onSearchChange={setChatSearch}
       assistantsHasMore={assistantsHasMore}
       onLoadMoreAssistants={handleLoadMoreAssistants}
-      collapsed={isMobile ? false : sidebarCollapsed}
-      onToggleCollapse={toggleSidebarCollapsed}
+      collapsed={isMobile ? false : effectiveSidebarCollapsed}
+      onToggleCollapse={handleToggleSidebar}
     />
   );
-
-  const resolvedGradient = activeAssistantTheme
-    ? theme === "dark" &&
-      activeAssistantTheme.bgFromDark &&
-      activeAssistantTheme.bgToDark
-      ? {
-          from: activeAssistantTheme.bgFromDark,
-          via:
-            activeAssistantTheme.bgViaDark || activeAssistantTheme.bgFromDark,
-          to: activeAssistantTheme.bgToDark,
-        }
-      : activeAssistantTheme.bgFrom && activeAssistantTheme.bgTo
-        ? {
-            from: activeAssistantTheme.bgFrom,
-            via: activeAssistantTheme.bgVia || activeAssistantTheme.bgFrom,
-            to: activeAssistantTheme.bgTo,
-          }
-        : null
-    : null;
-  const hasAssistantGradient = !!resolvedGradient;
-  const dynamicBackgroundStyle = resolvedGradient
-    ? {
-        background: `linear-gradient(135deg, ${resolvedGradient.from}, ${resolvedGradient.via}, ${resolvedGradient.to})`,
-      }
-    : undefined;
 
   return (
     <>
@@ -681,21 +737,37 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       </Dialog>
 
       <div
-        className={`h-dvh flex overflow-hidden text-foreground ${
-          hasAssistantGradient
-            ? "bg-background"
-            : "bg-linear-to-br from-white via-pink-50 to-rose-100/70 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40"
-        }`}
-        style={dynamicBackgroundStyle}
+        className="h-dvh flex overflow-hidden text-foreground bg-background"
       >
         <aside
-          className={`hidden md:flex shrink-0 border-r border-border/50 transition-[width] duration-300 ease-in-out ${
-            sidebarCollapsed ? "w-16" : "w-70"
-          }`}
-          style={{ contain: "layout style paint", willChange: "transform" }}
+          className={`relative hidden md:flex shrink-0 border-r border-border ${
+            // No width animation while dragging, or the sidebar lags the cursor.
+            isResizingSidebar ? "" : "transition-[width] duration-300 ease-in-out"
+          } ${effectiveSidebarCollapsed ? "w-16" : ""}`}
+          style={{
+            contain: "layout style",
+            ...(effectiveSidebarCollapsed ? {} : { width: sidebarWidth }),
+          }}
           data-guide="sidebar"
         >
           {renderSidebar(false)}
+          {!sidebarCollapsed && (
+            <div
+              onMouseDown={handleSidebarResizeStart}
+              className="absolute top-0 right-0 h-full w-2 cursor-col-resize z-10 group"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+            >
+              <div
+                className={`h-full w-px mx-auto transition-colors ${
+                  isResizingSidebar
+                    ? "bg-primary"
+                    : "bg-transparent group-hover:bg-primary/50"
+                }`}
+              />
+            </div>
+          )}
         </aside>
 
         <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center px-3 bg-background/80 backdrop-blur-md border-b border-border/50 justify-between">
@@ -790,8 +862,8 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
         {mobileOpen && (
           <aside
             className={`
-              md:hidden fixed z-50 h-full w-70 shrink-0 border-r border-border/40
-              bg-background flex flex-col transition-all duration-300 ease-in-out translate-x-0
+              md:hidden fixed z-50 h-full w-70 shrink-0 border-r border-border
+              bg-sidebar flex flex-col transition-all duration-300 ease-in-out translate-x-0
             `}
             style={{ contain: "layout style paint" }}
             data-guide="sidebar"
@@ -803,6 +875,9 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
         <main className="flex-1 flex flex-col min-w-0 md:pt-0 pt-14">
           {children}
         </main>
+
+        <DocumentPanel />
+        <CodePanel />
 
         <StartupGuide
           userId={typeof user?.id === "number" ? user.id : undefined}

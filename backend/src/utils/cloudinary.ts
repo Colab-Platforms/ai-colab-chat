@@ -7,24 +7,53 @@ interface UploadResult {
   url: string;
   publicId: string;
   moderationStatuses?: string[];
+  bytes?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface UploadOptions {
   folder?: string;
-  resourceType?: "image" | "raw" | "auto";
+  resourceType?: "image" | "raw" | "auto" | "video";
   format?: string;
   quality?: string;
   moderation?: string;
+  /**
+   * Explicit Cloudinary public_id (relative to `folder`, no extension).
+   *
+   * Worth setting for anything a user downloads: browsers ignore the `download`
+   * attribute on cross-origin links, so the saved filename is always the URL's
+   * basename — which is Cloudinary's random id unless we name it here.
+   * Must be unique per file, since a repeat overwrites the earlier upload.
+   */
+  publicId?: string;
 }
+
+// Cloudinary's aws_rek rejects on its own default policy and ignores per-category
+// options, so a rejection caused only by these labels (e.g. a game banner with a
+// weapon) is downgraded to "approved". Any other flagged label still blocks.
+const IGNORED_MODERATION_LABELS = new Set(["violence", "weapons"]);
+
+const isOnlyIgnoredLabels = (entry: any): boolean => {
+  const labels = entry?.response?.moderation_labels;
+  if (!Array.isArray(labels) || labels.length === 0) return false;
+  return labels.every((label: any) =>
+    IGNORED_MODERATION_LABELS.has(String(label?.name || "").toLowerCase()),
+  );
+};
 
 const normalizeModerationStatuses = (
   moderationData: unknown,
 ): string[] | undefined => {
   if (!Array.isArray(moderationData)) return undefined;
   const statuses = moderationData
-    .map((entry: any) =>
-      typeof entry?.status === "string" ? entry.status.toLowerCase() : null,
-    )
+    .map((entry: any) => {
+      if (typeof entry?.status !== "string") return null;
+      const status = entry.status.toLowerCase();
+      return status === "rejected" && isOnlyIgnoredLabels(entry)
+        ? "approved"
+        : status;
+    })
     .filter((status: string | null): status is string => Boolean(status));
   return statuses.length > 0 ? statuses : undefined;
 };
@@ -43,6 +72,7 @@ export const uploadToCloudinary = async (
     format,
     quality,
     moderation,
+    publicId,
   } = options;
 
   if (typeof file === "string") {
@@ -52,11 +82,15 @@ export const uploadToCloudinary = async (
       format,
       quality,
       moderation,
+      ...(publicId ? { public_id: publicId, overwrite: true } : {}),
     });
     return {
       url: result.secure_url,
       publicId: result.public_id,
       moderationStatuses: normalizeModerationStatuses((result as any).moderation),
+      bytes: result.bytes,
+      width: result.width,
+      height: result.height,
     };
   } else {
     return new Promise((resolve, reject) => {
@@ -67,6 +101,7 @@ export const uploadToCloudinary = async (
           format,
           quality,
           moderation,
+          ...(publicId ? { public_id: publicId, overwrite: true } : {}),
         },
         (error, result?: UploadApiResponse) => {
           if (error || !result)
@@ -77,6 +112,9 @@ export const uploadToCloudinary = async (
             moderationStatuses: normalizeModerationStatuses(
               (result as any).moderation,
             ),
+            bytes: result.bytes,
+            width: result.width,
+            height: result.height,
           });
         },
       );
@@ -87,9 +125,17 @@ export const uploadToCloudinary = async (
 
 /**
  * Delete a file from Cloudinary by its public ID.
+ *
+ * `resourceType` must match what the asset was uploaded with — Cloudinary
+ * namespaces destroy() by resource type, so deleting a "video" or "raw"
+ * upload without passing it here silently does nothing (`image` is the
+ * SDK's own default).
  */
-export const deleteFromCloudinary = async (publicId: string): Promise<void> => {
-  await cloudinary.uploader.destroy(publicId);
+export const deleteFromCloudinary = async (
+  publicId: string,
+  resourceType: "image" | "raw" | "video" = "image",
+): Promise<void> => {
+  await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 };
 
 /**

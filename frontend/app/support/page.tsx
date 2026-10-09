@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, Loader2, LifeBuoy, Mail } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/auth-context";
 import api from "@/lib/api";
 import { Button } from "@/components/ui/button";

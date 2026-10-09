@@ -9,8 +9,7 @@ export async function seedModels() {
 
   if (!openRouter) {
     console.log(
-      "  ⚠️ OpenRouter provider not found — run modelProviders seed first.",
-    );
+      "  ⚠️ OpenRouter provider not found — run modelProviders seed first.");
     return;
   }
 
@@ -167,6 +166,265 @@ export async function seedModels() {
       isActive: true,
       tokenMultiplier: 0,
     },
+    {
+      name: "GPT-5.6 Sol",
+      externalId: "openai/gpt-5.6-sol",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION"],
+      description: "OpenAI's flagship model for complex reasoning, coding, and agentic workflows.",
+      isActive: true,
+    },
+    {
+      name: "GPT-5.6 Terra",
+      externalId: "openai/gpt-5.6-terra",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION"],
+      description: "Balanced OpenAI model for everyday coding, reasoning, and agentic tasks.",
+      isActive: true,
+    },
+    {
+      name: "GPT-5.6 Luna",
+      externalId: "openai/gpt-5.6-luna",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION"],
+      description: "Fast and cost-efficient OpenAI model for chat, classification, and lightweight agentic tasks.",
+      isActive: true,
+    },
+    {
+      name: "Claude Opus 5",
+      externalId: "anthropic/claude-opus-5",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
+      description: "Anthropic's flagship model for advanced reasoning, coding, and long-horizon agentic workflows.",
+      isActive: true,
+    },
+    {
+      name: "Claude Sonnet 5",
+      externalId: "anthropic/claude-sonnet-5",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
+      description: "High-performance Claude model for coding, agents, reasoning, and professional work.",
+      isActive: true,
+    },
+    {
+      name: "Claude Opus 4.8",
+      externalId: "anthropic/claude-opus-4.8",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
+      description: "Advanced Claude model for autonomous agents, complex reasoning, coding, and long-context work.",
+      isActive: true,
+    },
+    {
+      name: "Gemini 3.8 Flash",
+      externalId: "google/gemini-3.8-flash",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      description: "Google's high-performance Flash model for fast reasoning, coding, multimodal understanding, and agents.",
+      isActive: true,
+    },
+    {
+      name: "Gemini 3 Flash Preview",
+      externalId: "google/gemini-3-flash-preview",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      description: "Fast multimodal reasoning model for chat, coding, agentic workflows, and long-context tasks.",
+      isActive: true,
+    },
+    {
+      name: "DeepSeek V4 Pro",
+      externalId: "deepseek/deepseek-v4-pro",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
+      description: "DeepSeek's large-scale model for advanced reasoning, coding, long-context analysis, and agent workflows.",
+      isActive: true,
+    },
+    {
+      name: "DeepSeek V4 Flash",
+      externalId: "deepseek/deepseek-v4-flash",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
+      description: "Fast and cost-efficient DeepSeek model for coding, reasoning, chat, and agentic workloads.",
+      isActive: true,
+    },
+    {
+      name: "DeepSeek V3.2",
+      externalId: "deepseek/deepseek-v3.2",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD"],
+      description: "Efficient reasoning model optimized for coding, tool use, long-context tasks, and agentic workflows.",
+      isActive: true,
+    },
+    {
+      name: "Mistral Medium 3.5",
+      externalId: "mistralai/mistral-medium-3-5",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION"],
+      description: "Mistral model for coding, multimodal reasoning, tool calling, and long-horizon agent workflows.",
+      isActive: true,
+    },
+    {
+      name: "Mistral Small 4",
+      externalId: "mistralai/mistral-small-2603",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION"],
+      description: "Efficient multimodal model combining reasoning, coding, visual understanding, and agentic capabilities.",
+      isActive: true,
+    },
+    {
+      name: "GLM 5.3 FlashX",
+      externalId: "z-ai/glm-5.3-flashx",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      description: "Fast multimodal model optimized for coding, visual understanding, reasoning, and long-horizon agents.",
+      isActive: true,
+    },
+    {
+      name: "Qwen 3.8 Max",
+      externalId: "qwen/qwen3.8-max-0902",
+      modelProviderId: openRouter.id,
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION", "VIDEO_GENERATION"],
+      description: "Alibaba's flagship Qwen model for multimodal reasoning, coding, agents, and long-context tasks.",
+      isActive: true,
+    },
+    {
+      name: "Seedance 2.0",
+      externalId: "bytedance/seedance-2.0",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "ByteDance's full-quality video model — 480p/720p/1080p/4K, 4-15s clips",
+      isActive: true,
+      // Calibrated 2026-09-07 straight from OpenRouter's live
+      // GET /api/v1/videos/models pricing_skus (not the marketing page,
+      // which only quotes the 480p/4K endpoints): video_tokens=$0.000007/tok
+      // (480p/720p tier), video_tokens_1080p=$0.0000077/tok,
+      // video_tokens_4k=$0.000004/tok. Tokens/sec = width*height*24/1024
+      // (OpenRouter's own formula) at each resolution's standard size
+      // (854x480 / 1280x720 / 1920x1080 / 3840x2160). Verified against the
+      // model page's own Providers table: 720p computes to exactly
+      // $0.1512/sec, matching the table's quoted example precisely.
+      // Each break-even $/sec × 63,362 tokens/$ (Pro plan: ₹1499/mo ÷
+      // 1,000,000 tokens ÷ ₹94.98/$) × 1.5 margin:
+      //   480p:  $0.06728/sec → 6,394 tokens/sec
+      //   720p:  $0.1512/sec  → 14,371 tokens/sec
+      //   1080p: $0.37422/sec → 35,570 tokens/sec
+      //   4K:    $0.7776/sec  → 73,904 tokens/sec
+      // videoCostPerSecond is only a last-resort fallback for a resolution
+      // string outside this map — every resolution this model actually
+      // supports is in videoCostPerSecondByResolution below.
+      videoCostPerSecond: 14371,
+      videoCostPerSecondByResolution: {
+        "480p": 6394,
+        "720p": 14371,
+        "1080p": 35570,
+        "4K": 73904,
+      },
+      // Image-to-video (frame_images) is CHEAPER on this model — its own
+      // pricing_skus: video_tokens_with_video_input=$0.0000043/tok (480p/720p,
+      // ~39% below text-only), video_tokens_1080p_with_video_input=$0.0000047,
+      // video_tokens_4k_with_video_input=$0.0000024. Same tokens/sec formula
+      // and margin as above:
+      //   480p:  $0.04133/sec → 3,928 tokens/sec
+      //   720p:  $0.09288/sec → 8,829 tokens/sec
+      //   1080p: $0.22842/sec → 21,714 tokens/sec
+      //   4K:    $0.46656/sec → 44,345 tokens/sec
+      videoCostPerSecondByResolutionImageInput: {
+        "480p": 3928,
+        "720p": 8829,
+        "1080p": 21714,
+        "4K": 44345,
+      },
+      // Video-credit pricing (CreditWallet unit, $0.03/credit real cost, no
+      // multiplier) — same $/sec figures above divided by $0.03:
+      //   480p: 2.2427  720p: 5.04  1080p: 12.474  4K: 25.92 credits/sec
+      creditCostPerSecond: 5.04,
+      creditCostPerSecondByResolution: {
+        "480p": 2.2427,
+        "720p": 5.04,
+        "1080p": 12.474,
+        "4K": 25.92,
+      },
+      //   480p: 1.3777  720p: 3.096  1080p: 7.614  4K: 15.552 credits/sec
+      creditCostPerSecondByResolutionImageInput: {
+        "480p": 1.3777,
+        "720p": 3.096,
+        "1080p": 7.614,
+        "4K": 15.552,
+      },
+    },
+    {
+      name: "Seedance 2.0 Mini",
+      externalId: "bytedance/seedance-2.0-mini",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "ByteDance's cheapest video model — 480p/720p, 4-15s clips, text/image/video/audio inputs",
+      isActive: true,
+      // Same method as Seedance 2.0 above, using this model's own
+      // pricing_skus: video_tokens=$0.0000035/tok (flat across 480p/720p —
+      // no _1080p/_4k keys since this model only supports those two
+      // resolutions). Tokens/sec via the same width*height*24/1024 formula:
+      //   480p (854x480):  9,611 tok/sec × $0.0000035 = $0.03364/sec → 3,197 tokens/sec
+      //   720p (1280x720): 21,600 tok/sec × $0.0000035 = $0.0756/sec  → 7,185 tokens/sec
+      videoCostPerSecond: 3197,
+      videoCostPerSecondByResolution: {
+        "480p": 3197,
+        "720p": 7185,
+      },
+      // video_tokens_with_video_input=$0.0000021/tok (flat, ~40% below
+      // text-only) — same formula/margin:
+      //   480p: $0.02018/sec → 1,918 tokens/sec
+      //   720p: $0.04536/sec → 4,312 tokens/sec
+      videoCostPerSecondByResolutionImageInput: {
+        "480p": 1918,
+        "720p": 4312,
+      },
+      // $0.03364/sec and $0.0756/sec above ÷ $0.03/credit:
+      creditCostPerSecond: 1.1213,
+      creditCostPerSecondByResolution: {
+        "480p": 1.1213,
+        "720p": 2.52,
+      },
+      // $0.02018/sec and $0.04536/sec above ÷ $0.03/credit:
+      creditCostPerSecondByResolutionImageInput: {
+        "480p": 0.6727,
+        "720p": 1.512,
+      },
+    },
+    {
+      name: "Veo 3.1 Lite",
+      externalId: "google/veo-3.1-lite",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "Google's cost-effective video model — 720p/1080p with native audio, 4/6/8s clips, 16:9/9:16",
+      isActive: true,
+      // Unlike Seedance, Veo's pricing_skus are already flat $/sec per
+      // resolution (no token-pixel formula) — duration_seconds_with_audio
+      // (1080p, the model's larger/default tier) = $0.08/sec,
+      // duration_seconds_with_audio_720p = $0.05/sec. Priced for the
+      // with-audio rate since there's no audio toggle in the UI and Veo's
+      // audio is native/on by default.
+      //   720p:  $0.05/sec → 4,752 tokens/sec
+      //   1080p: $0.08/sec → 7,603 tokens/sec
+      // Also fixed a real bug this pricing check surfaced: Veo 3.1 Lite's
+      // actual supported_durations are [4, 6, 8] only (not every integer
+      // 4-8) — the dialog previously offered 5s/7s, which OpenRouter would
+      // have rejected.
+      // No videoCostPerSecondByResolutionImageInput — Veo's pricing_skus
+      // have no distinct video/image-input tier (unlike Seedance), so
+      // image-to-video on this model costs the same as text-to-video and
+      // just falls back to videoCostPerSecondByResolution above.
+      videoCostPerSecond: 4752,
+      videoCostPerSecondByResolution: {
+        "720p": 4752,
+        "1080p": 7603,
+      },
+      // $0.05/sec and $0.08/sec above ÷ $0.03/credit. No image-input
+      // variant — same as videoCostPerSecondByResolutionImageInput above.
+      creditCostPerSecond: 1.6667,
+      creditCostPerSecondByResolution: {
+        "720p": 1.6667,
+        "1080p": 2.6667,
+      },
+    },
   ];
 
   for (const model of MODELS) {
@@ -183,6 +441,14 @@ export async function seedModels() {
         description: model.description,
         isActive: model.isActive,
         tokenMultiplier: (model as any).tokenMultiplier ?? 1.0,
+        videoCostPerSecond: (model as any).videoCostPerSecond ?? null,
+        videoCostPerSecondByResolution: (model as any).videoCostPerSecondByResolution ?? undefined,
+        videoCostPerSecondByResolutionImageInput:
+          (model as any).videoCostPerSecondByResolutionImageInput ?? undefined,
+        creditCostPerSecond: (model as any).creditCostPerSecond ?? null,
+        creditCostPerSecondByResolution: (model as any).creditCostPerSecondByResolution ?? undefined,
+        creditCostPerSecondByResolutionImageInput:
+          (model as any).creditCostPerSecondByResolutionImageInput ?? undefined,
       },
       create: {
         ...model,

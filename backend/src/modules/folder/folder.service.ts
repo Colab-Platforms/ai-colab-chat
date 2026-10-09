@@ -11,7 +11,13 @@ import { buildPrismaQuery } from "prisma-qb";
 class FolderService {
   async create(userId: number, data: CreateFolderBody) {
     const folder = await prisma.folder.create({
-      data: { name: data.name, userId },
+      data: {
+        name: data.name,
+        description: data.description ?? null,
+        icon: data.icon || null,
+        color: data.color || null,
+        userId,
+      },
     });
 
     return folder;
@@ -22,7 +28,7 @@ class FolderService {
 
     const { where: qbWhere, orderBy } = buildPrismaQuery({
       query,
-      searchFields: [{ field: "name" }],
+      searchFields: [{ field: "name" }, { field: "description" }],
       filterFields: [],
       sortFields: [
         { key: "createdAt", field: "createdAt" },
@@ -41,11 +47,35 @@ class FolderService {
         skip,
         take,
         orderBy,
+        include: {
+          // Live chats only (the old unfiltered count included deleted ones),
+          // plus the two newest as a preview on the project card.
+          _count: { select: { chats: { where: { isDeleted: false } } } },
+          chats: {
+            where: { isDeleted: false, isArchived: false },
+            orderBy: { updatedAt: "desc" },
+            take: 2,
+            select: { id: true, title: true },
+          },
+        },
       }),
       prisma.folder.count({ where }),
     ]);
 
     return formatPaginationResponse(folders, totalRecords, page, pageSize);
+  }
+
+  async getById(userId: number, folderId: number) {
+    const folder = await prisma.folder.findFirst({
+      where: { id: folderId, userId, isDeleted: false },
+      include: { _count: { select: { chats: { where: { isDeleted: false } } } } },
+    });
+
+    if (!folder) {
+      throw new ApiError("Folder not found", STATUS_CODES.NOT_FOUND);
+    }
+
+    return folder;
   }
 
   async update(userId: number, folderId: number, data: UpdateFolderBody) {
@@ -59,7 +89,14 @@ class FolderService {
 
     const updatedFolder = await prisma.folder.update({
       where: { id: folderId },
-      data: { name: data.name },
+      data: {
+        name: data.name,
+        description: data.description ?? null,
+        // undefined (not null) when omitted so an edit that doesn't touch the
+        // look keeps the existing icon/colour.
+        icon: data.icon === undefined ? undefined : data.icon || null,
+        color: data.color === undefined ? undefined : data.color || null,
+      },
     });
 
     return updatedFolder;

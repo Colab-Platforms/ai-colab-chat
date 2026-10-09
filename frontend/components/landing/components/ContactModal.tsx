@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 
 interface ContactModalProps {
   children: React.ReactNode;

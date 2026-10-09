@@ -26,4 +26,10 @@ export interface Chat {
 export interface FolderItem {
   id: number;
   name: string;
+  description?: string | null;
+  icon?: string | null;
+  color?: string | null;
+  updatedAt?: string;
+  chats?: { id: number; title: string | null }[];
+  _count?: { chats: number };
 }

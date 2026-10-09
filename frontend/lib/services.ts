@@ -14,6 +14,9 @@ export const chatService = {
   }) => api.post("/chats", data),
   list: (params?: Record<string, string>) => api.get("/chats", { params }),
   getById: (id: number) => api.get(`/chats/${id}`),
+  // Explicit Stop: generations keep running if the page is left, so aborting
+  // the request alone no longer stops them.
+  stop: (id: number) => api.post(`/chats/${id}/stop`),
   archive: (id: number) => api.patch(`/chats/${id}/archive`),
   pin: (id: number) => api.patch(`/chats/${id}/pin`),
   share: (id: number) => api.patch(`/chats/${id}/share`),
@@ -59,10 +62,23 @@ export const modelResponseService = {
 };
 
 export const folderService = {
-  create: (data: { name: string }) => api.post("/folders", data),
+  create: (data: {
+    name: string;
+    description?: string | null;
+    icon?: string | null;
+    color?: string | null;
+  }) => api.post("/folders", data),
   list: (params?: Record<string, string>) => api.get("/folders", { params }),
-  update: (id: number, data: { name: string }) =>
-    api.put(`/folders/${id}`, data),
+  getById: (id: number) => api.get(`/folders/${id}`),
+  update: (
+    id: number,
+    data: {
+      name: string;
+      description?: string | null;
+      icon?: string | null;
+      color?: string | null;
+    },
+  ) => api.put(`/folders/${id}`, data),
   delete: (id: number, deleteChats: boolean) =>
     api.delete(`/folders/${id}`, {
       params: { deleteChats: deleteChats ? "true" : "false" },
@@ -89,6 +105,14 @@ export const walletService = {
   get: () => api.get("/wallet"),
   getTransactions: (params?: Record<string, string>) =>
     api.get("/wallet/transactions", { params }),
+};
+
+export const creditWalletService = {
+  get: () => api.get("/credit-wallet"),
+  getTransactions: (params?: Record<string, string>) =>
+    api.get("/credit-wallet/transactions", { params }),
+  getPricing: () => api.get("/credit-wallet/pricing"),
+  topup: (amountInr: number) => api.post("/credit-wallet/topup", { amountInr }),
 };
 
 export const subscriptionService = {
@@ -159,7 +183,7 @@ export const attachmentService = {
 
 export const userPreferenceService = {
   getPreferences: () => api.get("/preferences"),
-  updatePreferences: (data: { enableFollowUpQuestions?: boolean }) =>
+  updatePreferences: (data: { enableFollowUpQuestions?: boolean; voiceId?: string | null }) =>
     api.put("/preferences", data),
 };
 
@@ -186,6 +210,73 @@ export const contextService = {
   delete: (id: number) => api.delete(`/contexts/${id}`),
 };
 
+export const documentService = {
+  list: (params?: Record<string, string>) => api.get("/documents", { params }),
+  getById: (id: number) => api.get(`/documents/${id}`),
+  create: (data: {
+    prompt: string;
+    chatId?: number;
+    messageId?: number;
+    title?: string;
+    theme?: string;
+    sourceText?: string;
+  }) => api.post("/documents", data),
+  retry: (id: number) => api.post(`/documents/${id}/retry`),
+  delete: (id: number) => api.delete(`/documents/${id}`),
+  getSpec: (id: number) => api.get(`/documents/${id}/spec`),
+  templates: () => api.get("/documents/templates"),
+  updateStyle: (id: number, data: { title?: string; theme?: string }) =>
+    api.patch(`/documents/${id}`, data),
+};
+
+export const videoService = {
+  listModels: () => api.get("/videos/models"),
+  list: (params?: Record<string, string>) => api.get("/videos", { params }),
+  getById: (id: number) => api.get(`/videos/${id}`),
+  create: (data: {
+    prompt: string;
+    chatId?: number;
+    messageId?: number;
+    modelId?: number;
+    duration?: number;
+    resolution?: string;
+    aspectRatio?: string;
+    firstFrameUrl?: string;
+    lastFrameUrl?: string;
+  }) => api.post("/videos", data),
+  retry: (id: number) => api.post(`/videos/${id}/retry`),
+  delete: (id: number) => api.delete(`/videos/${id}`),
+};
+
+export const imageService = {
+  list: (params?: Record<string, string>) => api.get("/images", { params }),
+  getById: (id: number) => api.get(`/images/${id}`),
+  delete: (id: number) => api.delete(`/images/${id}`),
+};
+
+export const studioTemplateService = {
+  list: (type: "IMAGE" | "VIDEO") => api.get("/studio-templates", { params: { type } }),
+  adminList: () => api.get("/studio-templates", { params: { all: "true" } }),
+  create: (data: Record<string, unknown>) => api.post("/studio-templates", data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/studio-templates/${id}`, data),
+  delete: (id: number) => api.delete(`/studio-templates/${id}`),
+  recordUse: (id: number) => api.post(`/studio-templates/${id}/use`),
+};
+
+export const demoRequestService = {
+  list: (params?: Record<string, string>) => api.get("/demo-requests", { params }),
+  update: (id: number, data: { status?: string; adminNotes?: string | null }) =>
+    api.patch(`/demo-requests/${id}`, data),
+  delete: (id: number) => api.delete(`/demo-requests/${id}`),
+};
+
+export const voiceService = {
+  createSession: (voiceId?: string, chatId?: number, attachmentIds?: number[]) =>
+    api.post("/voice/session", { voiceId, chatId, attachmentIds }),
+  listOptions: () => api.get("/voice/options"),
+};
+
 export const supportService = {
   listTickets: (params?: Record<string, string>) =>
     api.get("/support/tickets", { params }),
@@ -193,4 +284,8 @@ export const supportService = {
     api.get("/support/contact", { params }),
   updateStatus: (id: number, status: string) =>
     api.patch(`/support/${id}/status`, { status }),
+};
+
+export const adminService = {
+  getOverview: () => api.get("/admin/overview"),
 };

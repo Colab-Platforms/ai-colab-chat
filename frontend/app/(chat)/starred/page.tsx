@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { messageService } from "@/lib/services";
 import { MessageList } from "@/components/chat/message-list";
 import { Star } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 
 interface StarredResponse {
   id: number;

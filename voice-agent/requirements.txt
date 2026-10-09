@@ -1,0 +1,9 @@
+fastapi>=0.115.6
+uvicorn[standard]>=0.34.0
+python-dotenv>=1.0.1
+pydantic~=2.10.6
+pydantic-settings>=2.7.1
+
+pipecat-ai[daily,deepgram,elevenlabs,openai,silero]==0.0.62
+aiohttp>=3.11.12
+loguru>=0.7.3

@@ -29,7 +29,11 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
-  ) => Promise<{ requiresEmailVerification: boolean; email?: string }>;
+  ) => Promise<{
+    requiresEmailVerification: boolean;
+    email?: string;
+    isAdmin?: boolean;
+  }>;
   register: (data: {
     firstName: string;
     lastName: string;
@@ -48,13 +52,20 @@ interface AuthContextType {
     otp: string,
     newPassword: string,
   ) => Promise<void>;
-  completeGoogleLogin: (token: string) => Promise<void>;
+  completeGoogleLogin: (token: string) => Promise<{ isAdmin: boolean }>;
   logout: () => void;
   hasRole: (role: string) => boolean;
   refreshUser: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const isAdminUser = (userData: User) => {
+  const normalize = (r: string) => r.replace(/_/g, "").toUpperCase();
+  return userData.userRoles.some((ur) =>
+    ["ADMIN", "SUPERADMIN"].includes(normalize(ur.role.name)),
+  );
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
@@ -116,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { user: userData, token: tokenData } = data;
     saveAuth(userData, tokenData);
-    return { requiresEmailVerification: false };
+    return { requiresEmailVerification: false, isAdmin: isAdminUser(userData) };
   };
 
   const register = async (data: {
@@ -167,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const userData = response.data.data as User;
     saveAuth(userData, tokenData);
+    return { isAdmin: isAdminUser(userData) };
   }, []);
 
   const logout = useCallback(() => {

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Brain, Check } from "lucide-react";
 import { contextService, chatService, folderService } from "@/lib/services";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 import { ContextModal } from "@/components/contexts/ContextModal";
 import { getRouteUiSnapshot } from "@/lib/route-ui-store";
 

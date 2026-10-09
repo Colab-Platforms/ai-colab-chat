@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SettingsCard, SettingsHeader } from "@/components/settings/settings-ui";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { subscriptionService, planService, paymentService } from "@/lib/services";
-import { Loader2 } from "lucide-react";
-import { toast } from "react-toastify";
+import { subscriptionService, planService, paymentService, creditWalletService } from "@/lib/services";
+import { openSubscriptionCheckout, openPaymentCheckout } from "@/lib/cashfree";
+import { getPlanFeatureLines } from "@/lib/planFeatures";
+import { Loader2, Check, X } from "lucide-react";
+import { toast } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -36,81 +37,15 @@ export default function SubscriptionPage() {
   const [cancellingPendingPayment, setCancellingPendingPayment] = useState(false);
   const [subscribingPlanId, setSubscribingPlanId] = useState<number | null>(null);
   const isSubscribingRef = useRef(false);
-  const [confirmUpgradePlanId, setConfirmUpgradePlanId] = useState<number | null>(null);
+  const [planToConfirm, setPlanToConfirm] = useState<any | null>(null);
+  const [gstPercent, setGstPercent] = useState<number>(18);
   const [autoPayUpdating, setAutoPayUpdating] = useState(false);
-  const [autoStartingPlanId, setAutoStartingPlanId] = useState<number | null>(null);
   const autoStartedPlanIdsRef = useRef<Set<number>>(new Set());
   const isUsableAuthLink = (url: string | null | undefined) =>
     Boolean(url) && !String(url).includes("/subscriptions/checkout/timer");
   const markCheckoutFlowStart = () => {
     if (typeof window === "undefined") return;
     sessionStorage.setItem("subscription_checkout_in_progress", "1");
-  };
-
-  const loadCashfreeSdk = async () => {
-    if (typeof window === "undefined") return null;
-    if ((window as any).Cashfree) return (window as any).Cashfree;
-
-    await new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector('script[data-cashfree-sdk="true"]') as HTMLScriptElement | null;
-      if (existing) {
-        existing.addEventListener("load", () => resolve(), { once: true });
-        existing.addEventListener("error", () => reject(new Error("Cashfree SDK failed to load")), { once: true });
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
-      script.async = true;
-      script.setAttribute("data-cashfree-sdk", "true");
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Cashfree SDK failed to load"));
-      document.head.appendChild(script);
-    });
-
-    return (window as any).Cashfree ?? null;
-  };
-
-  const openSubscriptionCheckout = async (sessionId: string) => {
-    const Cashfree = await loadCashfreeSdk();
-    if (!Cashfree) {
-      toast.error("Failed to load Cashfree checkout");
-      return;
-    }
-
-    const mode = String(process.env.NEXT_PUBLIC_CASHFREE_MODE || "production").toLowerCase() === "sandbox"
-      ? "sandbox"
-      : "production";
-    const cashfree = Cashfree({ mode });
-    const result = await cashfree.subscriptionsCheckout({
-      subsSessionId: sessionId,
-      // Keep checkout in same tab so browser back returns here.
-      redirectTarget: "_self",
-    });
-
-    if (result?.error) {
-      toast.error(result.error?.message || "Failed to open payment checkout");
-    }
-  };
-
-  const openPaymentCheckout = async (paymentSessionId: string) => {
-    const Cashfree = await loadCashfreeSdk();
-    if (!Cashfree) {
-      toast.error("Failed to load Cashfree checkout");
-      return;
-    }
-
-    const mode = String(process.env.NEXT_PUBLIC_CASHFREE_MODE || "production").toLowerCase() === "sandbox"
-      ? "sandbox"
-      : "production";
-    const cashfree = Cashfree({ mode });
-    const result = await cashfree.checkout({
-      paymentSessionId,
-      redirectTarget: "_self",
-    });
-
-    if (result?.error) {
-      toast.error(result.error?.message || "Failed to open payment checkout");
-    }
   };
 
   const fetchData = useCallback(async () => {
@@ -158,6 +93,18 @@ export default function SubscriptionPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    // Live rate, not hardcoded — same CreditPricingConfig.gstPercent the
+    // backend actually charges with, so this popup never quietly drifts
+    // from what Cashfree really bills.
+    creditWalletService
+      .getPricing()
+      .then((res: any) => {
+        const pct = res?.data?.data?.gstPercent;
+        if (typeof pct === "number" && Number.isFinite(pct)) setGstPercent(pct);
+      })
+      .catch(() => { /* keep the 18% fallback */ });
+  }, []);
   useEffect(() => {
     if (!pendingExpiresAt) {
       setPendingCountdownMs(null);
@@ -316,7 +263,7 @@ export default function SubscriptionPage() {
     if (!rawPlanId) return;
     const parsedPlanId = Number(rawPlanId);
     if (!Number.isFinite(parsedPlanId) || parsedPlanId <= 0) return;
-    if (autoStartingPlanId === parsedPlanId || subscribingPlanId !== null) return;
+    if (subscribingPlanId !== null) return;
     if (autoStartedPlanIdsRef.current.has(parsedPlanId)) return;
 
     const selectedPlan = plans.find((p: any) => p.id === parsedPlanId);
@@ -328,15 +275,14 @@ export default function SubscriptionPage() {
     const isFreePlan = Number(selectedPlan.monthlyPrice ?? 0) === 0;
     if (isFreePlan && freePlanTaken) return;
 
-    setAutoStartingPlanId(parsedPlanId);
+    // Open the price/feature confirmation popup rather than charging
+    // immediately — a deep link from the marketing page shouldn't skip the
+    // "here's what you're about to pay, including GST" step.
     autoStartedPlanIdsRef.current.add(parsedPlanId);
-    void handleSubscribe(parsedPlanId).finally(() => {
-      setAutoStartingPlanId(null);
-    });
+    setPlanToConfirm(selectedPlan);
   }, [
     loading,
     searchParams,
-    autoStartingPlanId,
     subscribingPlanId,
     plans,
     subscription,
@@ -450,106 +396,172 @@ export default function SubscriptionPage() {
   })();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Subscription</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage your plan and billing</p>
-      </div>
+    <div>
+      <SettingsHeader title="Subscription" description="Manage your plan and billing." />
 
-      <AlertDialog open={confirmUpgradePlanId !== null} onOpenChange={(open) => !open && setConfirmUpgradePlanId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm upgrade</AlertDialogTitle>
-            <AlertDialogDescription>
-              You still have remaining tokens in your current plan. If you continue, those tokens will carry over and be added to your new plan&apos;s tokens.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={subscribingPlanId !== null}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (confirmUpgradePlanId != null) {
-                  void handleSubscribe(confirmUpgradePlanId);
-                }
-                setConfirmUpgradePlanId(null);
-              }}
-              disabled={subscribingPlanId !== null}
-            >
-              Continue
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {(() => {
+        if (!planToConfirm) return null;
+        const basePrice = Number(planToConfirm.monthlyPrice ?? 0);
+        const isFree = basePrice === 0;
+        const gstAmount = isFree ? 0 : Number(((basePrice * gstPercent) / 100).toFixed(2));
+        const totalAmount = isFree ? 0 : Number((basePrice + gstAmount).toFixed(2));
+        const currentMonthlyPrice = Number(subscription?.plan?.monthlyPrice ?? 0);
+        const currentIsFree = currentMonthlyPrice === 0;
+        const isUpgradeFromFree = Boolean(subscription) && currentIsFree && basePrice > currentMonthlyPrice;
+        const { included, excluded } = getPlanFeatureLines(planToConfirm);
+
+        return (
+          <AlertDialog open onOpenChange={(open) => !open && setPlanToConfirm(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{planToConfirm.name} plan</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-4 text-left">
+                    <ul className="space-y-1.5">
+                      {included.map((line: string) => (
+                        <li key={line} className="flex items-center gap-2 text-sm text-foreground">
+                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                      {excluded.map((line: string) => (
+                        <li key={line} className="flex items-center gap-2 text-sm text-muted-foreground/60">
+                          <X className="w-3.5 h-3.5 shrink-0" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <div className="rounded-lg border border-border/50 p-3 space-y-1.5 text-sm">
+                      {isFree ? (
+                        <div className="flex items-center justify-between font-semibold text-foreground">
+                          <span>Total</span>
+                          <span>Free</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span>Plan price</span>
+                            <span>₹{basePrice.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span>GST ({gstPercent}%)</span>
+                            <span>₹{gstAmount.toLocaleString("en-IN")}</span>
+                          </div>
+                          <div className="flex items-center justify-between font-semibold text-foreground pt-1.5 border-t border-border/50">
+                            <span>Total to pay</span>
+                            <span>₹{totalAmount.toLocaleString("en-IN")}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {isUpgradeFromFree && (
+                      <p className="text-xs text-muted-foreground">
+                        You still have remaining tokens in your current plan. If you continue, those tokens will carry over and be added to your new plan&apos;s tokens.
+                      </p>
+                    )}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={subscribingPlanId !== null}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    const planId = planToConfirm.id;
+                    setPlanToConfirm(null);
+                    void handleSubscribe(planId);
+                  }}
+                  disabled={subscribingPlanId !== null}
+                >
+                  {isFree ? "Confirm" : "Proceed to Pay"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      })()}
 
       {subscription ? (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{subscription.plan?.name} Plan</CardTitle>
-                <CardDescription>{subscription.billingCycle} billing</CardDescription>
+        <SettingsCard className="mb-6 overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">{subscription.plan?.name}</h2>
+                <span
+                  className={`rounded-md px-2 py-0.5 text-xs font-medium ${
+                    subscription.status === "ACTIVE" ? "bg-ok/15 text-ok" : "bg-sunken text-muted-foreground"
+                  }`}
+                >
+                  {String(subscription.status).charAt(0) + String(subscription.status).slice(1).toLowerCase()}
+                </span>
               </div>
-              <Badge variant={subscription.status === "ACTIVE" ? "default" : "secondary"}>
-                {subscription.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {subscription.expiresAt && (
-              <p className="text-sm text-muted-foreground">
-                Expires: {new Date(subscription.expiresAt).toLocaleDateString()}
+              <p className="mt-1 text-[13px] text-muted-foreground">
+                {Number(subscription.plan?.monthlyPrice ?? 0) > 0
+                  ? `₹${Number(subscription.plan.monthlyPrice).toLocaleString("en-IN")}/month + GST · `
+                  : ""}
+                Billed {String(subscription.billingCycle || "monthly").toLowerCase()}
               </p>
+            </div>
+            {subscription.expiresAt && (
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">Expires on</p>
+                <p className="text-sm font-semibold">
+                  {new Date(subscription.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </p>
+              </div>
             )}
-            {subscription.status === "ACTIVE" && (
-              <Button variant="destructive" size="sm" onClick={handleCancel} disabled={cancellingSubscription}>
-                {cancellingSubscription ? <Loader2 className="w-4 h-4 animate-spin" /> : "Cancel subscription"}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+
+          {Number(subscription?.plan?.monthlyPrice ?? 0) > 0 && subscription.status === "ACTIVE" && (
+            <div className="flex items-center justify-between gap-4 border-t border-border px-5 py-4">
+              <div>
+                <p className="text-sm font-medium">AutoPay for renewals</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Turn AutoPay on or off anytime. Your current cycle stays active either way.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2.5">
+                <span className="text-xs text-muted-foreground">{subscription.autoRenew ? "On" : "Off"}</span>
+                <Switch
+                  checked={Boolean(subscription.autoRenew)}
+                  onCheckedChange={handleToggleAutoPay}
+                  disabled={autoPayUpdating || subscribingPlanId !== null}
+                />
+              </div>
+            </div>
+          )}
+
+          {subscription.status === "ACTIVE" && (
+            <div className="border-t border-border px-5 py-4">
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={cancellingSubscription}
+                className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-medium text-destructive hover:underline disabled:opacity-60"
+              >
+                {cancellingSubscription && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Cancel subscription
+              </button>
+            </div>
+          )}
+        </SettingsCard>
       ) : (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">No active plans</p>
-          </CardContent>
-        </Card>
+        <SettingsCard className="mb-6 px-5 py-4">
+          <p className="text-sm text-muted-foreground">No active plan.</p>
+        </SettingsCard>
       )}
 
-      {subscription
-        && Number(subscription?.plan?.monthlyPrice ?? 0) > 0
-        && subscription.status === "ACTIVE" && (
-          <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-            <CardHeader>
-              <CardTitle>AutoPay for renewals</CardTitle>
-              <CardDescription>
-                Turn AutoPay on/off anytime. Your current cycle remains active either way.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">
-                {subscription.autoRenew ? "Enabled" : "Disabled"}
-              </p>
-              <Switch
-                checked={Boolean(subscription.autoRenew)}
-                onCheckedChange={handleToggleAutoPay}
-                disabled={autoPayUpdating || subscribingPlanId !== null}
-              />
-            </CardContent>
-          </Card>
-        )}
-
       {pendingSubscription && (
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{pendingSubscription.plan?.name} Plan</CardTitle>
-                <CardDescription>{pendingSubscription.billingCycle} billing</CardDescription>
-              </div>
-              <Badge variant="secondary">PENDING</Badge>
+        <SettingsCard className="mb-6 space-y-4 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold">{pendingSubscription.plan?.name} plan</h2>
+              <p className="text-xs text-muted-foreground">{String(pendingSubscription.billingCycle).toLowerCase()} billing</p>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            <span className="rounded-md bg-warn/15 px-2 py-0.5 text-xs font-medium text-warn">Pending</span>
+          </div>
+          <div className="space-y-4">
             <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 px-3 py-2 dark:border-amber-900/40 dark:bg-amber-950/20">
               <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
                 Payment authorization pending
@@ -587,82 +599,83 @@ export default function SubscriptionPage() {
                 </p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsCard>
       )}
 
-      <Card className="border-border/30 bg-card/90 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Available Plans</CardTitle>
-          <CardDescription>Choose the plan that works for you</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {plans.map((plan: any) => (
-              <div key={plan.id} className="border border-border/40 rounded-xl p-5 space-y-3 bg-card/80 hover:shadow-md transition-shadow">
+      <h2 className="text-base font-semibold">Plans</h2>
+      <p className="mb-4 mt-0.5 text-xs text-muted-foreground">Prices are per month, plus GST.</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {[...plans]
+          .sort((x: any, y: any) => Number(x.monthlyPrice ?? 0) - Number(y.monthlyPrice ?? 0))
+          .map((plan: any) => {
+            const isCurrentPlan = !!subscription && subscription.planId === plan.id;
+            const isFreePlan = Number(plan.monthlyPrice) === 0;
+            const isAlreadyTakenFree = isFreePlan && freePlanTaken && !isCurrentPlan;
+            const hasCurrentPlan = Boolean(subscription);
+            const { included, excluded } = getPlanFeatureLines(plan);
+            const price = Number(plan.monthlyPrice ?? 0);
+
+            return (
+              <div
+                key={plan.id}
+                className={`flex flex-col rounded-2xl border bg-surface p-5 ${
+                  isCurrentPlan ? "border-primary shadow-cl" : "border-border"
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-lg">{plan.name}</h3>
-                  <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                    {plan.monthlyPrice === 0 ? "Free" : `₹${plan.monthlyPrice}/mo`}
-                  </span>
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                  {isCurrentPlan && (
+                    <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-ink">Current</span>
+                  )}
                 </div>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>
-                    🎯 {plan.tokenLimit >= 1_000_000
-                      ? `${(plan.tokenLimit / 1_000_000).toFixed(plan.tokenLimit % 1_000_000 === 0 ? 0 : 1)}M`
-                      : `${(plan.tokenLimit / 1000).toFixed(0)}k`} tokens / month
-                  </p>
-                  <p>🤖 {plan.features?.maxModels === -1 ? "Unlimited" : plan.features?.maxModels} model{plan.features?.maxModels !== 1 ? "s" : ""}</p>
-                  {plan.features?.attachments && <p>📎 File attachments</p>}
+                <p className="mt-3">
+                  <span className="text-[28px] font-semibold tracking-tight">₹{price.toLocaleString("en-IN")}</span>
+                  <span className="ml-1 text-xs text-muted-foreground">/mo</span>
+                </p>
+
+                {isCurrentPlan ? (
+                  <button disabled className="mt-4 h-10 w-full cursor-default rounded-xl bg-sunken text-sm font-medium text-muted-foreground">
+                    Your current plan
+                  </button>
+                ) : isAlreadyTakenFree ? (
+                  <button disabled className="mt-4 h-10 w-full cursor-default rounded-xl bg-sunken text-sm font-medium text-muted-foreground">
+                    Already used
+                  </button>
+                ) : (
+                  <Button
+                    className="mt-4 h-10 w-full rounded-xl"
+                    disabled={subscribingPlanId !== null}
+                    onClick={() => setPlanToConfirm(plan)}
+                  >
+                    {subscribingPlanId === plan.id
+                      ? "Starting..."
+                      : isFreePlan
+                        ? "Start free"
+                        : hasCurrentPlan
+                          ? `Switch to ${plan.name}`
+                          : "Pay now"}
+                  </Button>
+                )}
+
+                <div className="mt-4 space-y-2 border-t border-border pt-4 text-[13px]">
+                  {included.map((line: string) => (
+                    <p key={line} className="flex items-center gap-2.5">
+                      <Check className="h-3.5 w-3.5 shrink-0 text-ok" />
+                      {line}
+                    </p>
+                  ))}
+                  {excluded.map((line: string) => (
+                    <p key={line} className="flex items-center gap-2.5 text-faint">
+                      <X className="h-3.5 w-3.5 shrink-0" />
+                      {line}
+                    </p>
+                  ))}
                 </div>
-                {(() => {
-                  const isCurrentPlan = !!subscription && subscription.planId === plan.id;
-                  const isFreePlan = Number(plan.monthlyPrice) === 0;
-                  const isAlreadyTakenFree = isFreePlan && freePlanTaken && !isCurrentPlan;
-                  const currentMonthlyPrice = Number(subscription?.plan?.monthlyPrice ?? 0);
-                  const planMonthlyPrice = Number(plan.monthlyPrice ?? 0);
-                  const hasCurrentPlan = Boolean(subscription);
-                  const isUpgrade = hasCurrentPlan && planMonthlyPrice > currentMonthlyPrice;
-                  const currentIsFree = Number(subscription?.plan?.monthlyPrice ?? 0) === 0;
-
-                  if (isCurrentPlan) {
-                    return <Badge className="w-full justify-center">Current plan</Badge>;
-                  }
-
-                  if (isAlreadyTakenFree) {
-                    return <Badge variant="secondary" className="w-full justify-center">Already taken</Badge>;
-                  }
-
-                  return (
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      disabled={subscribingPlanId !== null}
-                      onClick={() => {
-                        if (isUpgrade && currentIsFree) {
-                          setConfirmUpgradePlanId(plan.id);
-                          return;
-                        }
-                        void handleSubscribe(plan.id);
-                      }}
-                    >
-                      {subscribingPlanId === plan.id
-                        ? "Starting..."
-                        : isFreePlan
-                          ? "Start Free"
-                          : isUpgrade
-                            ? "Upgrade"
-                            : hasCurrentPlan
-                              ? "Change plan"
-                              : "Pay now"}
-                    </Button>
-                  );
-                })()}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            );
+          })}
+      </div>
     </div>
   );
 }

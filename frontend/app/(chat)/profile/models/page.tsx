@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DataTable, Column } from "@/components/dashboard/data-table";
 import { modelService, modelProviderService } from "@/lib/services";
 import { Loader2, Eye, Pencil, Trash2, Save, Plus, MessageSquare, Globe, Sparkles, Image as ImageIcon } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 
 const CAPABILITY_OPTIONS = [
   { value: "STANDARD", label: "Standard", icon: MessageSquare, color: "bg-blue-500/10 text-blue-600 border-blue-200 dark:border-blue-800" },

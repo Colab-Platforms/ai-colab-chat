@@ -1,14 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import "react-toastify/dist/ReactToastify.css";
 import { ThemeProvider } from "@/context/theme-context";
 import { AuthProvider } from "@/context/auth-context";
+import { PlanCapabilitiesProvider } from "@/context/plan-capabilities-context";
 import { ChatRootShell } from "@/components/chat/chat-root-shell";
-import { ToastContainer } from "react-toastify";
+import { Toaster } from "@/components/ui/toast";
 import { ServiceWorkerRegister } from "@/components/pwa/sw-register";
 import { PwaInstallPrompt } from "@/components/pwa/install-prompt";
 import Script from "next/script";
+// Imported directly (not via the feature index) so it stays a plain string in this server component.
+import { NODEBOX_ERROR_FILTER_SCRIPT } from "@/features/code-workspace/lib/nodeboxErrorFilter";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -61,7 +63,11 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://cdn.shopify.com/s/files/1/0636/5226/6115/files/CP_white_logo_new.png?v=1762234933",
+        // A dedicated opaque social-share card, not the transparent white
+        // logo mark: WhatsApp/Facebook flatten transparent PNGs onto a white
+        // canvas, so a white-on-transparent logo rendered as a blank white
+        // box in link previews.
+        url: "https://res.cloudinary.com/dlmcpmdpn/image/upload/v1790661491/ai-colab-chat/marketing/og-share-image.png",
         width: 1200,
         height: 630,
         alt: "ColabPlatforms AI - Multi-Model LLM Chat Platform",
@@ -74,7 +80,7 @@ export const metadata: Metadata = {
     description:
       "Advanced AI chatbot platform by ColabPlatforms. Chat with multiple LLM models simultaneously.",
     images: [
-      "https://cdn.shopify.com/s/files/1/0636/5226/6115/files/CP_white_logo_new.png?v=1762234933",
+      "https://res.cloudinary.com/dlmcpmdpn/image/upload/v1790661491/ai-colab-chat/marketing/og-share-image.png",
     ],
   },
 };
@@ -87,6 +93,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Must run before hydration — see features/code-workspace/lib/nodeboxErrorFilter.ts */}
+        <Script
+          id="code-workspace-nodebox-error-filter"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: NODEBOX_ERROR_FILTER_SCRIPT }}
+        />
         <Script
           id="ms-clarity"
           strategy="afterInteractive"
@@ -125,22 +137,13 @@ fbq('track', 'PageView');`,
             src="https://www.facebook.com/tr?id=927597176298283&ev=PageView&noscript=1"
           />
         </noscript>
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          pauseOnHover
-          theme="light"
-          toastClassName="!text-sm"
-          style={{ zIndex: 99999 }}
-          className={"max-md:m-2"}
-        />
+        <Toaster />
         <ThemeProvider>
           <AuthProvider>
-            <ChatRootShell>{children}</ChatRootShell>
-            <PwaInstallPrompt />
+            <PlanCapabilitiesProvider>
+              <ChatRootShell>{children}</ChatRootShell>
+              <PwaInstallPrompt />
+            </PlanCapabilitiesProvider>
           </AuthProvider>
         </ThemeProvider>
         <ServiceWorkerRegister />

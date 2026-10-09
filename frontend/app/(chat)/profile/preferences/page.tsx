@@ -2,99 +2,64 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles, Plus, Eye, Edit2, Trash2, Compass } from "lucide-react";
+import { Compass, Sun, Moon, Columns2, Focus } from "lucide-react";
+import { useTheme } from "@/context/theme-context";
+import {
+  SectionLabel,
+  Segmented,
+  SettingRow,
+  SettingsCard,
+  SettingsHeader,
+} from "@/components/settings/settings-ui";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { DataTable, Column } from "@/components/dashboard/data-table";
-import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
-import { ContextModal } from "@/components/contexts/ContextModal";
-import { ContextViewDialog } from "@/components/contexts/ContextViewDialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  contextService,
-  folderService,
   userPreferenceService,
+  voiceService,
 } from "@/lib/services";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 
 export default function PreferencesPage() {
   const router = useRouter();
-  // ── Context state ────────────────────────────────────────────────────────
-  const [contexts, setContexts] = useState<any[]>([]);
-  const [folders, setFolders] = useState<any[]>([]);
-  const [loadingContexts, setLoadingContexts] = useState(true);
+  const { theme, toggleTheme } = useTheme();
 
-  // view dialog (read-only)
-  const [viewContext, setViewContext] = useState<any | null>(null);
-
-  // create / edit modal
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editContext, setEditContext] = useState<any | null>(null); // null = create
-  const [isSaving, setIsSaving] = useState(false);
-
-  const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // create folder modal (used when ContextModal requests a new folder from this page)
-  const [createFolderOpen, setCreateFolderOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [pendingContextDraft, setPendingContextDraft] = useState<{
-    title: string;
-    memory: string;
-    type: "GLOBAL" | "FOLDER" | "CUSTOM";
-    folderId: string;
-    isAutoSelected: boolean;
-    existingContextId?: number | null;
-  } | null>(null);
-  const [contextInitialData, setContextInitialData] = useState<any | null>(
-    null,
-  );
-
+  // Multi-model layout lives in localStorage — the chat view reads the same key.
+  const [multiView, setMultiView] = useState<"columns" | "focus">("columns");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ai-colab:multi-view");
+      if (saved === "columns" || saved === "focus") setMultiView(saved);
+    } catch { /* storage unavailable */ }
+  }, []);
+  const changeMultiView = (mode: "columns" | "focus") => {
+    setMultiView(mode);
+    try { localStorage.setItem("ai-colab:multi-view", mode); } catch { /* storage unavailable */ }
+  };
   // ── Preferences state ────────────────────────────────────────────────────
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
   const [loadingPrefs, setLoadingPrefs] = useState(true);
   const [togglingFollowUp, setTogglingFollowUp] = useState(false);
 
+  // ── Voice preference state ───────────────────────────────────────────────
+  const [voiceOptions, setVoiceOptions] = useState<{ id: string; name: string }[]>([]);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
+  const [savingVoice, setSavingVoice] = useState(false);
+
   // ── Fetch ─────────────────────────────────────────────────────────────────
-
-  const fetchContexts = useCallback(async () => {
-    setLoadingContexts(true);
-    try {
-      const res = await contextService.list();
-      const data = res?.data?.data?.data;
-      setContexts(Array.isArray(data) ? data : []);
-    } catch {
-      setContexts([]);
-    } finally {
-      setLoadingContexts(false);
-    }
-  }, []);
-
-  const fetchFolders = useCallback(async () => {
-    try {
-      const res = await folderService.list();
-      const data = res?.data?.data?.data;
-      setFolders(Array.isArray(data) ? data : []);
-    } catch {
-      setFolders([]);
-    }
-  }, []);
 
   const fetchPreferences = useCallback(async () => {
     try {
       const res = await userPreferenceService.getPreferences();
       const prefs = res?.data?.data;
       setFollowUpEnabled(prefs?.enableFollowUpQuestions ?? false);
+      setSelectedVoiceId(prefs?.voiceId ?? "");
     } catch {
       setFollowUpEnabled(false);
     } finally {
@@ -102,128 +67,19 @@ export default function PreferencesPage() {
     }
   }, []);
 
+  const fetchVoiceOptions = useCallback(async () => {
+    try {
+      const res = await voiceService.listOptions();
+      setVoiceOptions(res?.data?.data ?? []);
+    } catch {
+      setVoiceOptions([]);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchContexts();
-    fetchFolders();
     fetchPreferences();
-  }, [fetchContexts, fetchFolders, fetchPreferences]);
-
-  // Keep folders updated when created elsewhere (e.g. sidebar)
-  useEffect(() => {
-    const handleFolderCreated = () => {
-      void fetchFolders();
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("folder-created", handleFolderCreated);
-    }
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("folder-created", handleFolderCreated);
-      }
-    };
-  }, [fetchFolders]);
-
-  // ── Context handlers ──────────────────────────────────────────────────────
-
-  const handleOpenCreate = () => {
-    setEditContext(null);
-    setContextInitialData(null);
-    setEditModalOpen(true);
-  };
-
-  const handleSaveContext = async (data: any) => {
-    setIsSaving(true);
-    try {
-      if (editContext) {
-        await contextService.update(editContext.id, data);
-        toast.success("Context updated");
-      } else {
-        await contextService.create(data);
-        toast.success("Context created");
-      }
-      setEditModalOpen(false);
-      await fetchContexts();
-    } catch {
-      toast.error("Failed to save context");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleContextRequestCreateFolder = (draft: {
-    title: string;
-    memory: string;
-    type: "GLOBAL" | "FOLDER" | "CUSTOM";
-    folderId: string;
-    isAutoSelected: boolean;
-  }) => {
-    setPendingContextDraft({
-      ...draft,
-      existingContextId: editContext?.id ?? null,
-    });
-    setEditModalOpen(false);
-    setCreateFolderOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setIsDeleting(true);
-    try {
-      await contextService.delete(deleteTarget.id);
-      toast.success("Context deleted");
-      setDeleteTarget(null);
-      await fetchContexts();
-    } catch {
-      toast.error("Failed to delete context");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleCreateFolder = async () => {
-    if (!newFolderName.trim() || isCreatingFolder) return;
-    setIsCreatingFolder(true);
-    try {
-      const res = await folderService.create({ name: newFolderName.trim() });
-      const createdId = res?.data?.data?.id;
-      toast.success("Folder created");
-      setNewFolderName("");
-      setCreateFolderOpen(false);
-      await fetchFolders();
-
-      if (pendingContextDraft && createdId) {
-        const draft = pendingContextDraft;
-        setPendingContextDraft(null);
-        const baseInitialData = {
-          title: draft.title,
-          memory: draft.memory,
-          type: "FOLDER" as const,
-          folderId: createdId,
-          isAutoSelected: draft.isAutoSelected,
-        };
-
-        if (draft.existingContextId) {
-          const existing = contexts.find(
-            (c) => c.id === draft.existingContextId,
-          ) || {
-            id: draft.existingContextId,
-          };
-          const nextContext = { ...existing, ...baseInitialData };
-          setContextInitialData(nextContext);
-          setEditContext(nextContext);
-        } else {
-          setContextInitialData(baseInitialData);
-          setEditContext(null);
-        }
-
-        setEditModalOpen(true);
-      }
-    } catch {
-      toast.error("Failed to create folder");
-    } finally {
-      setIsCreatingFolder(false);
-    }
-  };
+    fetchVoiceOptions();
+  }, [fetchPreferences, fetchVoiceOptions]);
 
   // ── Preferences handlers ──────────────────────────────────────────────────
 
@@ -241,6 +97,19 @@ export default function PreferencesPage() {
     }
   };
 
+  const handleVoiceChange = async (val: string) => {
+    const nextVoiceId = val === "default" ? null : val;
+    setSavingVoice(true);
+    try {
+      await userPreferenceService.updatePreferences({ voiceId: nextVoiceId });
+      setSelectedVoiceId(nextVoiceId ?? "");
+    } catch {
+      toast.error("Failed to update voice");
+    } finally {
+      setSavingVoice(false);
+    }
+  };
+
   const handleStartGuide = () => {
     if (typeof window === "undefined") return;
 
@@ -252,291 +121,87 @@ export default function PreferencesPage() {
     toast.info("Interactive startup guide started.");
   };
 
-  // ── Table columns ─────────────────────────────────────────────────────────
-
-  const getFolderName = (folderId: number) => {
-    if (!Array.isArray(folders)) return "Unknown Folder";
-    return folders.find((f) => f.id === folderId)?.name || "Unknown Folder";
-  };
-
-  const columns: Column[] = [
-    {
-      key: "title",
-      label: "Title",
-      render: (r) => (
-        <span className="font-medium max-w-37.5 truncate block" title={r.title}>
-          {r.title}
-        </span>
-      ),
-    },
-    {
-      key: "memory",
-      label: "Content Info",
-      render: (r) => (
-        <span
-          className="max-w-50 truncate block text-muted-foreground text-xs"
-          title={r.memory}
-        >
-          {r.memory}
-        </span>
-      ),
-    },
-    {
-      key: "type",
-      label: "Type",
-      render: (r) => (
-        <div className="flex flex-col gap-1 items-start">
-          <Badge
-            variant={
-              r.type === "GLOBAL"
-                ? "default"
-                : r.type === "FOLDER"
-                  ? "secondary"
-                  : "outline"
-            }
-          >
-            {r.type === "CUSTOM" ? "CHAT" : r.type}
-          </Badge>
-          {r.type === "FOLDER" && r.folderId && (
-            <span className="text-[10px] text-muted-foreground ml-1">
-              in {getFolderName(r.folderId)}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "isAutoSelected",
-      label: "Auto-Selected",
-      render: (r) => (
-        <Badge
-          variant={r.isAutoSelected ? "default" : "secondary"}
-          className="text-[10px] uppercase"
-        >
-          {r.type === "GLOBAL" ? (r.isAutoSelected ? "Yes" : "No") : "N/A"}
-        </Badge>
-      ),
-    },
-    {
-      key: "createdAt",
-      label: "Created",
-      render: (r) => (
-        <span className="text-xs whitespace-nowrap">
-          {new Date(r.createdAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </span>
-      ),
-    },
-    {
-      key: "actions",
-      label: "Actions",
-      className: "text-right",
-      render: (r) => (
-        <div className="flex justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title="View"
-            onClick={() => setViewContext(r)}
-          >
-            <Eye className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-blue-500"
-            title="Edit"
-            onClick={() => {
-              setEditContext(r);
-              setContextInitialData(r);
-              setEditModalOpen(true);
-            }}
-          >
-            <Edit2 className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            disabled={r.isAutoGenerated}
-            title={
-              r.isAutoGenerated
-                ? "Cannot delete system generated context"
-                : "Delete"
-            }
-            onClick={() => setDeleteTarget(r)}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-8">
-      {/* ── Context Memory ── */}
-      <section className="space-y-4">
-        <DataTable
-          columns={columns}
-          data={contexts}
-          title="Preferences"
-          description="Customize your chat experience and AI behaviour"
-          searchPlaceholder="Search contexts..."
-          headerActions={
-            <Button onClick={handleOpenCreate} size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Create Context
-            </Button>
-          }
-          loading={loadingContexts}
-        />
-      </section>
+    <div>
+      <SettingsHeader title="Preferences" description="How Colab AI looks, answers and talks to you." />
 
-      {/* ── AI Suggestions ── */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-semibold">AI Suggestions</h2>
-        </div>
+      <SectionLabel>Appearance</SectionLabel>
+      <SettingsCard>
+        <SettingRow title="Theme" description="Applies to every screen.">
+          <Segmented
+            value={theme}
+            onChange={(v) => {
+              if (v !== theme) toggleTheme();
+            }}
+            options={[
+              { value: "light", label: "Light", icon: Sun },
+              { value: "dark", label: "Dark", icon: Moon },
+            ]}
+          />
+        </SettingRow>
+      </SettingsCard>
 
-        <Card className="border-border/30 bg-card/80 backdrop-blur-sm">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium">
-                  Suggested Follow-up Questions
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Automatically generate 4 context-aware questions at the end of
-                  each AI response.
-                </p>
-              </div>
-              <Switch
-                checked={followUpEnabled}
-                onCheckedChange={handleToggleFollowUp}
-                disabled={togglingFollowUp || loadingPrefs}
-                id="follow-up-toggle"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </section>
+      <SectionLabel>Chat</SectionLabel>
+      <SettingsCard>
+        <SettingRow
+          title="Suggested follow-up questions"
+          description="Add 4 context-aware questions at the end of each AI response."
+        >
+          <Switch
+            checked={followUpEnabled}
+            onCheckedChange={handleToggleFollowUp}
+            disabled={togglingFollowUp || loadingPrefs}
+            id="follow-up-toggle"
+          />
+        </SettingRow>
+        <SettingRow title="Multi-model answers" description="How answers appear when you ask more than one model.">
+          <Segmented
+            value={multiView}
+            onChange={changeMultiView}
+            options={[
+              { value: "columns", label: "Columns", icon: Columns2 },
+              { value: "focus", label: "Focus", icon: Focus },
+            ]}
+          />
+        </SettingRow>
+      </SettingsCard>
 
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Compass className="w-4 h-4 text-primary" />
-          <h2 className="text-base font-semibold">Startup Guide</h2>
-        </div>
+      <SectionLabel>Voice</SectionLabel>
+      <SettingsCard>
+        <SettingRow title="Assistant voice" description="The voice Colab AI speaks with during voice chats.">
+          <Select
+            value={selectedVoiceId || "default"}
+            onValueChange={handleVoiceChange}
+            disabled={savingVoice || loadingPrefs}
+          >
+            <SelectTrigger className="w-40 rounded-xl">
+              <SelectValue placeholder="Default" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              {voiceOptions.map((voice) => (
+                <SelectItem key={voice.id} value={voice.id}>
+                  {voice.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </SettingsCard>
 
-        <Card className="border-border/30 bg-card/80 backdrop-blur-sm">
-          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-0.5">
-              <p className="text-sm font-medium">
-                Interactive onboarding walkthrough
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Re-run the guide anytime to learn chat basics, capabilities,
-                multi-model flow, contexts, assistants, enhancer, files, and
-                mic.
-              </p>
-            </div>
-            <Button onClick={handleStartGuide} className="sm:self-start">
-              Start Guide
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
-
-      <ContextViewDialog
-        open={!!viewContext}
-        onOpenChange={(open) => !open && setViewContext(null)}
-        context={viewContext}
-        getFolderName={getFolderName}
-      />
-
-      {/* ── Create / Edit Modal ── */}
-      <ContextModal
-        isOpen={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setPendingContextDraft(null);
-          setContextInitialData(null);
-        }}
-        onSave={handleSaveContext}
-        initialData={contextInitialData || editContext}
-        folders={folders}
-        isSaving={isSaving}
-        mode={editContext ? "edit" : "create"}
-        onRequestCreateFolder={handleContextRequestCreateFolder}
-      />
-
-      {/* ── Delete Confirmation ── */}
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open && !isDeleting) setDeleteTarget(null);
-        }}
-        title="Delete Context"
-        description={`Are you sure you want to delete "${deleteTarget?.title}"? This action cannot be undone.`}
-        onConfirm={handleConfirmDelete}
-        loading={isDeleting}
-      />
-
-      {/* New Project Folder dialog (for contexts on this page) */}
-      <Dialog
-        open={createFolderOpen}
-        onOpenChange={(open) => {
-          if (!isCreatingFolder) {
-            setCreateFolderOpen(open);
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Project Folder</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              placeholder="e.g. Marketing Campaign"
-              value={newFolderName}
-              onChange={(e) => setNewFolderName(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void handleCreateFolder();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!isCreatingFolder) {
-                  setCreateFolderOpen(false);
-                }
-              }}
-              disabled={isCreatingFolder}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => void handleCreateFolder()}
-              disabled={!newFolderName.trim() || isCreatingFolder}
-            >
-              {isCreatingFolder ? "Creating..." : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SectionLabel>Help</SectionLabel>
+      <SettingsCard>
+        <SettingRow
+          title="Startup guide"
+          description="Re-run the walkthrough of chat basics, multi-model answers, contexts, assistants, the prompt enhancer, files and voice."
+        >
+          <Button variant="outline" onClick={handleStartGuide} className="gap-2 rounded-xl">
+            <Compass className="h-4 w-4" /> Start guide
+          </Button>
+        </SettingRow>
+      </SettingsCard>
     </div>
   );
 }

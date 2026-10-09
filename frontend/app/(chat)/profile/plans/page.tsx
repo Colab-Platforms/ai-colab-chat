@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { DataTable, Column } from "@/components/dashboard/data-table";
 import { planService } from "@/lib/services";
 import { Loader2, Eye, Pencil, Trash2, Plus, Save } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 
 export default function PlansAdminPage() {
   const defaultFeatures = { maxModels: -1, attachments: true };

@@ -39,6 +39,15 @@ class InvoiceService {
         ? dateFormatter.format(subscription.nextBillingDate)
         : null;
 
+      // baseAmount/taxPercent/taxAmount are null for payments predating this
+      // split (or for flows that don't add GST on top, e.g. credit top-ups) —
+      // the template falls back to a single-line total in that case rather
+      // than showing a fabricated $0 tax row.
+      const baseAmount = invoice.payment.baseAmount;
+      const taxPercent = invoice.payment.taxPercent;
+      const taxAmount = invoice.payment.taxAmount;
+      const hasTaxBreakdown = baseAmount != null && taxPercent != null && taxAmount != null;
+
       const html = ejs.render(invoiceTemplate, {
         logoDataUri: invoiceLogoBase64,
         invoiceNumber: invoice.invoiceNumber,
@@ -50,6 +59,10 @@ class InvoiceService {
         billingCycle,
         paymentType: invoice.payment.type,
         amount: invoice.amount.toString(),
+        hasTaxBreakdown,
+        baseAmount: hasTaxBreakdown ? baseAmount!.toString() : null,
+        taxPercent: hasTaxBreakdown ? taxPercent!.toString() : null,
+        taxAmount: hasTaxBreakdown ? taxAmount!.toString() : null,
         currency: invoice.currency,
         nextBillingDate,
         autoRenew: subscription?.autoRenew ?? false,

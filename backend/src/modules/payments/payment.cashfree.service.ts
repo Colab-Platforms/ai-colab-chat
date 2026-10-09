@@ -33,7 +33,7 @@ class PaymentCashfreeService {
     };
   }
 
-  private getHttpsReturnUrl(): string | null {
+  private getHttpsReturnUrl(returnPath = "/profile/subscription/success"): string | null {
     const candidate =
       process.env.CASHFREE_SUBSCRIPTION_RETURN_URL ||
       process.env.FRONTEND_URL ||
@@ -41,7 +41,7 @@ class PaymentCashfreeService {
     const trimmed = String(candidate).trim();
     if (!trimmed.startsWith("https://")) return null;
     if (process.env.CASHFREE_SUBSCRIPTION_RETURN_URL) return trimmed;
-    return `${trimmed.replace(/\/+$/, "")}/profile/subscription/success`;
+    return `${trimmed.replace(/\/+$/, "")}${returnPath}`;
   }
 
   async createOrder(input: {
@@ -51,9 +51,11 @@ class PaymentCashfreeService {
     customerName: string;
     customerEmail: string;
     customerPhone: string;
+    /** Where Cashfree redirects after checkout — defaults to the subscription success page. */
+    returnPath?: string;
   }) {
     const endpoint = `${this.paymentsBaseUrl}/orders`;
-    const returnUrl = this.getHttpsReturnUrl();
+    const returnUrl = this.getHttpsReturnUrl(input.returnPath);
 
     const payload = {
       order_id: input.orderId,

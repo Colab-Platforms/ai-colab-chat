@@ -1,16 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { walletService, billingService } from "@/lib/services";
-import { Loader2, Coins, TrendingUp, Eye, Download } from "lucide-react";
+import { Segmented, SettingsCard, SettingsHeader } from "@/components/settings/settings-ui";
+import { walletService, billingService, creditWalletService } from "@/lib/services";
+import { Loader2, Eye, Download, MessagesSquare, Clapperboard } from "lucide-react";
 import { DataTable, Column } from "@/components/dashboard/data-table";
+import { CreditTopUpCard } from "@/components/wallet/credit-topup-card";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +13,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type ActivityTab = "tokens" | "credits" | "invoices";
+
+const CREDIT_TOPUP_BASELINE_KEY = "credit_topup_baseline";
+
 export default function WalletPage() {
   const [wallet, setWallet] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activityTab, setActivityTab] = useState<ActivityTab>("tokens");
+
+  // Credit wallet state
+  const [creditWallet, setCreditWallet] = useState<any>(null);
+  const [creditWalletLoading, setCreditWalletLoading] = useState(true);
+  const [creditTransactions, setCreditTransactions] = useState<any[]>([]);
+  const [creditTxLoading, setCreditTxLoading] = useState(false);
+  const [creditSort, setCreditSort] = useState("");
+  const [creditPage, setCreditPage] = useState(1);
+  const [creditPageSize, setCreditPageSize] = useState(10);
+  const [creditPagination, setCreditPagination] = useState<any>({});
 
   // Transactions state
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -44,7 +54,46 @@ export default function WalletPage() {
       .then((res) => setWallet(res.data.data))
       .catch(() => {})
       .finally(() => setLoading(false));
+    creditWalletService
+      .get()
+      .then((res) => setCreditWallet(res.data.data))
+      // A 404 here just means no CreditWallet row exists yet (e.g. the
+      // account subscribed before video credits existed, or is on Free) —
+      // not an error to hide the section for. It's created on first top-up
+      // or the next plan renewal.
+      .catch(() => setCreditWallet(null))
+      .finally(() => setCreditWalletLoading(false));
   }, []);
+
+  const fetchCreditTransactions = useCallback(async () => {
+    if (!creditWallet) return;
+    setCreditTxLoading(true);
+    try {
+      const params: any = { page: String(creditPage), pageSize: String(creditPageSize) };
+      if (creditSort) params.sort = creditSort;
+      const res = await creditWalletService.getTransactions(params);
+      const result = res.data.data;
+      setCreditTransactions(result?.data || []);
+      setCreditPagination(result || {});
+    } catch {
+      // ignore
+    } finally {
+      setCreditTxLoading(false);
+    }
+  }, [creditSort, creditPage, creditPageSize, creditWallet]);
+
+  useEffect(() => {
+    fetchCreditTransactions();
+  }, [fetchCreditTransactions]);
+
+  useEffect(() => {
+    setCreditPage(1);
+  }, [creditSort, creditPageSize]);
+
+  const handleTopUpCheckoutStart = () => {
+    if (typeof window === "undefined") return;
+    sessionStorage.setItem(CREDIT_TOPUP_BASELINE_KEY, String(creditWallet?.creditsRemaining ?? 0));
+  };
 
   const fetchTransactions = useCallback(async () => {
     if (!wallet) return;
@@ -106,11 +155,9 @@ export default function WalletPage() {
 
   if (!wallet) {
     return (
-      <Card className="border-border/30 bg-card/90 backdrop-blur-sm">
-        <CardContent className="py-12 text-center text-muted-foreground">
-          No wallet found. Subscribe to a plan first.
-        </CardContent>
-      </Card>
+      <SettingsCard className="py-12 text-center text-sm text-muted-foreground">
+        No wallet found. Subscribe to a plan first.
+      </SettingsCard>
     );
   }
 
@@ -136,13 +183,13 @@ export default function WalletPage() {
 
         return (
           <span
-            className={`text-xs uppercase px-2 py-1 rounded-md ${
+            className={`text-xs capitalize px-2 py-1 rounded-md ${
               isAddition
                 ? "text-emerald-500 bg-emerald-500/10"
                 : "text-rose-500 bg-rose-500/10"
             }`}
           >
-            {r.type.replace(/_/g, " ")}
+            {r.type.replace(/_/g, " ").toLowerCase()}
           </span>
         );
       },
@@ -218,7 +265,7 @@ export default function WalletPage() {
               ? "text-rose-500 bg-rose-500/10"
               : "text-amber-500 bg-amber-500/10";
         return (
-          <span className={`text-xs uppercase px-2 py-1 rounded-md ${color}`}>
+          <span className={`text-xs capitalize px-2 py-1 rounded-md ${color}`}>
             {r.status}
           </span>
         );
@@ -256,107 +303,193 @@ export default function WalletPage() {
     },
   ];
 
+  const creditColumns: Column[] = [
+    {
+      key: "referenceId",
+      label: "Reference ID",
+      render: (r: any) => (
+        <span className="font-mono text-xs text-muted-foreground">{r.referenceId || "-"}</span>
+      ),
+    },
+    {
+      key: "type",
+      label: "Type",
+      sortable: true,
+      render: (r: any) => {
+        const isAddition = r.type !== "DEBIT";
+        return (
+          <span
+            className={`text-xs capitalize px-2 py-1 rounded-md ${
+              isAddition ? "text-emerald-500 bg-emerald-500/10" : "text-rose-500 bg-rose-500/10"
+            }`}
+          >
+            {r.type.replace(/_/g, " ").toLowerCase()}
+          </span>
+        );
+      },
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      sortable: true,
+      render: (r: any) => {
+        const isAddition = r.type !== "DEBIT";
+        const color = isAddition ? "text-emerald-500" : "text-rose-500";
+        return (
+          <span className={`font-mono text-sm font-medium ${color}`}>
+            {isAddition ? "+" : "-"}
+            {Math.abs(r.amount).toLocaleString()}
+          </span>
+        );
+      },
+    },
+    {
+      key: "createdAt",
+      label: "Date",
+      sortable: true,
+      render: (r) => (
+        <span className="text-muted-foreground text-sm">{new Date(r.createdAt).toLocaleString()}</span>
+      ),
+    },
+  ];
+
+  const periodEnd = wallet.currentPeriodEnd
+    ? new Date(wallet.currentPeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : null;
+  const creditTotal = (creditWallet?.bundledCredits ?? 0) + (creditWallet?.topupCredits ?? 0);
+  const creditPlanPct = creditTotal > 0 ? ((creditWallet?.bundledCredits ?? 0) / creditTotal) * 100 : 0;
+
+  const tabs: { value: ActivityTab; label: string }[] = [
+    { value: "tokens", label: "Tokens" },
+    ...(creditWallet ? [{ value: "credits" as const, label: "Video credits" }] : []),
+    { value: "invoices", label: "Invoices" },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Wallet</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Track your token balance and usage
-        </p>
-      </div>
+    <div>
+      <SettingsHeader
+        title="Wallet"
+        description="Your plan's chat tokens, video credits and payment history. Chat tokens reset each month; video credits can be topped up."
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardContent className="p-6 text-center">
-            <Coins className="w-8 h-8 mx-auto text-emerald-500 mb-2" />
-            <p className="text-3xl font-bold">
-              {wallet.tokensRemaining.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Tokens Remaining
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card/90 backdrop-blur-sm border-border/30">
-          <CardContent className="p-6 text-center">
-            <TrendingUp className="w-8 h-8 mx-auto text-blue-500 mb-2" />
-            <p className="text-3xl font-bold">
-              {wallet.tokensUsed.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">Tokens Used</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/30 bg-card/90 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-base">Usage Progress</CardTitle>
-          <CardDescription>
-            Period:{" "}
-            {wallet.currentPeriodStart
-              ? new Date(wallet.currentPeriodStart).toLocaleDateString()
-              : "N/A"}{" "}
-            —{" "}
-            {wallet.currentPeriodEnd
-              ? new Date(wallet.currentPeriodEnd).toLocaleDateString()
-              : "N/A"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Used</span>
-              <span className="font-medium">
-                {wallet.tokensUsed.toLocaleString()} / {total.toLocaleString()}
-              </span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primary to-primary/60 transition-all"
-                style={{ width: `${Math.min(usagePercent, 100)}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{usagePercent.toFixed(1)}% used</span>
-              <span>{wallet.tokensRemaining.toLocaleString()} remaining</span>
-            </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <SettingsCard className="p-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
+              <MessagesSquare className="h-4 w-4 text-accent-ink" />
+            </span>
+            <span className="text-[13px] font-medium">Chat tokens</span>
           </div>
-        </CardContent>
-      </Card>
+          <p className="mt-4 text-[32px] font-semibold leading-none tracking-tight">
+            {wallet.tokensRemaining.toLocaleString()}
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">left</span>
+          </p>
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-sunken">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(usagePercent, 100)}%` }} />
+          </div>
+          <div className="mt-2.5 flex justify-between text-xs text-muted-foreground">
+            <span>
+              {wallet.tokensUsed.toLocaleString()} used of {total.toLocaleString()}
+            </span>
+            {periodEnd && <span>Resets {periodEnd}</span>}
+          </div>
+        </SettingsCard>
 
-      <DataTable
-        columns={columns}
-        data={transactions}
-        title="Transactions"
-        description="History of your token deductions, recharges, and refunds"
-        sort={sort}
-        onSortChange={setSort}
-        page={page}
-        pageSize={pageSize}
-        totalRecords={pagination.totalRecords || 0}
-        totalPages={pagination.totalPages || 1}
-        hasNextPage={pagination.hasNextPage}
-        hasPreviousPage={pagination.hasPreviousPage}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-        loading={txLoading}
-      />
+        <SettingsCard className="p-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
+              <Clapperboard className="h-4 w-4 text-accent-ink" />
+            </span>
+            <span className="text-[13px] font-medium">Video credits</span>
+          </div>
+          <p className="mt-4 text-[32px] font-semibold leading-none tracking-tight">
+            {(creditWallet?.creditsRemaining ?? 0).toLocaleString()}
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">credits</span>
+          </p>
+          <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-sunken">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${creditTotal > 0 ? 100 : 0}%` }} />
+          </div>
+          <div className="mt-2.5 flex justify-between text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              {(creditWallet?.bundledCredits ?? 0).toLocaleString()} plan · resets monthly
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-border-strong" style={{ background: "var(--cl-border-strong)" }} />
+              {(creditWallet?.topupCredits ?? 0).toLocaleString()} top-up · never expire
+            </span>
+          </div>
+        </SettingsCard>
+      </div>
 
-      <DataTable
-        columns={invoiceColumns}
-        data={invoices}
-        title="Invoices"
-        description="Downloadable invoices for your payments"
-        page={invoicePage}
-        pageSize={invoicePageSize}
-        totalRecords={invoicePagination.totalRecords || 0}
-        totalPages={invoicePagination.totalPages || 1}
-        hasNextPage={invoicePagination.hasNextPage}
-        hasPreviousPage={invoicePagination.hasPreviousPage}
-        onPageChange={setInvoicePage}
-        onPageSizeChange={setInvoicePageSize}
-        loading={invoicesLoading}
-      />
+      {!creditWalletLoading && (
+        <div className="mt-4">
+          {!creditWallet && (
+            <p className="mb-2 px-1 text-xs text-muted-foreground">
+              No credits yet — they&apos;re added automatically on your plan&apos;s next renewal, or as soon as you top up below.
+            </p>
+          )}
+          <CreditTopUpCard onCheckoutStart={handleTopUpCheckoutStart} />
+        </div>
+      )}
+
+      <SettingsCard className="mt-4 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <h2 className="text-base font-semibold">Activity</h2>
+          <Segmented value={activityTab} onChange={setActivityTab} options={tabs} />
+        </div>
+        <div className="border-t border-border">
+          {activityTab === "tokens" && (
+            <DataTable
+              columns={columns}
+              data={transactions}
+              sort={sort}
+              onSortChange={setSort}
+              page={page}
+              pageSize={pageSize}
+              totalRecords={pagination.totalRecords || 0}
+              totalPages={pagination.totalPages || 1}
+              hasNextPage={pagination.hasNextPage}
+              hasPreviousPage={pagination.hasPreviousPage}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              loading={txLoading}
+            />
+          )}
+          {activityTab === "credits" && creditWallet && (
+            <DataTable
+              columns={creditColumns}
+              data={creditTransactions}
+              sort={creditSort}
+              onSortChange={setCreditSort}
+              page={creditPage}
+              pageSize={creditPageSize}
+              totalRecords={creditPagination.totalRecords || 0}
+              totalPages={creditPagination.totalPages || 1}
+              hasNextPage={creditPagination.hasNextPage}
+              hasPreviousPage={creditPagination.hasPreviousPage}
+              onPageChange={setCreditPage}
+              onPageSizeChange={setCreditPageSize}
+              loading={creditTxLoading}
+            />
+          )}
+          {activityTab === "invoices" && (
+            <DataTable
+              columns={invoiceColumns}
+              data={invoices}
+              page={invoicePage}
+              pageSize={invoicePageSize}
+              totalRecords={invoicePagination.totalRecords || 0}
+              totalPages={invoicePagination.totalPages || 1}
+              hasNextPage={invoicePagination.hasNextPage}
+              hasPreviousPage={invoicePagination.hasPreviousPage}
+              onPageChange={setInvoicePage}
+              onPageSizeChange={setInvoicePageSize}
+              loading={invoicesLoading}
+            />
+          )}
+        </div>
+      </SettingsCard>
 
       <Dialog
         open={!!selectedTx}
@@ -374,7 +507,7 @@ export default function WalletPage() {
                     Type
                   </span>
                   <span
-                    className={`text-xs uppercase px-2 py-1 rounded-md ${
+                    className={`text-xs capitalize px-2 py-1 rounded-md ${
                       selectedTx.type === "CREDIT"
                         ? "text-emerald-500 bg-emerald-500/10"
                         : "text-rose-500 bg-rose-500/10"

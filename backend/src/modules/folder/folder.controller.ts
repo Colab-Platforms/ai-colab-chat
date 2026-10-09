@@ -64,6 +64,34 @@ export const listFolders = async (
   }
 };
 
+export const getFolder = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const result = await folderService.getById(
+      req.user!.id,
+      parseInt(req.params.id as string),
+    );
+    sendResponse(
+      res,
+      true,
+      result,
+      "Folder fetched successfully",
+      STATUS_CODES.OK,
+    );
+  } catch (error: any) {
+    console.error("Get folder error", error);
+    sendResponse(
+      res,
+      false,
+      null,
+      error.message,
+      error.statusCode ?? STATUS_CODES.SERVER_ERROR,
+    );
+  }
+};
+
 export const updateFolder = async (
   req: Request,
   res: Response,

@@ -2,22 +2,29 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { chatService } from "@/lib/services";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Loader2, ArchiveRestore, MessageSquare, Archive } from "lucide-react";
-import { toast } from "react-toastify";
+import { Loader2, ArchiveRestore, MessageSquare, Archive, Trash2 } from "lucide-react";
+import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
+import { SettingsCard, SettingsHeader } from "@/components/settings/settings-ui";
 
 interface ArchivedChat {
   id: number;
   title: string | null;
   updatedAt: string;
   createdAt: string;
+  model?: { name?: string } | null;
+  models?: { name?: string }[];
 }
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
 export default function ArchivedChatsPage() {
   const [chats, setChats] = useState<ArchivedChat[]>([]);
   const [loading, setLoading] = useState(true);
   const [unarchivingId, setUnarchivingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ArchivedChat | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchArchivedChats = useCallback(async () => {
     try {
@@ -38,83 +45,109 @@ export default function ArchivedChatsPage() {
     setUnarchivingId(chatId);
     try {
       await chatService.archive(chatId);
-      toast.success("Chat unarchived");
+      toast.success("Chat restored");
       setChats((prev) => prev.filter((c) => c.id !== chatId));
     } catch {
-      toast.error("Failed to unarchive chat");
+      toast.error("Failed to restore chat");
     } finally {
       setUnarchivingId(null);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center p-12">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await chatService.delete(deleteTarget.id);
+      toast.success("Chat deleted");
+      setChats((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch {
+      toast.error("Failed to delete chat");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const modelLabel = (c: ArchivedChat) => c.model?.name || c.models?.[0]?.name;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Archived Chats</h1>
-        <p className="text-muted-foreground text-xs sm:text-sm mt-1">
-          View and restore your archived conversations.
-        </p>
-      </div>
+    <div>
+      <SettingsHeader title="Archived chats" description="Chats you archive from the sidebar appear here. Restore them anytime." />
 
-      {chats.length === 0 ? (
-        <Card className="border-dashed bg-card/90 backdrop-blur-sm">
-          <CardContent className="flex flex-col items-center justify-center py-10 sm:py-12 text-center px-4">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Archive className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <h3 className="font-semibold text-base sm:text-lg mb-1">No archived chats</h3>
-            <p className="text-muted-foreground text-xs sm:text-sm max-w-sm">
-              Chats you archive from the sidebar will appear here. You can unarchive them anytime.
-            </p>
-          </CardContent>
-        </Card>
+      {loading ? (
+        <div className="flex items-center justify-center p-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : chats.length === 0 ? (
+        <SettingsCard className="flex flex-col items-center justify-center px-4 py-12 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-sunken">
+            <Archive className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="mb-1 text-base font-semibold">No archived chats</h3>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            Chats you archive from the sidebar will appear here. You can restore them anytime.
+          </p>
+        </SettingsCard>
       ) : (
-        <div className="bg-card/90 backdrop-blur-sm border border-border/30 rounded-xl divide-y divide-border/20">
+        <SettingsCard className="overflow-hidden">
           {chats.map((chat) => (
-            <div key={chat.id} className="flex items-start sm:items-center justify-between gap-3 p-3 sm:p-4 hover:bg-muted/30 transition-colors">
-              <div className="flex items-start gap-3 min-w-0 flex-1">
-                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5 sm:mt-0">
-                  <MessageSquare className="w-4 h-4 text-muted-foreground" />
+            <div
+              key={chat.id}
+              className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5 transition-colors hover:bg-sunken/60"
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sunken">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm break-words">
-                    {chat.title || "Untitled Chat"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(chat.updatedAt).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{chat.title || "Untitled chat"}</p>
+                  <p className="mt-0.5 text-xs text-faint">
+                    {modelLabel(chat) ? `${modelLabel(chat)} · ` : ""}Archived {fmtDate(chat.updatedAt)}
                   </p>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 flex-shrink-0 h-8"
-                onClick={() => handleUnarchive(chat.id)}
-                disabled={unarchivingId === chat.id}
-              >
-                {unarchivingId === chat.id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <ArchiveRestore className="w-3.5 h-3.5" />
-                )}
-                <span className="hidden sm:inline">Unarchive</span>
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleUnarchive(chat.id)}
+                  disabled={unarchivingId === chat.id}
+                  className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[13px] font-medium transition-colors hover:bg-sunken disabled:opacity-60"
+                >
+                  {unarchivingId === chat.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ArchiveRestore className="h-3.5 w-3.5" />
+                  )}
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(chat)}
+                  title="Delete chat"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
-        </div>
+          <p className="px-5 py-3 text-xs text-faint">
+            {chats.length} archived chat{chats.length === 1 ? "" : "s"}
+          </p>
+        </SettingsCard>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+        title="Delete chat"
+        description={`Permanently delete "${deleteTarget?.title || "Untitled chat"}"? This can't be undone.`}
+        onConfirm={handleDelete}
+        loading={deleting}
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ChatLayoutView } from "@/components/chat/ChatLayoutView";
+import { DocumentPanelProvider } from "@/context/document-panel-context";
 
 /**
  * Keeps a single ChatLayoutView instance for all authenticated chat routes.
@@ -27,11 +28,19 @@ export function ChatRootShell({ children }: { children: ReactNode }) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
     pathname.startsWith("/forgot-password") ||
-    pathname.startsWith("/share/");
+    pathname.startsWith("/share/") ||
+    // Public marketing page — never inside the chat layout, signed in or not.
+    pathname.startsWith("/business") ||
+    pathname.startsWith("/code-preview/") ||
+    pathname.startsWith("/admin");
 
   if (bareShell) {
     return <>{children}</>;
   }
 
-  return <ChatLayoutView>{children}</ChatLayoutView>;
+  return (
+    <DocumentPanelProvider>
+      <ChatLayoutView>{children}</ChatLayoutView>
+    </DocumentPanelProvider>
+  );
 }

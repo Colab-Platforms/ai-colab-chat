@@ -1,12 +1,19 @@
 import { Request, Response } from "express";
 import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
+import { getUserPlanContext, assertCanGenerateImage } from "@/modules/plan-access/planAccess.service.js";
 import { createOpenRouterStream } from "@/utils/openrouter.js";
 import { estimateMessageTokens } from "@/utils/tokenCounter.js";
 import { checkPredefinedResponse } from "@/utils/predefinedResponses.js";
 import {
+  buildSystemMessage,
+  getDefaultSystemPrompt,
+} from "@/utils/systemPrompt.js";
+import {
   createWalletTransaction,
   calculateAdjustedTokens,
+  computeBillableTokens,
+  getUsdPerToken,
 } from "@/utils/walletUtils.js";
 import AttachmentService from "@/modules/attachment/attachment.service.js";
 import mammoth from "mammoth";
@@ -17,6 +24,21 @@ import {
   parseSpreadsheetFromUrl,
 } from "@/utils/spreadsheet.js";
 import { parsePdfFromUrl } from "@/utils/pdf.js";
+import {
+  maybeGenerateDocumentFromChat,
+  parseRequestedDocumentOptions,
+  prepareDocumentTurn,
+} from "@/modules/document/document.chat.js";
+import {
+  CODE_MAX_COMPLETION,
+  CodeSession,
+  injectCodeTurnMessages,
+  prepareCodeTurn,
+  resolveCodeChatType,
+} from "@/modules/code-workspace/code-workspace.chat.js";
+import { CODE_CONTINUE_PROMPT } from "@/modules/code-workspace/code-workspace.protocol.js";
+
+import { abortChatStreams, registerStream } from "./chat.streamRegistry.js";
 
 const attachmentService = new AttachmentService();
 
@@ -30,32 +52,34 @@ function isAbortError(error: any) {
   );
 }
 
+/**
+ * Wires a generation to the stop control — NOT to the browser connection.
+ *
+ * This used to abort the generation whenever the client disconnected, so
+ * navigating to another page, switching tab or a network blip stopped a
+ * half-finished answer and saved "Generation stopped by user." Now a dropped
+ * connection leaves the job running: it finishes, is saved to the chat, and is
+ * waiting when the user returns. Only an explicit stop request aborts it (see
+ * stopChatGeneration / chat.streamRegistry.ts).
+ */
 function setupClientAbortTracking(
   req: Request,
   res: Response,
   abortController: AbortController,
 ) {
-  let clientAborted = false;
-  let responseFinished = false;
-  const onResponseFinish = () => {
-    responseFinished = true;
-  };
-  const abortIfDisconnected = () => {
-    if (responseFinished) return;
-    if (!req.aborted && req.complete) return;
-    clientAborted = true;
-    abortController.abort();
-  };
-  const onClientDisconnect = () => {
-    if (responseFinished) return;
-    clientAborted = true;
-    abortController.abort();
-  };
-  req.on("aborted", abortIfDisconnected);
-  req.on("close", abortIfDisconnected);
-  res.on("close", onClientDisconnect);
-  res.on("finish", onResponseFinish);
-  return () => clientAborted || abortController.signal.aborted;
+  const userId = req.user?.id;
+  const chatId = Number(req.params.chatId);
+  if (userId && Number.isFinite(chatId)) {
+    const unregister = registerStream(userId, chatId, abortController);
+    res.on("finish", unregister);
+  }
+  return () => abortController.signal.aborted;
+}
+
+/** POST /chats/:chatId/stop — the user pressed Stop. */
+export async function stopChatGeneration(req: Request, res: Response) {
+  const stopped = abortChatStreams(req.user!.id, Number(req.params.chatId));
+  res.status(200).json({ status: true, data: { stopped }, message: "Stopped" });
 }
 
 async function touchChat(chatId: number) {
@@ -101,20 +125,15 @@ async function getDefaultContextIdsForChat(
   userId: number,
   folderId?: number | null,
 ) {
-  const globalContextsQuery = folderId
-    ? prisma.contextMemory.findMany({
-        where: {
-          userId,
-          type: "GLOBAL",
-          isAutoSelected: true,
-          isDeleted: false,
-        },
-        select: { id: true },
-      })
-    : prisma.contextMemory.findMany({
-        where: { userId, type: "GLOBAL", isDeleted: false },
-        select: { id: true },
-      });
+  const globalContextsQuery = prisma.contextMemory.findMany({
+    where: {
+      userId,
+      type: "GLOBAL",
+      isAutoSelected: true,
+      isDeleted: false,
+    },
+    select: { id: true },
+  });
 
   const folderContextsQuery = folderId
     ? prisma.contextMemory.findMany({
@@ -429,13 +448,14 @@ async function checkTokenLimitsAndSetupStream(
   assistantMessageId: number,
   messageIdPayload: Record<string, any>,
   enableFollowUpQuestions: boolean,
+  absoluteMaxCompletion = 10000,
 ): Promise<{ maxCompletionTokens: number; trimmedHistory: any[] } | null> {
   const tokenMultiplier = model.tokenMultiplier ?? 1.0;
   const maxAffordableTokens = Math.floor(
     wallet.tokensRemaining / tokenMultiplier,
   );
 
-  res.setHeader("Content-Type", "text-event-stream");
+  res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
@@ -466,7 +486,7 @@ async function checkTokenLimitsAndSetupStream(
 
     if (allowedPromptTokens <= 0) {
       res.write(
-        `data: ${JSON.stringify({ type: "error", message: "Insufficient tokens for this prompt length." })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", code: "INSUFFICIENT_BALANCE", message: "Insufficient tokens for this prompt length." })}\n\n`,
       );
       res.write("data: [DONE]\n\n");
       res.end();
@@ -597,7 +617,9 @@ async function checkTokenLimitsAndSetupStream(
 
   // Set a hard absolute upper limit of 10,000 raw tokens for generating tokens in a single response
   // Note: For models with multipliers, this could incur up to 30k billable tokens (e.g. 3x Opus)
-  const ABSOLUTE_MAX_COMPLETION = 10000;
+  // Code-workspace turns pass a higher cap (CODE_MAX_COMPLETION) — a whole
+  // multi-file project does not fit in 10k tokens.
+  const ABSOLUTE_MAX_COMPLETION = absoluteMaxCompletion;
 
   const maxCompletionTokens = Math.min(
     Math.max(1, maxAffordableTokens - currentHistoryTokens),
@@ -614,6 +636,26 @@ interface SendMessageBody {
   userMessageId?: number;
   assistantMessageId?: number;
   attachmentIds?: number[];
+  replaceModelId?: number;
+  /** Documents studio: output format and visual template picked up front. */
+  documentFormat?: string;
+  documentTheme?: string;
+}
+
+/**
+ * Flattens a history entry's content to plain text.
+ *
+ * History content is either a bare string or the multipart array used for
+ * attachments/images, so the document intent classifier — which only ever
+ * reasons about words — needs the text parts pulled back out.
+ */
+function historyContentToText(content: any): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part: any) => part?.type === "text" && typeof part.text === "string")
+    .map((part: any) => part.text)
+    .join("\n");
 }
 
 function keepOnlyFirstImageMarkdown(content: string): string {
@@ -629,8 +671,22 @@ function keepOnlyFirstImageMarkdown(content: string): string {
   });
 }
 
-const EMPTY_IMAGE_RESPONSE_ERROR =
-  "Image generation failed: the request was blocked by safety checks or produced no image output.";
+/**
+ * An image request that comes back with no image is almost always a provider
+ * refusal / safety block, not a balance problem (the wallet is checked before
+ * the request is sent), so say that instead of blaming the user's tokens.
+ */
+function buildEmptyImageResponseError(
+  finishReason: string | null,
+  refusal: string | null,
+): string {
+  console.warn(
+    `[image-generation] empty response finishReason=${finishReason ?? "none"} refusal=${refusal ?? "none"}`,
+  );
+  const base =
+    "Image generation failed: the model didn't return an image. This can happen if the prompt or photo was blocked by the provider's safety filters. Try rephrasing your prompt.";
+  return refusal ? `${base} Provider message: ${refusal}` : base;
+}
 
 const FAILED_GENERATION_USER_MESSAGE =
   "Failed to generate a response. Please try again.";
@@ -644,6 +700,10 @@ interface OpenRouterSseAccumulator {
   imagesToUpload: string[];
   selectedImageUrl: string | null;
   finishReason: string | null;
+  /** Provider refusal text (e.g. safety block), when reported. */
+  refusal: string | null;
+  /** Real $ OpenRouter charged for this request (usage.cost), when reported. */
+  costUsd: number | null;
 }
 
 interface OpenRouterStreamError extends Error {
@@ -658,6 +718,8 @@ function createEmptyOpenRouterAccumulator(): OpenRouterSseAccumulator {
     imagesToUpload: [],
     selectedImageUrl: null,
     finishReason: null,
+    refusal: null,
+    costUsd: null,
   };
 }
 
@@ -667,7 +729,8 @@ function hasStreamAccumulatorData(acc: OpenRouterSseAccumulator): boolean {
     acc.promptTokens > 0 ||
     acc.completionTokens > 0 ||
     acc.imagesToUpload.length > 0 ||
-    acc.finishReason,
+    acc.finishReason ||
+    acc.refusal,
   );
 }
 
@@ -688,13 +751,20 @@ function shouldRetryEmptyOpenRouterAttempt(
   return !fullContent.trim() && completionTokens === 0;
 }
 
+interface StreamPumpOptions {
+  includeImages?: boolean;
+  includeAnnotations?: boolean;
+  codeSession?: CodeSession | null;
+}
+
 async function pipeOpenRouterStreamToClient(
   stream: AsyncIterable<any>,
   chatType: string | undefined,
   res: Response,
   isClientAborted: () => boolean,
   acc: OpenRouterSseAccumulator,
-  streamOptions: { includeImages?: boolean; includeAnnotations?: boolean },
+  streamOptions: StreamPumpOptions,
+  modelLabel?: string,
 ): Promise<void> {
   const includeImages = streamOptions.includeImages !== false;
   const includeAnnotations = streamOptions.includeAnnotations === true;
@@ -737,7 +807,12 @@ async function pipeOpenRouterStreamToClient(
       }
     }
 
-    if (delta) {
+    if (delta && streamOptions.codeSession) {
+      // Code-workspace turn: the session parses the tagged output and emits
+      // token / code_file_* events itself.
+      acc.fullContent += delta;
+      streamOptions.codeSession.push(delta);
+    } else if (delta) {
       acc.fullContent += delta;
       res.write(
         `data: ${JSON.stringify({ type: "token", content: delta })}\n\n`,
@@ -755,6 +830,21 @@ async function pipeOpenRouterStreamToClient(
     if (chunk.usage) {
       acc.promptTokens = chunk.usage.prompt_tokens || 0;
       acc.completionTokens = chunk.usage.completion_tokens || 0;
+      if (typeof chunk.usage.cost === "number") {
+        acc.costUsd = chunk.usage.cost;
+        if (chatType === "IMAGE_GENERATION") {
+          console.log(
+            `[image-generation] model=${modelLabel ?? "?"} real OpenRouter cost=$${chunk.usage.cost} ` +
+              `promptTokens=${acc.promptTokens} completionTokens=${acc.completionTokens}`,
+          );
+        }
+      }
+    }
+    const refusal =
+      chunk.choices?.[0]?.delta?.refusal ||
+      chunk.choices?.[0]?.message?.refusal;
+    if (typeof refusal === "string" && refusal.trim()) {
+      acc.refusal = refusal;
     }
     const fr =
       chunk.choices?.[0]?.finish_reason ||
@@ -775,8 +865,9 @@ async function runOpenRouterStreamWithEmptyRetry(params: {
   chatType: string | undefined;
   res: Response;
   isClientAborted: () => boolean;
-  streamOptions: { includeImages?: boolean; includeAnnotations?: boolean };
+  streamOptions: StreamPumpOptions;
   createStream: () => Promise<AsyncIterable<any>>;
+  modelLabel?: string;
 }): Promise<OpenRouterSseAccumulator> {
   let acc = createEmptyOpenRouterAccumulator();
 
@@ -794,6 +885,7 @@ async function runOpenRouterStreamWithEmptyRetry(params: {
         params.isClientAborted,
         acc,
         params.streamOptions,
+        params.modelLabel,
       );
     } catch (error: any) {
       const streamError = error as OpenRouterStreamError;
@@ -823,11 +915,21 @@ export async function streamChat(req: Request, res: Response) {
   const {
     content,
     modelId,
-    chatType,
+    chatType: requestedChatType,
     userMessageId,
     assistantMessageId,
     attachmentIds,
+    replaceModelId,
+    documentFormat,
+    documentTheme,
   } = req.body as SendMessageBody;
+  const requestedDocument = parseRequestedDocumentOptions(
+    documentFormat,
+    documentTheme,
+  );
+  // The "Code" pill arrives as chatType CODE; from here on the turn is a
+  // STANDARD turn plus a forceCode flag (see code-workspace.chat.ts).
+  const { chatType, forceCode } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -869,16 +971,28 @@ export async function streamChat(req: Request, res: Response) {
 
     const isfreeModel = model.isFreeModel
 
-    console.log(" it is returning from here 1", isfreeModel, model.isFreeModel, model.name, model.externalId, model.modelProvider.name)
-
-    // Check wallet
-    const wallet = await prisma.userWallet.findUnique({ where: { userId } });
-    if ((!wallet || wallet.tokensRemaining <= 0 ) && !isfreeModel) {
-      res.status(400).json({ status: false, message: "Token limit exceeded" });
+    // Model choice itself isn't plan-restricted — any plan (including Free)
+    // may pick any model, gated purely by wallet balance: a paid model bills
+    // real cost against tokensRemaining like normal, and once that hits zero
+    // only free models (which bill $0) keep working. Image generation is
+    // still a genuine plan capability, so that gate stays.
+    const planContext = await getUserPlanContext(userId);
+    try {
+      if (chatType === "IMAGE_GENERATION") {
+        assertCanGenerateImage(planContext);
+      }
+    } catch (err: any) {
+      res.status(err.statusCode ?? 403).json({ status: false, code: "PLAN_RESTRICTED", message: err.message });
       return;
     }
 
-    console.log(" it is returning from here 2")
+    // Check wallet
+    const usdPerToken = await getUsdPerToken();
+    const wallet = await prisma.userWallet.findUnique({ where: { userId } });
+    if ((!wallet || wallet.tokensRemaining <= 0 ) && !isfreeModel) {
+      res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
+      return;
+    }
 
 
     // Reuse existing user message or create a new one
@@ -944,6 +1058,19 @@ export async function streamChat(req: Request, res: Response) {
       });
     }
 
+    // A retry that switches models (e.g. "switch to free model" after an
+    // insufficient-balance failure) supersedes the prior failed attempt on
+    // this message instead of adding a second model to it.
+    if (replaceModelId && replaceModelId !== modelId) {
+      await prisma.modelResponse.deleteMany({
+        where: {
+          messageId: assistantMessage.id,
+          modelId: replaceModelId,
+          status: "FAILED",
+        },
+      });
+    }
+
     await touchChat(chatId);
 
     // Build conversation history - exclude current messages to avoid duplication
@@ -1000,40 +1127,37 @@ export async function streamChat(req: Request, res: Response) {
       userPreference?.enableFollowUpQuestions !== false;
 
     // -----------------------------------------------------------------------
-    // Assistant persona injection – prepend assistant system prompt first
-    // so it sits at the very beginning of the conversation context.
-    // Context memory (user personalisation) is stacked on top of it next.
+    // Persona injection – prepend the assistant's system prompt (or the
+    // platform default for normal chats) so it sits at the very beginning of
+    // the conversation context. Context memory (user personalisation) is
+    // stacked on top of it next.
     // -----------------------------------------------------------------------
     let assistantTemperature: number | undefined;
+    let personaPrompt: string | null = null;
+    let assistantSlug: string | null = null;
     if (chat.assistantId) {
       const chatAssistant = await prisma.assistant.findFirst({
         where: { id: chat.assistantId, isActive: true, isDeleted: false },
       });
       if (chatAssistant) {
+        assistantSlug = chatAssistant.slug;
         console.log(
           `[DEBUG] Adding Assistant System Prompt for: ${chatAssistant.name}`,
         );
-        const usePromptCaching =
-          model.externalId.includes("anthropic/") ||
-          model.externalId.includes("claude");
-        conversationHistory.unshift({
-          role: "system",
-          content: usePromptCaching
-            ? [
-                {
-                  type: "text",
-                  text: chatAssistant.systemPrompt,
-                  cache_control: { type: "ephemeral" },
-                },
-              ]
-            : chatAssistant.systemPrompt,
-        });
+        personaPrompt = chatAssistant.systemPrompt;
         assistantTemperature = chatAssistant.temperature;
       } else {
         console.log(
           `[DEBUG] Assistant with ID ${chat.assistantId} not found or inactive`,
         );
       }
+    }
+
+    const systemPrompt = personaPrompt ?? getDefaultSystemPrompt(chatType);
+    if (systemPrompt) {
+      conversationHistory.unshift(
+        buildSystemMessage(systemPrompt, model.externalId),
+      );
     }
 
     const selectedContexts = await getSelectedContextsForChat(userId, chatId);
@@ -1044,21 +1168,9 @@ export async function streamChat(req: Request, res: Response) {
         `[DEBUG] Adding User Context (${contextStrings.length} items)`,
       );
       const systemContent = `User context (personalisation — always keep in mind):\n${contextStrings.map((c: any) => `- ${c}`).join("\n")}`;
-      const usePromptCaching =
-        model.externalId.includes("anthropic/") ||
-        model.externalId.includes("claude");
-      conversationHistory.unshift({
-        role: "system",
-        content: usePromptCaching
-          ? [
-              {
-                type: "text",
-                text: systemContent,
-                cache_control: { type: "ephemeral" },
-              },
-            ]
-          : systemContent,
-      });
+      conversationHistory.unshift(
+        buildSystemMessage(systemContent, model.externalId),
+      );
     }
 
     // Build multipart content for current message if attachments are present
@@ -1136,6 +1248,61 @@ export async function streamChat(req: Request, res: Response) {
     }
     // ---------------------------------------
 
+    // -----------------------------------------------------------------------
+    // Document generation — pre-stream pass.
+    //
+    // Classifying BEFORE the answer streams is what stops the model from
+    // refusing ("I can't create files, paste the text again") while the
+    // pipeline renders the PDF anyway. Gated by a free regex, so ordinary
+    // turns pay nothing; only a real document request costs the extra call.
+    //
+    // Runs before the token budget is computed so the injected note is priced
+    // in rather than pushing the turn over the limit.
+    // -----------------------------------------------------------------------
+    const lastAssistantAnswer = [...conversationHistory]
+      .reverse()
+      .filter((m: any) => m.role === "assistant")
+      .map((m: any) => historyContentToText(m.content))
+      .find((text: string) => text.trim().length > 0);
+
+    // Code workspace (Software Engineer assistant only) — decided before the
+    // token budget so the protocol prompt and project files are priced in.
+    // A code turn replaces the document pipeline for this message.
+    const codeTurn = await prepareCodeTurn({
+      userId,
+      chatId,
+      userPrompt: content,
+      assistantSlug,
+      forceCode,
+    });
+    if (codeTurn) {
+      injectCodeTurnMessages(conversationHistory, codeTurn, model.externalId);
+    }
+
+    const documentTurn = codeTurn
+      ? null
+      : await prepareDocumentTurn({
+          chatId,
+          userPrompt: content,
+          lastAssistantAnswer,
+          requested: requestedDocument,
+        });
+
+    if (documentTurn) {
+      // Deliberately NOT unshifted and NOT cache_control'd, unlike the persona
+      // and context blocks: this note changes every turn, so putting it at
+      // index 0 would invalidate the cached prefix behind it on every message.
+      // Slotting it after the stable system block keeps that prefix intact.
+      const firstNonSystem = conversationHistory.findIndex(
+        (m: any) => m.role !== "system" && m.role !== "SYSTEM",
+      );
+      conversationHistory.splice(
+        firstNonSystem === -1 ? conversationHistory.length : firstNonSystem,
+        0,
+        { role: "system", content: documentTurn.systemNote },
+      );
+    }
+
     const tokenLimits = await checkTokenLimitsAndSetupStream(
       res,
       wallet,
@@ -1147,7 +1314,10 @@ export async function streamChat(req: Request, res: Response) {
         userMessageId: userMessage.id,
         assistantMessageId: assistantMessage.id,
       },
-      enableFollowUpQuestions,
+      // Code turns: the follow-up-questions JSON block would land after the
+      // <summary> and pollute the parsed output.
+      enableFollowUpQuestions && !codeTurn,
+      codeTurn ? CODE_MAX_COMPLETION : undefined,
     );
     if (tokenLimits === null) return;
     const { maxCompletionTokens, trimmedHistory } = tokenLimits;
@@ -1158,7 +1328,9 @@ export async function streamChat(req: Request, res: Response) {
     // -----------------------------------------------------------------------
     // Predefined response intercept – platform identity / greetings / about
     // -----------------------------------------------------------------------
-    const predefinedText = checkPredefinedResponse(content, contextStrings);
+    const predefinedText = codeTurn
+      ? null
+      : checkPredefinedResponse(content, contextStrings);
     if (predefinedText) {
       // Stream word-by-word with a small delay (same feel as OpenRouter)
       const words = predefinedText.split(" ");
@@ -1177,9 +1349,18 @@ export async function streamChat(req: Request, res: Response) {
       const pTokens = Math.ceil(content.length / 3.5);
       const cTokens = Math.ceil(predefinedText.length / 3.5);
       const tTokens = pTokens + cTokens;
-      const tokenMultiplierPre = model.tokenMultiplier ?? 1.0;
-      const billablePromptPre = Math.ceil(pTokens * tokenMultiplierPre);
-      const billableCompletionPre = Math.ceil(cTokens * tokenMultiplierPre);
+      const tokenMultiplierPre = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+      // No OpenRouter call happens for a predefined/canned response, so there's
+      // no real costUsd to report here — this always falls back to the
+      // legacy multiplier math via computeBillableTokens's null-cost branch.
+      const { billablePromptTokens: billablePromptPre, billableCompletionTokens: billableCompletionPre } =
+        computeBillableTokens({
+          rawPromptTokens: pTokens,
+          rawCompletionTokens: cTokens,
+          costUsd: null,
+          tokenMultiplier: tokenMultiplierPre,
+          usdPerToken,
+        });
 
       let finalPrompt = pTokens;
       let finalCompletion = cTokens;
@@ -1266,19 +1447,35 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
+    // Code workspace: create/reopen the project and open the panel. Null for
+    // ASK turns (plain chat answer with the files as context) and on failure.
+    let codeSession: CodeSession | null = null;
+    if (codeTurn) {
+      try {
+        codeSession = await CodeSession.start({ res, turn: codeTurn, userId, chatId });
+      } catch (error) {
+        console.error("[code-workspace] session start failed:", error);
+      }
+    }
+
     // Call OpenRouter with streaming
     let fullContent = "";
     let promptTokens = 0;
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let refusal: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
         chatType,
         res,
         isClientAborted,
-        streamOptions: { includeImages: true, includeAnnotations: true },
+        streamOptions: codeSession
+          ? { includeImages: false, includeAnnotations: false, codeSession }
+          : { includeImages: true, includeAnnotations: true },
+        modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
             model: model.externalId,
@@ -1295,6 +1492,46 @@ export async function streamChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      refusal = acc.refusal;
+      costUsd = acc.costUsd;
+
+      // A project cut off by max_tokens gets one continuation call; the
+      // parser keeps its state, so the second half streams straight into the
+      // file that was being written. Both calls are billed together below.
+      if (codeSession && finishReason === "length" && !isClientAborted()) {
+        const affordable = model.isFreeModel
+          ? CODE_MAX_COMPLETION
+          : Math.floor((wallet?.tokensRemaining ?? 0) / (model.tokenMultiplier ?? 1)) -
+            2 * (promptTokens + completionTokens);
+        const continueTokens = Math.min(CODE_MAX_COMPLETION, affordable);
+        if (continueTokens >= 1000) {
+          const partial = acc.fullContent;
+          const more = await runOpenRouterStreamWithEmptyRetry({
+            chatType,
+            res,
+            isClientAborted,
+            streamOptions: { includeImages: false, includeAnnotations: false, codeSession },
+            modelLabel: model.externalId,
+            createStream: () =>
+              createOpenRouterStream({
+                model: model.externalId,
+                messages: [
+                  ...trimmedHistory,
+                  { role: "assistant", content: partial },
+                  { role: "user", content: CODE_CONTINUE_PROMPT },
+                ],
+                chatType,
+                max_tokens: continueTokens,
+                temperature: assistantTemperature,
+                signal: abortController.signal,
+              }),
+          });
+          fullContent += more.fullContent;
+          promptTokens += more.promptTokens;
+          completionTokens += more.completionTokens;
+          finishReason = more.finishReason;
+        }
+      }
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -1305,19 +1542,25 @@ export async function streamChat(req: Request, res: Response) {
           imagesToUpload = partialAcc.imagesToUpload;
         }
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
+        // Code turns keep the files written so far; the bubble shows the
+        // parsed text, never raw <file> tags.
         const stoppedContent =
-          fullContent.trim() || "Generation stopped by user.";
+          (codeSession ? await codeSession.closeStream() : fullContent.trim()) ||
+          "Generation stopped by user.";
+        let abortedResponseId: number | null = null;
         try {
-          const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-          const billablePromptTokens = Math.ceil(
-            (promptTokens || 0) * tokenMultiplier,
-          );
-          const billableCompletionTokens = Math.ceil(
-            (completionTokens || 0) * tokenMultiplier,
-          );
+          const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+          const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+            rawPromptTokens: promptTokens || 0,
+            rawCompletionTokens: completionTokens || 0,
+            costUsd,
+            tokenMultiplier,
+            usdPerToken,
+          });
 
           await prisma.$transaction(async (tx: any) => {
             const walletRecord = await tx.userWallet.findUnique({
@@ -1339,7 +1582,7 @@ export async function streamChat(req: Request, res: Response) {
               data: { content: stoppedContent },
             });
 
-            await tx.modelResponse.create({
+            const abortedResponse = await tx.modelResponse.create({
               data: {
                 chatId,
                 messageId: assistantMessage.id,
@@ -1353,6 +1596,7 @@ export async function streamChat(req: Request, res: Response) {
                 completedAt: new Date(),
               },
             });
+            abortedResponseId = abortedResponse.id;
 
             if (adjusted.finalBillableTotal > 0) {
               await tx.usageLog.create({
@@ -1396,6 +1640,7 @@ export async function streamChat(req: Request, res: Response) {
             }
           });
         } catch {}
+        if (codeSession) await codeSession.complete(abortedResponseId);
         if (!res.writableEnded) {
           res.end();
         }
@@ -1409,10 +1654,12 @@ export async function streamChat(req: Request, res: Response) {
         JSON.stringify(aiError.error || aiError.response?.data, null, 2),
       );
 
+      if (codeSession) fullContent = await codeSession.closeStream();
+      let failedResponseId: number | null = null;
       // Save whatever partial content we received so it doesn't vanish from the UI
       // Even if empty, we must create a FAILED message so the assistant bubble persists
       try {
-        await prisma.modelResponse.create({
+        const failedResponse = await prisma.modelResponse.create({
           data: {
             chatId,
             messageId: assistantMessage.id,
@@ -1426,6 +1673,7 @@ export async function streamChat(req: Request, res: Response) {
             completedAt: new Date(),
           },
         });
+        failedResponseId = failedResponse.id;
         // Update assistant message content with whatever we got
         await prisma.message.update({
           where: { id: assistantMessage.id },
@@ -1435,6 +1683,7 @@ export async function streamChat(req: Request, res: Response) {
         console.error("Failed to save partial AI response to DB", dbErr);
       }
 
+      if (codeSession) await codeSession.complete(failedResponseId);
       res.write(
         `data: ${JSON.stringify({ type: "error", message: aiError.message || "AI request failed" })}\n\n`,
       );
@@ -1443,8 +1692,11 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
+    // Code turns: the chat bubble gets the plan/summary text, never raw tags.
+    if (codeSession) fullContent = await codeSession.closeStream();
+
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
-      const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
+      const failureMessage = buildEmptyImageResponseError(finishReason, refusal);
       await prisma.$transaction(async (tx: any) => {
         await tx.message.update({
           where: { id: assistantMessage.id },
@@ -1475,6 +1727,7 @@ export async function streamChat(req: Request, res: Response) {
 
     if (!fullContent.trim() && chatType !== "IMAGE_GENERATION") {
       const failureMessage = FAILED_GENERATION_USER_MESSAGE;
+      if (codeSession) await codeSession.complete(null);
       await prisma.$transaction(async (tx: any) => {
         await tx.message.update({
           where: { id: assistantMessage.id },
@@ -1503,6 +1756,7 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
+    const uploadedImages: { url: string; publicId: string; bytes?: number; width?: number; height?: number }[] = [];
     if (imagesToUpload.length > 0) {
       for (const origUrl of imagesToUpload) {
         try {
@@ -1513,6 +1767,13 @@ export async function streamChat(req: Request, res: Response) {
           });
           if (result && result.url) {
             fullContent = fullContent.split(origUrl).join(result.url);
+            uploadedImages.push({
+              url: result.url,
+              publicId: result.publicId,
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            });
           }
         } catch (imgError) {
           console.error("  ❌ Failed to upload image to Cloudinary:", imgError);
@@ -1523,11 +1784,14 @@ export async function streamChat(req: Request, res: Response) {
       fullContent = keepOnlyFirstImageMarkdown(fullContent).trim();
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
@@ -1577,6 +1841,24 @@ export async function streamChat(req: Request, res: Response) {
         (res as any).modelResponseId = mr.id;
       }
 
+      if (chatType === "IMAGE_GENERATION" && uploadedImages.length > 0) {
+        await tx.generatedImage.createMany({
+          data: uploadedImages.map((img) => ({
+            userId,
+            chatId,
+            messageId: assistantMessage.id,
+            modelResponseId: mr.id,
+            modelId: model.id,
+            prompt: content.trim(),
+            fileUrl: img.url,
+            cloudinaryPublicId: img.publicId,
+            fileSize: img.bytes ?? null,
+            width: img.width ?? null,
+            height: img.height ?? null,
+          })),
+        });
+      }
+
       if (adjusted.finalBillableTotal > 0) {
         await tx.usageLog.create({
           data: {
@@ -1619,6 +1901,37 @@ export async function streamChat(req: Request, res: Response) {
 
     await maybeEnqueueDistillation(chatId, chat.folderId);
 
+    // Code workspace: snapshot this turn as a version linked to the response
+    // (the bubble finds its project card through it) and unlock the editor.
+    if (codeSession) await codeSession.complete((res as any).modelResponseId);
+
+    // Document generation — enqueue pass. Intent was already resolved before
+    // the stream (see prepareDocumentTurn above) and is handed back here, so
+    // the classifier is never paid for twice in one turn. The enqueue itself
+    // still has to wait for the answer, which is the document's source text.
+    const generatedDocument = await maybeGenerateDocumentFromChat({
+      userId,
+      chatId,
+      messageId: assistantMessage.id,
+      modelResponseId: (res as any).modelResponseId,
+      userPrompt: content,
+      assistantAnswer: fullContent,
+      intent: documentTurn?.intent ?? null,
+      effectiveFormat: documentTurn?.effectiveFormat,
+      // Only honoured when the rendered format matches the one the template was
+      // chosen for (a substituted format must not inherit a foreign template).
+      theme:
+        requestedDocument?.theme &&
+        documentTurn?.effectiveFormat === requestedDocument.format
+          ? requestedDocument.theme
+          : undefined,
+    });
+    if (generatedDocument) {
+      res.write(
+        `data: ${JSON.stringify({ type: "document_started", documentId: generatedDocument.documentId, format: generatedDocument.format, title: generatedDocument.title })}\n\n`,
+      );
+    }
+
     // Send done signal with usage info
     res.write(
       `data: ${JSON.stringify({ type: "done", modelResponseId: (res as any).modelResponseId, promptTokens: finalPrompt, completionTokens: finalCompletion, totalTokens: finalTotal, finishReason })}\n\n`,
@@ -1646,10 +1959,12 @@ export async function regenerateChat(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
   const messageId = Number(req.params.messageId);
-  const { modelId, chatType } = req.body as {
+  const { modelId, chatType: requestedChatType } = req.body as {
     modelId: number;
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -1678,9 +1993,10 @@ export async function regenerateChat(req: Request, res: Response) {
       return;
     }
 
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
-      res.status(400).json({ status: false, message: "Token limit exceeded" });
+      res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
       return;
     }
 
@@ -1739,6 +2055,24 @@ export async function regenerateChat(req: Request, res: Response) {
     const enableFollowUpQuestions =
       userPreference?.enableFollowUpQuestions !== false;
 
+    // Prepend the persona (assistant prompt, or the platform default for
+    // normal chats), then context memory on top — same order as streamChat.
+    let personaPromptRegen: string | null = null;
+    if (chat.assistantId) {
+      const chatAssistant = await prisma.assistant.findFirst({
+        where: { id: chat.assistantId, isActive: true, isDeleted: false },
+      });
+      if (chatAssistant) personaPromptRegen = chatAssistant.systemPrompt;
+    }
+
+    const systemPromptRegen =
+      personaPromptRegen ?? getDefaultSystemPrompt(chatType);
+    if (systemPromptRegen) {
+      conversationHistory.unshift(
+        buildSystemMessage(systemPromptRegen, model.externalId),
+      );
+    }
+
     // Prepend context memory as a system message
     const selectedContextsRegen = await getSelectedContextsForChat(
       userId,
@@ -1748,7 +2082,9 @@ export async function regenerateChat(req: Request, res: Response) {
 
     if (contextStringsRegen.length > 0) {
       const systemContent = `User context (personalisation — always keep in mind):\n${contextStringsRegen.map((c: any) => `- ${c}`).join("\n")}`;
-      conversationHistory.unshift({ role: "system", content: systemContent });
+      conversationHistory.unshift(
+        buildSystemMessage(systemContent, model.externalId),
+      );
     }
 
     // --- IMAGE GENERATION ITERATION FIX ---
@@ -1830,9 +2166,18 @@ export async function regenerateChat(req: Request, res: Response) {
       const pTokens = Math.ceil(originalContent.length / 3.5);
       const cTokens = Math.ceil(predefinedTextRegen.length / 3.5);
       const tTokens = pTokens + cTokens;
-      const tokenMultiplierRegen = model.tokenMultiplier ?? 1.0;
-      const billablePromptRegen = Math.ceil(pTokens * tokenMultiplierRegen);
-      const billableCompletionRegen = Math.ceil(cTokens * tokenMultiplierRegen);
+      const tokenMultiplierRegen = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+      // No OpenRouter call happens for a predefined/canned response, so there's
+      // no real costUsd to report here — falls back to the legacy multiplier
+      // math via computeBillableTokens's null-cost branch.
+      const { billablePromptTokens: billablePromptRegen, billableCompletionTokens: billableCompletionRegen } =
+        computeBillableTokens({
+          rawPromptTokens: pTokens,
+          rawCompletionTokens: cTokens,
+          costUsd: null,
+          tokenMultiplier: tokenMultiplierRegen,
+          usdPerToken,
+        });
 
       let finalPrompt = pTokens;
       let finalCompletion = cTokens;
@@ -1916,6 +2261,8 @@ export async function regenerateChat(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let refusal: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -1923,6 +2270,7 @@ export async function regenerateChat(req: Request, res: Response) {
         res,
         isClientAborted,
         streamOptions: { includeImages: true, includeAnnotations: false },
+        modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
             model: model.externalId,
@@ -1937,6 +2285,8 @@ export async function regenerateChat(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      refusal = acc.refusal;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -1947,19 +2297,21 @@ export async function regenerateChat(req: Request, res: Response) {
           imagesToUpload = partialAcc.imagesToUpload;
         }
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
         const stoppedContent =
           fullContent.trim() || "Generation stopped by user.";
         try {
-          const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-          const billablePromptTokens = Math.ceil(
-            (promptTokens || 0) * tokenMultiplier,
-          );
-          const billableCompletionTokens = Math.ceil(
-            (completionTokens || 0) * tokenMultiplier,
-          );
+          const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+          const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+            rawPromptTokens: promptTokens || 0,
+            rawCompletionTokens: completionTokens || 0,
+            costUsd,
+            tokenMultiplier,
+            usdPerToken,
+          });
 
           await prisma.$transaction(async (tx: any) => {
             const walletRecord = await tx.userWallet.findUnique({
@@ -2072,7 +2424,7 @@ export async function regenerateChat(req: Request, res: Response) {
     }
 
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
-      const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
+      const failureMessage = buildEmptyImageResponseError(finishReason, refusal);
       await prisma.modelResponse.create({
         data: {
           chatId,
@@ -2125,6 +2477,7 @@ export async function regenerateChat(req: Request, res: Response) {
       return;
     }
 
+    const uploadedImages: { url: string; publicId: string; bytes?: number; width?: number; height?: number }[] = [];
     if (imagesToUpload.length > 0) {
       for (const origUrl of imagesToUpload) {
         try {
@@ -2135,6 +2488,13 @@ export async function regenerateChat(req: Request, res: Response) {
           });
           if (result && result.url) {
             fullContent = fullContent.split(origUrl).join(result.url);
+            uploadedImages.push({
+              url: result.url,
+              publicId: result.publicId,
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            });
           }
         } catch (imgError) {
           console.error("  ❌ Failed to upload image to Cloudinary:", imgError);
@@ -2145,15 +2505,24 @@ export async function regenerateChat(req: Request, res: Response) {
       fullContent = keepOnlyFirstImageMarkdown(fullContent).trim();
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
     let finalTotal = promptTokens + completionTokens;
+
+    // The regenerate flow has no fresh user prompt of its own — reuse the
+    // user turn this assistant message is answering, same "prompt" a normal
+    // send would have stored.
+    const regeneratedPrompt =
+      [...previousMessages].reverse().find((m: any) => m.role === "USER")?.content ?? "";
 
     await prisma.$transaction(async (tx: any) => {
       const walletRecord = await tx.userWallet.findUnique({
@@ -2191,6 +2560,24 @@ export async function regenerateChat(req: Request, res: Response) {
 
       if (mr) {
         (res as any).modelResponseId = mr.id;
+      }
+
+      if (chatType === "IMAGE_GENERATION" && uploadedImages.length > 0) {
+        await tx.generatedImage.createMany({
+          data: uploadedImages.map((img) => ({
+            userId,
+            chatId,
+            messageId,
+            modelResponseId: mr.id,
+            modelId: model.id,
+            prompt: regeneratedPrompt,
+            fileUrl: img.url,
+            cloudinaryPublicId: img.publicId,
+            fileSize: img.bytes ?? null,
+            width: img.width ?? null,
+            height: img.height ?? null,
+          })),
+        });
       }
 
       if (adjusted.finalBillableTotal > 0) {
@@ -2256,11 +2643,13 @@ export async function regenerateChat(req: Request, res: Response) {
 export async function prepareMulti(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
-  const { content, attachmentIds, chatType } = req.body as {
+  const { content, attachmentIds, chatType: requestedChatType } = req.body as {
     content: string;
     attachmentIds?: number[];
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
 
   try {
     if (!content?.trim()) {
@@ -2331,11 +2720,13 @@ export async function editAndResend(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
   const originalMessageId = Number(req.params.messageId);
-  const { content, modelId, chatType } = req.body as {
+  const { content, modelId, chatType: requestedChatType } = req.body as {
     content: string;
     modelId: number;
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -2382,9 +2773,10 @@ export async function editAndResend(req: Request, res: Response) {
     }
 
     // Check wallet
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
-      res.status(400).json({ status: false, message: "Token limit exceeded" });
+      res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
       return;
     }
 
@@ -2458,8 +2850,8 @@ export async function editAndResend(req: Request, res: Response) {
     });
 
     const conversationHistory: {
-      role: "user" | "assistant";
-      content: string;
+      role: "user" | "assistant" | "system";
+      content: string | any[];
     }[] = [];
     for (const msg of previousMessages) {
       if (msg.role === "USER") {
@@ -2473,6 +2865,23 @@ export async function editAndResend(req: Request, res: Response) {
     }
     // Add the new edited user message
     conversationHistory.push({ role: "user", content: content.trim() });
+
+    // Prepend the persona (assistant prompt, or the platform default)
+    let personaPromptEdit: string | null = null;
+    if (chat.assistantId) {
+      const chatAssistant = await prisma.assistant.findFirst({
+        where: { id: chat.assistantId, isActive: true, isDeleted: false },
+      });
+      if (chatAssistant) personaPromptEdit = chatAssistant.systemPrompt;
+    }
+
+    const systemPromptEdit =
+      personaPromptEdit ?? getDefaultSystemPrompt(chatType);
+    if (systemPromptEdit) {
+      conversationHistory.unshift(
+        buildSystemMessage(systemPromptEdit, model.externalId),
+      );
+    }
 
     const userPreference = await prisma.userPreference.findUnique({
       where: { userId },
@@ -2502,6 +2911,8 @@ export async function editAndResend(req: Request, res: Response) {
     let completionTokens = 0;
     let imagesToUpload: string[] = [];
     let finishReason: string | null = null;
+    let refusal: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -2509,6 +2920,7 @@ export async function editAndResend(req: Request, res: Response) {
         res,
         isClientAborted,
         streamOptions: { includeImages: true, includeAnnotations: false },
+        modelLabel: model.externalId,
         createStream: () =>
           createOpenRouterStream({
             model: model.externalId,
@@ -2523,6 +2935,8 @@ export async function editAndResend(req: Request, res: Response) {
       completionTokens = acc.completionTokens;
       imagesToUpload = acc.imagesToUpload;
       finishReason = acc.finishReason;
+      refusal = acc.refusal;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -2533,19 +2947,21 @@ export async function editAndResend(req: Request, res: Response) {
           imagesToUpload = partialAcc.imagesToUpload;
         }
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       if (isClientAborted() || isAbortError(aiError)) {
         const stoppedContent =
           fullContent.trim() || "Generation stopped by user.";
         try {
-          const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-          const billablePromptTokens = Math.ceil(
-            (promptTokens || 0) * tokenMultiplier,
-          );
-          const billableCompletionTokens = Math.ceil(
-            (completionTokens || 0) * tokenMultiplier,
-          );
+          const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+          const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+            rawPromptTokens: promptTokens || 0,
+            rawCompletionTokens: completionTokens || 0,
+            costUsd,
+            tokenMultiplier,
+            usdPerToken,
+          });
 
           await prisma.$transaction(async (tx: any) => {
             const walletRecord = await tx.userWallet.findUnique({
@@ -2662,7 +3078,7 @@ export async function editAndResend(req: Request, res: Response) {
     }
 
     if (chatType === "IMAGE_GENERATION" && !fullContent.trim()) {
-      const failureMessage = EMPTY_IMAGE_RESPONSE_ERROR;
+      const failureMessage = buildEmptyImageResponseError(finishReason, refusal);
       await prisma.$transaction(async (tx: any) => {
         await tx.message.update({
           where: { id: assistantMessage.id },
@@ -2722,6 +3138,7 @@ export async function editAndResend(req: Request, res: Response) {
     }
 
     // Upload images to Cloudinary
+    const uploadedImages: { url: string; publicId: string; bytes?: number; width?: number; height?: number }[] = [];
     if (imagesToUpload.length > 0) {
       for (const origUrl of imagesToUpload) {
         try {
@@ -2732,6 +3149,13 @@ export async function editAndResend(req: Request, res: Response) {
           });
           if (result && result.url) {
             fullContent = fullContent.split(origUrl).join(result.url);
+            uploadedImages.push({
+              url: result.url,
+              publicId: result.publicId,
+              bytes: result.bytes,
+              width: result.width,
+              height: result.height,
+            });
           }
         } catch (imgError) {
           console.error("  ❌ Failed to upload image to Cloudinary:", imgError);
@@ -2742,11 +3166,14 @@ export async function editAndResend(req: Request, res: Response) {
       fullContent = keepOnlyFirstImageMarkdown(fullContent).trim();
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     let finalPrompt = promptTokens;
     let finalCompletion = completionTokens;
@@ -2794,6 +3221,24 @@ export async function editAndResend(req: Request, res: Response) {
 
       if (mr) {
         (res as any).modelResponseId = mr.id;
+      }
+
+      if (chatType === "IMAGE_GENERATION" && uploadedImages.length > 0) {
+        await tx.generatedImage.createMany({
+          data: uploadedImages.map((img) => ({
+            userId,
+            chatId,
+            messageId: assistantMessage.id,
+            modelResponseId: mr.id,
+            modelId: model.id,
+            prompt: content.trim(),
+            fileUrl: img.url,
+            cloudinaryPublicId: img.publicId,
+            fileSize: img.bytes ?? null,
+            width: img.width ?? null,
+            height: img.height ?? null,
+          })),
+        });
       }
 
       if (adjusted.finalBillableTotal > 0) {
@@ -2865,10 +3310,12 @@ export async function prepareEditMulti(req: Request, res: Response) {
   const userId = req.user!.id;
   const chatId = Number(req.params.chatId);
   const messageId = Number(req.params.messageId);
-  const { content, chatType } = req.body as {
+  const { content, chatType: requestedChatType } = req.body as {
     content: string;
     chatType?: string;
   };
+  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  const { chatType } = resolveCodeChatType(requestedChatType);
 
   try {
     if (!content?.trim()) {
@@ -2897,7 +3344,7 @@ export async function prepareEditMulti(req: Request, res: Response) {
     // Check user tokens mapping
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
-      res.status(400).json({ status: false, message: "Token limit exceeded" });
+      res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
       return;
     }
 
@@ -3000,9 +3447,10 @@ export async function continueChatStream(req: Request, res: Response) {
       return;
     }
 
+    const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
-      res.status(400).json({ status: false, message: "Token limit exceeded" });
+      res.status(400).json({ status: false, code: "INSUFFICIENT_BALANCE", message: "Token limit exceeded" });
       return;
     }
 
@@ -3087,28 +3535,21 @@ export async function continueChatStream(req: Request, res: Response) {
       }
     }
 
-    // Add Persona
+    // Add Persona (assistant prompt, or the platform default for normal chats)
+    let personaPromptContinue: string | null = null;
     if (chat.assistantId) {
       const chatAssistant = await prisma.assistant.findFirst({
         where: { id: chat.assistantId, isActive: true, isDeleted: false },
       });
-      if (chatAssistant) {
-        const usePromptCaching =
-          model.externalId.includes("anthropic/") ||
-          model.externalId.includes("claude");
-        conversationHistory.unshift({
-          role: "system",
-          content: usePromptCaching
-            ? [
-                {
-                  type: "text",
-                  text: chatAssistant.systemPrompt,
-                  cache_control: { type: "ephemeral" },
-                },
-              ]
-            : chatAssistant.systemPrompt,
-        });
-      }
+      if (chatAssistant) personaPromptContinue = chatAssistant.systemPrompt;
+    }
+
+    const systemPromptContinue =
+      personaPromptContinue ?? getDefaultSystemPrompt(chat.capability);
+    if (systemPromptContinue) {
+      conversationHistory.unshift(
+        buildSystemMessage(systemPromptContinue, model.externalId),
+      );
     }
 
     // Now push the *partial* assistant message
@@ -3144,6 +3585,7 @@ export async function continueChatStream(req: Request, res: Response) {
     let promptTokens = 0;
     let completionTokens = 0;
     let finishReason: string | null = null;
+    let costUsd: number | null = null;
 
     try {
       const acc = await runOpenRouterStreamWithEmptyRetry({
@@ -3166,6 +3608,7 @@ export async function continueChatStream(req: Request, res: Response) {
       promptTokens = acc.promptTokens;
       completionTokens = acc.completionTokens;
       finishReason = acc.finishReason;
+      costUsd = acc.costUsd;
     } catch (aiError: any) {
       const partialAcc = getPartialAccumulatorFromError(aiError);
       if (partialAcc) {
@@ -3173,6 +3616,7 @@ export async function continueChatStream(req: Request, res: Response) {
         promptTokens = partialAcc.promptTokens || promptTokens;
         completionTokens = partialAcc.completionTokens || completionTokens;
         finishReason = partialAcc.finishReason || finishReason;
+        costUsd = partialAcc.costUsd ?? costUsd;
       }
 
       // Stream failed but we might have partial content
@@ -3213,11 +3657,14 @@ export async function continueChatStream(req: Request, res: Response) {
       return;
     }
 
-    const tokenMultiplier = model.tokenMultiplier ?? 1.0;
-    const billablePromptTokens = Math.ceil(promptTokens * tokenMultiplier);
-    const billableCompletionTokens = Math.ceil(
-      completionTokens * tokenMultiplier,
-    );
+    const tokenMultiplier = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
+    const { billablePromptTokens, billableCompletionTokens } = computeBillableTokens({
+      rawPromptTokens: promptTokens,
+      rawCompletionTokens: completionTokens,
+      costUsd,
+      tokenMultiplier,
+      usdPerToken,
+    });
 
     // Update the message by combining old text + new text
     const newCombinedText = modelResponse.content + fullContent;

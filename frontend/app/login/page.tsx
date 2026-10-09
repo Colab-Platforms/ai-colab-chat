@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2, Eye, EyeOff, ArrowLeft } from "lucide-react";
-import { toast } from "react-toastify";
+import { toast } from "@/lib/toast";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { EASE } from "@/components/landing/components/motionVariants";
@@ -38,7 +38,7 @@ const getErrorMessage = (err: unknown, fallback: string) => {
 };
 
 export default function LoginPage() {
-  const { login, verifyEmailOtp, resendEmailOtp, user } = useAuth();
+  const { login, verifyEmailOtp, resendEmailOtp, user, hasRole } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [step, setStep] = useState<"login" | "verify">("login");
@@ -65,10 +65,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
+      if (hasRole("ADMIN") || hasRole("SUPERADMIN")) {
+        router.replace("/admin");
+        return;
+      }
       const redirect = searchParams.get("redirect");
       router.replace(redirect && redirect.startsWith("/") ? redirect : "/home");
     }
-  }, [user, router, searchParams]);
+  }, [user, router, searchParams, hasRole]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -94,6 +98,10 @@ export default function LoginPage() {
         return;
       }
       toast.success("Login successful!");
+      if (result.isAdmin) {
+        router.replace("/admin");
+        return;
+      }
       const redirect = searchParams.get("redirect");
       router.replace(redirect && redirect.startsWith("/") ? redirect : "/home");
     } catch (err: unknown) {
@@ -114,6 +122,10 @@ export default function LoginPage() {
         return;
       }
       toast.success("Email verified. Login successful!");
+      if (result.isAdmin) {
+        router.replace("/admin");
+        return;
+      }
       const redirect = searchParams.get("redirect");
       router.replace(redirect && redirect.startsWith("/") ? redirect : "/home");
     } catch (err: unknown) {
@@ -141,7 +153,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}

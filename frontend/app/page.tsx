@@ -24,10 +24,18 @@ function AuthedHomeRedirect() {
 }
 
 export default function Home() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, hasRole } = useAuth();
   const { theme } = useTheme();
+  const router = useRouter();
+  const isAdmin = hasRole("ADMIN") || hasRole("SUPERADMIN");
 
-  if (isLoading || user) {
+  useEffect(() => {
+    if (!isLoading && isAdmin) {
+      router.replace("/admin");
+    }
+  }, [isLoading, isAdmin, router]);
+
+  if (isLoading || isAdmin) {
     const ringBase =
       theme === "dark" ? "border-[#f2bfdc]/25" : "border-landing-primary/20";
 

@@ -1,5 +1,6 @@
 import type { Server } from "http";
 import prisma from "@root/prisma.js";
+import { closeBrowser } from "./browserPool.js";
 
 export function configureServerTimeouts(server: Server) {
   server.keepAliveTimeout = Number(process.env.KEEP_ALIVE_TIMEOUT_MS ?? 65000);
@@ -17,6 +18,8 @@ export function registerServerLifecycle(server: Server) {
 
     server.close(async () => {
       try {
+        // Chromium is a child process — without this it survives the restart.
+        await closeBrowser();
         await prisma.$disconnect();
         console.log("[Server] Graceful shutdown complete.");
         process.exit(0);
