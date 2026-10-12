@@ -42,11 +42,9 @@ class DemoRequestService {
     return created;
   }
 
-  async list(query: { page?: number; pageSize?: number; status?: Status; search?: string }) {
-    const { take, skip, page, pageSize } = getPaginationOptions(query, 20);
+  private buildWhere(query: { status?: Status; search?: string }) {
     const search = query.search?.trim();
-
-    const where = {
+    return {
       isDeleted: false,
       ...(query.status ? { status: query.status } : {}),
       ...(search
@@ -59,6 +57,20 @@ class DemoRequestService {
           }
         : {}),
     };
+  }
+
+  /** Every lead matching the filters (no pagination), newest first, for the Excel export. */
+  async exportAll(query: { status?: Status; search?: string }) {
+    return prisma.demoRequest.findMany({
+      where: this.buildWhere(query),
+      orderBy: { createdAt: "desc" },
+      take: 10000,
+    });
+  }
+
+  async list(query: { page?: number; pageSize?: number; status?: Status; search?: string }) {
+    const { take, skip, page, pageSize } = getPaginationOptions(query, 20);
+    const where = this.buildWhere(query);
 
     const [items, total, counts] = await Promise.all([
       prisma.demoRequest.findMany({ where, orderBy: { createdAt: "desc" }, skip, take }),

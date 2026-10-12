@@ -9,6 +9,7 @@ router.post("/", controller.createDemoRequest);
 
 // Admin only: review and work the leads.
 router.get("/", auth("ADMIN", "SUPERADMIN"), controller.listDemoRequests);
+router.get("/export", auth("ADMIN", "SUPERADMIN"), controller.exportDemoRequests);
 router.patch("/:id", auth("ADMIN", "SUPERADMIN"), controller.updateDemoRequest);
 router.delete("/:id", auth("ADMIN", "SUPERADMIN"), controller.deleteDemoRequest);
 

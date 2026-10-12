@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Building2, Loader2, Mail, Phone, Search, Trash2 } from "lucide-react";
+import { Building2, Download, Loader2, Mail, Phone, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +63,7 @@ export default function DemoRequestsAdminPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -143,15 +144,43 @@ export default function DemoRequestsAdminPage() {
     }
   };
 
-  const allCount = Object.values(counts).reduce((a, b) => a + b, 0);
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const params: Record<string, string> = {};
+      if (status !== "ALL") params.status = status;
+      if (debounced) params.search = debounced;
+      const res = await demoRequestService.export(params);
+      const url = URL.createObjectURL(res.data as Blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `demo-requests-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export demo requests");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const allCount =Object.values(counts).reduce((a, b) => a + b, 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Demo requests</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Leads from the Business page form. New ones show first.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Demo requests</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Leads from the Business page form. New ones show first.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExport} disabled={exporting || allCount === 0}>
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          Export to Excel
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

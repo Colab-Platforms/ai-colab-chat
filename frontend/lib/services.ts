@@ -266,6 +266,8 @@ export const studioTemplateService = {
 
 export const demoRequestService = {
   list: (params?: Record<string, string>) => api.get("/demo-requests", { params }),
+  export: (params?: Record<string, string>) =>
+    api.get("/demo-requests/export", { params, responseType: "blob" }),
   update: (id: number, data: { status?: string; adminNotes?: string | null }) =>
     api.patch(`/demo-requests/${id}`, data),
   delete: (id: number) => api.delete(`/demo-requests/${id}`),
