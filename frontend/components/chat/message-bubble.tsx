@@ -21,6 +21,7 @@ import {
 } from "@/features/code-workspace";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
+import { unpackStudioPrompt } from "@/lib/studio-prompt";
 import { PhotoProvider, PhotoView } from "react-photo-view";
 import "react-photo-view/dist/react-photo-view.css";
 
@@ -372,7 +373,7 @@ export const MessageBubble = React.memo(function MessageBubble({
             // Display mode
             <div className="group/user relative">
               <div className="bg-sunken text-foreground rounded-2xl px-4 py-3 break-words">
-                <p data-message-text="true" className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                <p data-message-text="true" className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{unpackStudioPrompt(message.content).visible}</p>
               </div>
               
               {/* Action buttons below the message - left aligned */}
@@ -404,13 +405,13 @@ export const MessageBubble = React.memo(function MessageBubble({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/80 opacity-100 sm:opacity-0 group-hover/user:opacity-100 transition-opacity"
-                  onClick={() => { navigator.clipboard.writeText(message.content); toast.success("Copied"); }}
+                  onClick={() => { navigator.clipboard.writeText(unpackStudioPrompt(message.content).visible); toast.success("Copied"); }}
                 >
                   <Copy className="w-3.5 h-3.5" />
                 </Button>
 
                 {/* Edit button */}
-                {onEditMessage && (
+                {onEditMessage && !unpackStudioPrompt(message.content).hasHidden && (
                   <Button
                     variant="ghost"
                     size="icon"

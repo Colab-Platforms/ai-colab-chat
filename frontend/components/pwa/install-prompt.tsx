@@ -106,7 +106,7 @@ export function PwaInstallPrompt() {
         {/* Text */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground leading-tight">
-            Install AI Colab Chat
+            Install Colab AI
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
             {isIos

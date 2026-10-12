@@ -15,13 +15,11 @@ import {
 import {
   AttachButton,
   ChipSelect,
-  LinkAction,
   StudioComposer,
   StudioFrame,
   StudioHero,
   StudioTabs,
   TemplateStrip,
-  TemplatesComingSoon,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
 import { VIDEO_TEMPLATES } from "@/components/studio/studio-templates";
@@ -58,7 +56,6 @@ export default function VideoStudioPage() {
   const [busy, setBusy] = useState(false);
 
   const [tab, setTab] = useState<"templates" | "mine">("templates");
-  const [expanded, setExpanded] = useState(false);
   const [mine, setMine] = useState<MyVideo[]>([]);
   const [mineTotal, setMineTotal] = useState(0);
 
@@ -370,9 +367,9 @@ export default function VideoStudioPage() {
           onChange={setTab}
         />
 
-        {/* Templates are hidden for now — restore the LinkAction + TemplateStrip when they launch. */}
+        {/* Always a grid (not the scrolling strip): the cards autoplay their clips, so keep few on screen. */}
         {tab === "templates" ? (
-          <TemplatesComingSoon variant="video" />
+          <TemplateStrip templates={templates} expanded variant="video" onPick={pickTemplate} />
         ) : mine.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">No videos yet — describe a shot above to make one.</p>
         ) : (

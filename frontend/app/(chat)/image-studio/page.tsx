@@ -16,10 +16,10 @@ import {
   StudioHero,
   StudioTabs,
   TemplateStrip,
-  TemplatesComingSoon,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
 import { IMAGE_ASPECTS, IMAGE_TEMPLATES } from "@/components/studio/studio-templates";
+import { packStudioPrompt } from "@/lib/studio-prompt";
 import { TemplateUseDialog, type TemplatePhoto } from "@/components/studio/template-use-dialog";
 
 interface ImageModel {
@@ -162,11 +162,14 @@ export default function ImageStudioPage() {
     aspectRatio: string;
     photo: { id: number; fileName: string; fileUrl: string; mimeType: string } | null;
     title: string;
+    /** Template runs: shown in the chat instead of the (hidden) template prompt. */
+    hiddenPromptLabel?: string;
   }) => {
     if (!modelId || busy) return;
     setBusy(true);
     try {
-      const content = `${opts.text}\n\nAspect ratio: ${opts.aspectRatio}.`;
+      const fullText = `${opts.text}\n\nAspect ratio: ${opts.aspectRatio}.`;
+      const content = opts.hiddenPromptLabel ? packStudioPrompt(opts.hiddenPromptLabel, fullText) : fullText;
       const chatRes = await chatService.create({
         title: opts.title.substring(0, 50),
         modelIds: [modelId],
@@ -233,7 +236,7 @@ export default function ImageStudioPage() {
     }
     if (extra) text += `\n\nAdditional details: ${extra}`;
     if (typeof t.id === "number") void studioTemplateService.recordUse(t.id).catch(() => {});
-    generate({ text, aspectRatio: t.aspectRatio ?? aspect, photo, title: t.title });
+    generate({ text, aspectRatio: t.aspectRatio ?? aspect, photo, title: t.title, hiddenPromptLabel: t.title });
   };
 
   return (
@@ -310,11 +313,15 @@ export default function ImageStudioPage() {
           ]}
           active={tab}
           onChange={setTab}
+          action={
+            tab === "templates" ? (
+              <LinkAction onClick={() => setExpanded((v) => !v)}>{expanded ? "Show less" : "View all"}</LinkAction>
+            ) : undefined
+          }
         />
 
-        {/* Templates are hidden for now — restore the LinkAction + TemplateStrip when they launch. */}
         {tab === "templates" ? (
-          <TemplatesComingSoon variant="image" />
+          <TemplateStrip templates={templates} expanded={expanded} variant="image" onPick={pickTemplate} />
         ) : mine.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">No images yet — generate your first one above.</p>
         ) : (

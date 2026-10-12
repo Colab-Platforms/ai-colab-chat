@@ -16,6 +16,7 @@ import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 import { imageService } from "@/lib/services";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { unpackStudioPrompt } from "@/lib/studio-prompt";
 
 export interface GeneratedImage {
   id: number;
@@ -110,7 +111,7 @@ export function ImageCard({
           <div className="relative cursor-pointer">
             <img
               src={image.fileUrl}
-              alt={image.prompt || "Generated image"}
+              alt={unpackStudioPrompt(image.prompt ?? "").visible || "Generated image"}
               loading="lazy"
               className="aspect-square w-full rounded-t-2xl bg-muted object-cover"
             />
@@ -123,7 +124,7 @@ export function ImageCard({
 
       <div className="flex items-start gap-3 px-3.5 py-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{image.prompt}</p>
+          <p className="truncate text-sm font-medium">{unpackStudioPrompt(image.prompt ?? "").visible}</p>
           <p className="text-xs text-muted-foreground">
             {formatDateTime(image.createdAt)}
             {image.fileSize ? ` · ${formatBytes(image.fileSize)}` : ""}

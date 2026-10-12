@@ -1028,7 +1028,8 @@ export async function streamChat(req: Request, res: Response) {
       if (messageCount === 1) {
         await prisma.chat.update({
           where: { id: chatId },
-          data: { title: content.trim().substring(0, 60) },
+          // Studio templates store "<label>\n[[studio-template]]\n<hidden prompt>"; only the label is a title.
+          data: { title: content.split("\n[[studio-template]]\n")[0].trim().substring(0, 60) },
         });
       }
     }

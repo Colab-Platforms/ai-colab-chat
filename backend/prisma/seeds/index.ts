@@ -6,6 +6,8 @@ import { seedPlans } from "./plans.seed.js";
 import { seedSuperAdmin } from "./superAdmin.seed.js";
 import { seedAssistants } from "./assistants.seed.js";
 import { backfillCreditWallets } from "./backfillCreditWallets.seed.js";
+import { seedStudioTemplates } from "./studioTemplates.seed.js";
+import { seedVideoTemplates } from "./videoTemplates.seed.js";
 
 const seedRegistry = {
   roles: seedRoles,
@@ -14,6 +16,8 @@ const seedRegistry = {
   plans: seedPlans,
   superAdmin: seedSuperAdmin,
   assistants: seedAssistants,
+  studioTemplates: seedStudioTemplates,
+  videoTemplates: seedVideoTemplates,
   backfillCreditWallets,
 } as const;
 
