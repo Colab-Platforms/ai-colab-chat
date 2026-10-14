@@ -7,6 +7,7 @@ import { applyGst } from "@/utils/cashfreePlan.js";
 import PaymentCashfreeService from "./payment.cashfree.service.js";
 import BillingService from "@/modules/billing/billing.service.js";
 import InvoiceService from "@/modules/billing/invoice.service.js";
+import { grantStateFor, nextGrantDate } from "@/modules/subscription/yearly-grant.service.js";
 
 class PaymentService {
   private cashfreeService = new PaymentCashfreeService();
@@ -72,6 +73,29 @@ class PaymentService {
     });
     if (pendingSub) {
       throw new ApiError("You already have a pending payment", STATUS_CODES.CONFLICT);
+    }
+
+    // Renewing a yearly plan early stacks another year onto its end date (see the
+    // webhook below); cap how far ahead that can go so nobody prepays indefinitely.
+    if (data.billingCycle === "YEARLY") {
+      const current = await prisma.subscription.findFirst({
+        where: {
+          userId,
+          status: "ACTIVE",
+          planId: data.planId,
+          billingCycle: "YEARLY",
+          autoRenew: false,
+          expiresAt: { gt: now },
+        },
+        select: { expiresAt: true },
+        orderBy: { expiresAt: "desc" },
+      });
+      if (current?.expiresAt && dayjs(current.expiresAt).isAfter(dayjs(now).add(1, "year"))) {
+        throw new ApiError(
+          "Your plan already runs for more than a year. You can renew again once it is within a year of ending.",
+          STATUS_CODES.CONFLICT,
+        );
+      }
     }
 
     const localSubscription = await prisma.subscription.create({
@@ -353,6 +377,34 @@ class PaymentService {
           currentSub.lastPaymentId === normalizedPaymentId
         ) return null;
 
+        const isYearly = subscription.billingCycle === "YEARLY";
+
+        // Early renewal of the same yearly plan: stack the new year onto the end
+        // of the current one instead of throwing away the months already paid for.
+        // Months already granted stay granted - the new year just extends the
+        // schedule - so no tokens are added now. A different plan (or cycle) is a
+        // switch, which ends the old plan as before.
+        const renewing = isYearly
+          ? await tx.subscription.findFirst({
+              where: {
+                userId: subscription.userId,
+                id: { not: subscription.id },
+                status: "ACTIVE",
+                planId: subscription.planId,
+                billingCycle: "YEARLY",
+                autoRenew: false,
+                expiresAt: { gt: now },
+              },
+              orderBy: { expiresAt: "desc" },
+            })
+          : null;
+
+        const periodEnd = renewing ? this.addCycle(renewing.expiresAt!, "YEARLY") : nextPeriodEnd;
+        const grant = renewing
+          ? grantStateFor(renewing, now)
+          : { anchor: now, issued: 1 }; // month 1 is granted below, right now
+        const nextGrantAt = isYearly ? nextGrantDate(grant.anchor, grant.issued) : null;
+
         await tx.subscription.updateMany({
           where: {
             userId: subscription.userId,
@@ -372,11 +424,14 @@ class PaymentService {
             status: "ACTIVE",
             autoRenew: false,
             startedAt: now,
-            expiresAt: nextPeriodEnd,
+            expiresAt: periodEnd,
             currentPeriodStart: now,
-            currentPeriodEnd: nextPeriodEnd,
-            nextBillingDate: nextPeriodEnd,
+            currentPeriodEnd: periodEnd,
+            nextBillingDate: periodEnd,
             lastPaymentId: normalizedPaymentId ?? String(orderId),
+            ...(isYearly
+              ? { grantAnchorAt: grant.anchor, grantsIssued: grant.issued, nextGrantAt }
+              : {}),
           },
         });
 
@@ -404,52 +459,70 @@ class PaymentService {
           });
         }
 
-        const wallet = await tx.userWallet.upsert({
-          where: { userId: subscription.userId },
-          create: {
+        // Wallet window shown to the user: the plan period for monthly/quarterly,
+        // but one month for yearly (that is how often it is topped up).
+        const walletPeriodEnd =
+          isYearly && nextGrantAt && nextGrantAt < periodEnd ? nextGrantAt : periodEnd;
+
+        let wallet;
+        if (renewing) {
+          // Nothing to add now; the existing monthly schedule just runs longer.
+          wallet = await tx.userWallet.upsert({
+            where: { userId: subscription.userId },
+            create: { userId: subscription.userId, tokensRemaining: 0, tokensUsed: 0 },
+            update: {},
+          });
+        } else {
+          wallet = await tx.userWallet.upsert({
+            where: { userId: subscription.userId },
+            create: {
+              userId: subscription.userId,
+              tokensRemaining: tokenLimit,
+              tokensUsed: 0,
+              currentPeriodStart: now,
+              currentPeriodEnd: walletPeriodEnd,
+            },
+            update:
+              isPlanSwitch || isYearly
+                ? {
+                    tokensRemaining: { increment: tokenLimit },
+                    tokensUsed: 0,
+                    currentPeriodStart: now,
+                    currentPeriodEnd: walletPeriodEnd,
+                  }
+                : {
+                    tokensRemaining: tokenLimit,
+                    tokensUsed: 0,
+                    currentPeriodStart: now,
+                    currentPeriodEnd: walletPeriodEnd,
+                  },
+          });
+
+          await createWalletTransaction(tx, {
             userId: subscription.userId,
-            tokensRemaining: tokenLimit,
-            tokensUsed: 0,
-            currentPeriodStart: now,
-            currentPeriodEnd: nextPeriodEnd,
-          },
-          update: isPlanSwitch
-            ? {
-                tokensRemaining: { increment: tokenLimit },
-                tokensUsed: 0,
-                currentPeriodStart: now,
-                currentPeriodEnd: nextPeriodEnd,
-              }
-            : {
-                tokensRemaining: tokenLimit,
-                tokensUsed: 0,
-                currentPeriodStart: now,
-                currentPeriodEnd: nextPeriodEnd,
-              },
-        });
+            walletId: wallet.id,
+            amount: tokenLimit,
+            type: "CREDIT",
+            referenceId: "one_time_subscription_activation",
+            meta: {
+              reason: "ONE_TIME_PAYMENT_SUCCESS",
+              orderId,
+              paymentId: normalizedPaymentId,
+            },
+          });
 
-        await createWalletTransaction(tx, {
-          userId: subscription.userId,
-          walletId: wallet.id,
-          amount: tokenLimit,
-          type: "CREDIT",
-          referenceId: "one_time_subscription_activation",
-          meta: {
-            reason: "ONE_TIME_PAYMENT_SUCCESS",
-            orderId,
-            paymentId: normalizedPaymentId,
-          },
-        });
-
-        // Bundled video credits reset (overwrite) to this plan's monthly
-        // grant on every activation/renewal — unlike tokens above, they
-        // never carry forward. topupCredits is untouched.
-        await creditBundledCredits(tx, {
-          userId: subscription.userId,
-          monthlyVideoCredits: subscription.plan.monthlyVideoCredits,
-          referenceId: `one_time_subscription_activation_${subscription.id}`,
-          meta: { reason: "ONE_TIME_PAYMENT_SUCCESS", orderId, paymentId: normalizedPaymentId },
-        });
+          // Bundled video credits reset (overwrite) to this plan's monthly
+          // grant on every activation/renewal - unlike tokens above, they
+          // never carry forward. topupCredits is untouched. Yearly plans add
+          // instead: unused credits are kept (see yearly-grant.service.ts).
+          await creditBundledCredits(tx, {
+            userId: subscription.userId,
+            monthlyVideoCredits: subscription.plan.monthlyVideoCredits,
+            mode: isYearly ? "add" : "overwrite",
+            referenceId: `one_time_subscription_activation_${subscription.id}`,
+            meta: { reason: "ONE_TIME_PAYMENT_SUCCESS", orderId, paymentId: normalizedPaymentId },
+          });
+        }
 
         return this.billingService.createPaymentAndInvoice(tx, {
           userId: subscription.userId,

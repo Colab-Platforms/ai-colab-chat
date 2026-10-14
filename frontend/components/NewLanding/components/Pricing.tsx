@@ -14,6 +14,7 @@ interface PlanTier {
   id: number;
   name: string;
   price: number;
+  yearlyPrice: number;
   description: string;
   features: string[];
   isPopular: boolean;
@@ -28,6 +29,7 @@ const FALLBACK_PLANS: PlanTier[] = [
     id: 1,
     name: "Free",
     price: 0,
+    yearlyPrice: 0,
     description: "Get started at no cost for your first month.",
     features: [
       "Unlimited AI Models",
@@ -42,6 +44,7 @@ const FALLBACK_PLANS: PlanTier[] = [
     id: 2,
     name: "Plus",
     price: 1799,
+    yearlyPrice: 17988,
     description: "Ideal for Plus users.",
     features: [
       "Unlimited AI Models",
@@ -56,6 +59,7 @@ const FALLBACK_PLANS: PlanTier[] = [
     id: 3,
     name: "Pro",
     price: 3699,
+    yearlyPrice: 35988,
     description: "Ideal for Pro users.",
     features: [
       "Unlimited AI Models",
@@ -80,6 +84,7 @@ export default function Pricing() {
   const { user } = useAuth();
   const [plans, setPlans] = useState<PlanTier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cycle, setCycle] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -126,6 +131,7 @@ export default function Pricing() {
               id: plan.id,
               name: plan.name,
               price: Number(plan.monthlyPrice),
+              yearlyPrice: Number(plan.yearlyPrice ?? 0),
               description:
                 plan.description ||
                 (isFree ? "Get started at no cost for your first month." : `Ideal for ${plan.name} users.`),
@@ -151,8 +157,11 @@ export default function Pricing() {
     fetchPlans();
   }, []);
 
-  const getPlanHref = (planId: number) => {
-    const target = `/profile/subscription?planId=${planId}&billingCycle=MONTHLY`;
+  const hasYearly = plans.some((p) => !p.isFree && p.yearlyPrice > 0);
+
+  const getPlanHref = (plan: PlanTier) => {
+    const planCycle = !plan.isFree && cycle === "YEARLY" && plan.yearlyPrice > 0 ? "YEARLY" : "MONTHLY";
+    const target = `/profile/subscription?planId=${plan.id}&billingCycle=${planCycle}`;
     if (user) return target;
     return `/login?redirect=${encodeURIComponent(target)}`;
   };
@@ -162,12 +171,27 @@ export default function Pricing() {
       return {
         amount: "Free",
         period: "",
+        note: "",
+        strike: "",
+      };
+    }
+
+    if (cycle === "YEARLY" && plan.yearlyPrice > 0) {
+      const fullYear = plan.price * 12;
+      const save = fullYear > plan.yearlyPrice ? Math.round((1 - plan.yearlyPrice / fullYear) * 100) : 0;
+      return {
+        amount: `₹${plan.yearlyPrice.toLocaleString("en-IN")}`,
+        period: "/year + GST",
+        strike: fullYear > plan.yearlyPrice ? `₹${fullYear.toLocaleString("en-IN")}` : "",
+        note: `₹${Math.round(plan.yearlyPrice / 12).toLocaleString("en-IN")}/month effective${save > 0 ? ` · save ${save}%` : ""}. Pay once, tokens added monthly.`,
       };
     }
 
     return {
       amount: `₹${plan.price.toLocaleString("en-IN")}`,
       period: "/month + GST",
+      note: "",
+      strike: "",
     };
   };
 
@@ -204,6 +228,26 @@ export default function Pricing() {
             <br />
             That Scale With You
           </h2>
+
+          {hasYearly && (
+            <div className="mt-4 inline-flex rounded-full border border-neutral-800 bg-neutral-950/60 p-1 text-sm font-medium">
+              {(["MONTHLY", "YEARLY"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCycle(c)}
+                  className={`cursor-pointer rounded-full px-5 py-2 transition-colors ${
+                    cycle === c ? "bg-white text-black" : "text-neutral-400 hover:text-white"
+                  }`}
+                >
+                  {c === "MONTHLY" ? "Monthly" : "Yearly"}
+                  {c === "YEARLY" && cycle !== "YEARLY" && (
+                    <span className="ml-2 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] text-purple-300">Save more</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pricing Layout Container */}
@@ -222,7 +266,7 @@ export default function Pricing() {
                 </p>
 
                 <div className="mt-8">
-                  <Link href={getPlanHref(freePlan.id)}>
+                  <Link href={getPlanHref(freePlan)}>
                     <button className="w-full py-3 px-6 rounded-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white font-medium text-sm transition-all duration-200">
                       Start Free
                     </button>
@@ -265,7 +309,9 @@ export default function Pricing() {
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl sm:text-5xl font-bold text-white tracking-tight">{details.amount}</span>
                         {details.period && <span className="text-neutral-400 text-sm font-medium">{details.period}</span>}
+                        {details.strike && <span className="ml-2 text-sm text-neutral-500 line-through">{details.strike}</span>}
                       </div>
+                      {details.note && <p className="mt-2 text-xs text-purple-300/90">{details.note}</p>}
                     </div>
                   );
                 })()}
@@ -275,7 +321,7 @@ export default function Pricing() {
                 </p>
 
                 <div className="mt-8">
-                  <Link href={getPlanHref(proPlan.id)}>
+                  <Link href={getPlanHref(proPlan)}>
                     <button className="w-full py-3 px-6 rounded-full bg-white hover:bg-neutral-200 text-black font-semibold text-sm transition-all duration-200 shadow-lg shadow-purple-500/10">
                       Get Started - {proPlan.name}
                     </button>
@@ -309,7 +355,9 @@ export default function Pricing() {
                       <div className="flex items-baseline gap-1">
                         <span className="text-4xl sm:text-5xl font-bold text-white tracking-tight">{details.amount}</span>
                         {details.period && <span className="text-neutral-400 text-sm font-medium">{details.period}</span>}
+                        {details.strike && <span className="ml-2 text-sm text-neutral-500 line-through">{details.strike}</span>}
                       </div>
+                      {details.note && <p className="mt-2 text-xs text-neutral-400">{details.note}</p>}
                     </div>
                   );
                 })()}
@@ -319,7 +367,7 @@ export default function Pricing() {
                 </p>
 
                 <div className="mt-8">
-                  <Link href={getPlanHref(proPlusPlan.id)}>
+                  <Link href={getPlanHref(proPlusPlan)}>
                     <button className="w-full py-3 px-6 rounded-full bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-white font-medium text-sm transition-all duration-200">
                       Choose {proPlusPlan.name}
                     </button>

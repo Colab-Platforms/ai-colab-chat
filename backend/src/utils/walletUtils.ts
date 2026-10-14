@@ -221,12 +221,26 @@ export async function debitCredits(
  */
 export async function creditBundledCredits(
   tx: Prisma.TransactionClient,
-  params: { userId: number; monthlyVideoCredits: number; referenceId?: string; meta?: any },
+  params: {
+    userId: number;
+    monthlyVideoCredits: number;
+    referenceId?: string;
+    meta?: any;
+    /**
+     * "overwrite" (default) resets bundledCredits to the plan's grant — used by
+     * monthly plans. "add" keeps unused credits and adds the grant on top — used
+     * by yearly plans, whose users keep what they haven't spent.
+     */
+    mode?: "overwrite" | "add";
+  },
 ) {
+  const add = params.mode === "add";
   const wallet = await tx.creditWallet.upsert({
     where: { userId: params.userId },
     create: { userId: params.userId, bundledCredits: params.monthlyVideoCredits },
-    update: { bundledCredits: params.monthlyVideoCredits },
+    update: {
+      bundledCredits: add ? { increment: params.monthlyVideoCredits } : params.monthlyVideoCredits,
+    },
   });
 
   await createCreditTransaction(tx, {

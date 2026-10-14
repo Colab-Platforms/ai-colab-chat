@@ -794,12 +794,21 @@ model Subscription {
   lastPaymentId          String?
   mandateId              String?
   nextBillingDate        DateTime?
+  // Yearly one-time plans (billingCycle YEARLY, autoRenew false): the year is
+  // paid up front and each month's tokens/credits are added by the yearly-grant
+  // cron. Month N is due at grantAnchorAt + N months (anchored, so a 31st start
+  // never drifts); grantsIssued counts months already granted, including the
+  // one given at payment time. Null on every other kind of subscription.
+  grantAnchorAt          DateTime?
+  grantsIssued           Int                @default(0)
+  nextGrantAt            DateTime?
   payments               Payment[]
   plan                   Plan               @relation(fields: [planId], references: [id])
   user                   User               @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([status])
+  @@index([nextGrantAt])
 }
 
 enum SubscriptionCycle {

@@ -15,6 +15,7 @@
     "db:seed:only": "tsx prisma/seeds/index.ts --only",
     "db:studio": "prisma studio",
     "db:create-plan": "tsx prisma/scripts/createPlan.ts",
+    "yearly:grant": "tsx src/scripts/runYearlyGrantNow.ts",
     "suggestions:generate": "tsx src/scripts/runPromptSuggestionsNow.ts",
     "type-check": "tsc --noEmit"
   },

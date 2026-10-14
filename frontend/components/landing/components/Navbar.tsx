@@ -29,26 +29,27 @@ export function Navbar() {
   ];
 
   useMotionValueEvent(scrollY, "change", (latest) => {
-    if (latest > 50) {
-      setIsScrolled(true);
-    } else {
-      setIsScrolled(false);
-    }
+    // Hysteresis: the navbar changes height when it flips, which shifts the
+    // scroll position slightly. A single threshold made it flip back and forth
+    // (flicker) on trackpad momentum / iOS rubber-banding near the top.
+    setIsScrolled((prev) => (prev ? latest > 20 : latest > 80));
   });
 
   return (
     <motion.nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-[padding] duration-300 ease-in-out  ${
+      className={`fixed top-0 left-0 right-0 z-50 transform-gpu transition-[padding] duration-300 ease-in-out  ${
         isScrolled ? "pt-4 pb-2" : "py-8"
       }`}
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
+      // Slide only: starting at opacity 0 left the navbar invisible whenever
+      // the entrance animation was delayed or skipped.
+      initial={{ y: -20 }}
+      animate={{ y: 0 }}
       transition={{ duration: 0.55, ease: EASE }}
     >
       <div
         className={`mx-auto flex h-14 flex-col justify-center transition-all duration-300 ease-in-out ${
           isScrolled
-            ? "container max-w-6xl px-6 rounded-full border border-gray-200/50 dark:border-gray-800/50 bg-[#e7e4eb] dark:bg-[#060104] backdrop-blur-md shadow-sm max-md:max-w-[95%]"
+            ? "container max-w-6xl px-6 rounded-full border border-gray-200/50 dark:border-gray-800/50 bg-[#e7e4eb] dark:bg-[#060104] shadow-sm max-md:max-w-[95%]"
             : "container px-5 bg-transparent"
         }`}
       >

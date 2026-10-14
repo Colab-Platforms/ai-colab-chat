@@ -286,6 +286,20 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Lenis owns smooth scrolling on the landing page; native smooth scroll on top of it
+   makes every frame fight the other (jitter, fixed navbar shaking). */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+html.lenis,
+html.lenis-stopped {
+  scroll-behavior: auto !important;
+}
+html.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
 body {
   overflow-x: hidden;
 }

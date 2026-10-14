@@ -6,6 +6,7 @@ import documentGenerationCron from "./documentGeneration.js";
 import voiceMemorySummaryCron from "./voiceMemorySummary.js";
 import videoGenerationCron from "./videoGeneration.js";
 import promptSuggestionsCron from "./promptSuggestions.js";
+import yearlyTokenGrantCron from "./yearlyTokenGrant.js";
 
 export const startCronJobs = () => {
     subscriptionExpiryCron();
@@ -16,5 +17,6 @@ export const startCronJobs = () => {
     voiceMemorySummaryCron();
     videoGenerationCron();
     promptSuggestionsCron();
+    yearlyTokenGrantCron();
     console.log("⏰ Cron jobs started");
 };

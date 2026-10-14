@@ -10,7 +10,12 @@ const task = () => {
 
         try {
             const activeSubscriptions = await prisma.subscription.findMany({
-                where: { status: "ACTIVE" },
+                where: {
+                    status: "ACTIVE",
+                    // Yearly one-time plans get tokens ADDED on their own monthly
+                    // anniversary (yearlyTokenGrant cron) and never reset.
+                    NOT: { billingCycle: "YEARLY", autoRenew: false },
+                },
                 include: { plan: true },
             });
 

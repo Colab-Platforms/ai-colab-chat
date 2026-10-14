@@ -38,6 +38,11 @@ export default function SubscriptionPage() {
   const [subscribingPlanId, setSubscribingPlanId] = useState<number | null>(null);
   const isSubscribingRef = useRef(false);
   const [planToConfirm, setPlanToConfirm] = useState<any | null>(null);
+  // Which price the Plans grid shows and the checkout charges. Seeded from the
+  // ?billingCycle= deep link (landing page toggle) and switchable in the grid.
+  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "YEARLY">(
+    String(searchParams.get("billingCycle") ?? "").toUpperCase() === "YEARLY" ? "YEARLY" : "MONTHLY",
+  );
   const [gstPercent, setGstPercent] = useState<number>(18);
   const [autoPayUpdating, setAutoPayUpdating] = useState(false);
   const autoStartedPlanIdsRef = useRef<Set<number>>(new Set());
@@ -193,8 +198,10 @@ export default function SubscriptionPage() {
       const selectedPlan = plans.find((p: any) => p.id === planId);
       const isPaidPlan = Number(selectedPlan?.monthlyPrice ?? 0) > 0;
 
-      const rawCycle = searchParams.get("billingCycle") || "MONTHLY";
-      const cycle = rawCycle.toUpperCase() === "YEARLY" ? "YEARLY" : "MONTHLY";
+      // Yearly only exists for paid plans that actually have a yearly price.
+      const cycle = isPaidPlan && billingCycle === "YEARLY" && Number(selectedPlan?.yearlyPrice ?? 0) > 0
+        ? "YEARLY"
+        : "MONTHLY";
 
       if (isPaidPlan) {
         const payRes = await paymentService.createSubscribeOneTime({
@@ -270,7 +277,13 @@ export default function SubscriptionPage() {
     if (!selectedPlan) return;
 
     const isCurrentPlan = !!subscription && subscription.planId === parsedPlanId;
-    if (isCurrentPlan) return;
+    // A current yearly plan can still be renewed early (extends the end date).
+    const canRenewYearly =
+      isCurrentPlan &&
+      billingCycle === "YEARLY" &&
+      subscription?.billingCycle === "YEARLY" &&
+      Number(selectedPlan.yearlyPrice ?? 0) > 0;
+    if (isCurrentPlan && !canRenewYearly) return;
 
     const isFreePlan = Number(selectedPlan.monthlyPrice ?? 0) === 0;
     if (isFreePlan && freePlanTaken) return;
@@ -287,6 +300,7 @@ export default function SubscriptionPage() {
     plans,
     subscription,
     freePlanTaken,
+    billingCycle,
   ]);
 
   const handleContinuePending = () => {
@@ -401,8 +415,15 @@ export default function SubscriptionPage() {
 
       {(() => {
         if (!planToConfirm) return null;
-        const basePrice = Number(planToConfirm.monthlyPrice ?? 0);
-        const isFree = basePrice === 0;
+        const isYearlyCheckout = billingCycle === "YEARLY" && Number(planToConfirm.yearlyPrice ?? 0) > 0;
+        const basePrice = Number(isYearlyCheckout ? planToConfirm.yearlyPrice : planToConfirm.monthlyPrice ?? 0);
+        const isFree = Number(planToConfirm.monthlyPrice ?? 0) === 0;
+        const isRenewal =
+          isYearlyCheckout &&
+          Boolean(subscription) &&
+          subscription.planId === planToConfirm.id &&
+          subscription.billingCycle === "YEARLY" &&
+          subscription.status === "ACTIVE";
         const gstAmount = isFree ? 0 : Number(((basePrice * gstPercent) / 100).toFixed(2));
         const totalAmount = isFree ? 0 : Number((basePrice + gstAmount).toFixed(2));
         const currentMonthlyPrice = Number(subscription?.plan?.monthlyPrice ?? 0);
@@ -441,7 +462,7 @@ export default function SubscriptionPage() {
                       ) : (
                         <>
                           <div className="flex items-center justify-between text-muted-foreground">
-                            <span>Plan price</span>
+                            <span>{isYearlyCheckout ? "Plan price (1 year)" : "Plan price"}</span>
                             <span>₹{basePrice.toLocaleString("en-IN")}</span>
                           </div>
                           <div className="flex items-center justify-between text-muted-foreground">
@@ -455,6 +476,23 @@ export default function SubscriptionPage() {
                         </>
                       )}
                     </div>
+
+                    {isYearlyCheckout && !isFree && (
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <p>
+                          You pay once for the year. Your plan&apos;s tokens and credits are added to your
+                          account every month, and anything unused stays in your balance.
+                        </p>
+                        {isRenewal && subscription.expiresAt && (
+                          <p>
+                            This adds 12 months after your current end date (
+                            {new Date(subscription.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                            ), so no time is lost.
+                          </p>
+                        )}
+                        <p>Yearly plans are non-refundable. There is no auto-renewal.</p>
+                      </div>
+                    )}
 
                     {isUpgradeFromFree && (
                       <p className="text-xs text-muted-foreground">
@@ -497,11 +535,22 @@ export default function SubscriptionPage() {
                 </span>
               </div>
               <p className="mt-1 text-[13px] text-muted-foreground">
-                {Number(subscription.plan?.monthlyPrice ?? 0) > 0
-                  ? `₹${Number(subscription.plan.monthlyPrice).toLocaleString("en-IN")}/month + GST · `
-                  : ""}
+                {subscription.billingCycle === "YEARLY" && Number(subscription.plan?.yearlyPrice ?? 0) > 0
+                  ? `₹${Number(subscription.plan.yearlyPrice).toLocaleString("en-IN")}/year + GST · `
+                  : Number(subscription.plan?.monthlyPrice ?? 0) > 0
+                    ? `₹${Number(subscription.plan.monthlyPrice).toLocaleString("en-IN")}/month + GST · `
+                    : ""}
                 Billed {String(subscription.billingCycle || "monthly").toLowerCase()}
               </p>
+              {subscription.billingCycle === "YEARLY" && !subscription.autoRenew && subscription.status === "ACTIVE" && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Tokens and credits are added every month
+                  {subscription.nextGrantAt && new Date(subscription.nextGrantAt) < new Date(subscription.expiresAt ?? 0)
+                    ? ` — next top-up on ${new Date(subscription.nextGrantAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    : ""}
+                  .
+                </p>
+              )}
             </div>
             {subscription.expiresAt && (
               <div className="text-right">
@@ -513,7 +562,9 @@ export default function SubscriptionPage() {
             )}
           </div>
 
-          {Number(subscription?.plan?.monthlyPrice ?? 0) > 0 && subscription.status === "ACTIVE" && (
+          {Number(subscription?.plan?.monthlyPrice ?? 0) > 0 &&
+            subscription.status === "ACTIVE" &&
+            !(subscription.billingCycle === "YEARLY" && !subscription.autoRenew) && (
             <div className="flex items-center justify-between gap-4 border-t border-border px-5 py-4">
               <div>
                 <p className="text-sm font-medium">AutoPay for renewals</p>
@@ -543,6 +594,11 @@ export default function SubscriptionPage() {
                 {cancellingSubscription && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Cancel subscription
               </button>
+              {subscription.billingCycle === "YEARLY" && !subscription.autoRenew && (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Yearly plans are paid once and are non-refundable.
+                </p>
+              )}
             </div>
           )}
         </SettingsCard>
@@ -604,7 +660,29 @@ export default function SubscriptionPage() {
       )}
 
       <h2 className="text-base font-semibold">Plans</h2>
-      <p className="mb-4 mt-0.5 text-xs text-muted-foreground">Prices are per month, plus GST.</p>
+      <div className="mb-4 mt-0.5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          {billingCycle === "YEARLY"
+            ? "Pay once for the year, plus GST. Tokens and credits are added every month."
+            : "Prices are per month, plus GST."}
+        </p>
+        {plans.some((p: any) => Number(p.yearlyPrice ?? 0) > 0) && (
+          <div className="inline-flex rounded-full border border-border bg-sunken p-0.5 text-xs font-medium">
+            {(["MONTHLY", "YEARLY"] as const).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setBillingCycle(c)}
+                className={`cursor-pointer rounded-full px-3.5 py-1.5 transition-colors ${
+                  billingCycle === c ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {c === "MONTHLY" ? "Monthly" : "Yearly"}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {[...plans]
           .sort((x: any, y: any) => Number(x.monthlyPrice ?? 0) - Number(y.monthlyPrice ?? 0))
@@ -614,7 +692,15 @@ export default function SubscriptionPage() {
             const isAlreadyTakenFree = isFreePlan && freePlanTaken && !isCurrentPlan;
             const hasCurrentPlan = Boolean(subscription);
             const { included, excluded } = getPlanFeatureLines(plan);
-            const price = Number(plan.monthlyPrice ?? 0);
+            const monthly = Number(plan.monthlyPrice ?? 0);
+            const yearly = Number(plan.yearlyPrice ?? 0);
+            const showYearly = billingCycle === "YEARLY" && !isFreePlan && yearly > 0;
+            const price = showYearly ? yearly : monthly;
+            // Strike-through is what 12 monthly payments would cost.
+            const fullYearPrice = monthly * 12;
+            const savePercent = fullYearPrice > yearly ? Math.round((1 - yearly / fullYearPrice) * 100) : 0;
+            const isYearlyCurrent = isCurrentPlan && subscription?.billingCycle === "YEARLY";
+            const canRenewYearly = showYearly && isYearlyCurrent;
 
             return (
               <div
@@ -631,10 +717,19 @@ export default function SubscriptionPage() {
                 </div>
                 <p className="mt-3">
                   <span className="text-[28px] font-semibold tracking-tight">₹{price.toLocaleString("en-IN")}</span>
-                  <span className="ml-1 text-xs text-muted-foreground">/mo</span>
+                  <span className="ml-1 text-xs text-muted-foreground">{showYearly ? "/year" : "/mo"}</span>
+                  {showYearly && fullYearPrice > yearly && (
+                    <span className="ml-2 text-xs text-faint line-through">₹{fullYearPrice.toLocaleString("en-IN")}</span>
+                  )}
                 </p>
+                {showYearly && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    ₹{Math.round(yearly / 12).toLocaleString("en-IN")}/month effective
+                    {savePercent > 0 ? ` · save ${savePercent}%` : ""}
+                  </p>
+                )}
 
-                {isCurrentPlan ? (
+                {isCurrentPlan && !canRenewYearly ? (
                   <button disabled className="mt-4 h-10 w-full cursor-default rounded-xl bg-sunken text-sm font-medium text-muted-foreground">
                     Your current plan
                   </button>
@@ -650,11 +745,13 @@ export default function SubscriptionPage() {
                   >
                     {subscribingPlanId === plan.id
                       ? "Starting..."
-                      : isFreePlan
-                        ? "Start free"
-                        : hasCurrentPlan
-                          ? `Switch to ${plan.name}`
-                          : "Pay now"}
+                      : canRenewYearly
+                        ? "Renew for 1 more year"
+                        : isFreePlan
+                          ? "Start free"
+                          : hasCurrentPlan
+                            ? `Switch to ${plan.name}`
+                            : "Pay now"}
                   </Button>
                 )}
 

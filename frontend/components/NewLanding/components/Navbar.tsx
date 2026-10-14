@@ -41,27 +41,28 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
   const demoHref = "/business#demo";
 
   useMotionValueEvent(scrollY, "change", (latest) => {
-    if (latest > 50) {
-      setIsScrolled(true);
-    } else {
-      setIsScrolled(false);
-    }
+    // Hysteresis: the navbar changes shape when it flips, which can nudge the
+    // scroll position; a single threshold flickered on trackpad momentum and
+    // iOS rubber-banding near the top.
+    setIsScrolled((prev) => (prev ? latest > 20 : latest > 80));
   });
 
   return (
     <motion.nav
-      className={`fixed top-0 left-0 right-0 z-9999 transition-[padding] duration-300 ease-in-out ${
+      className={`fixed top-0 left-0 right-0 z-9999 transform-gpu transition-[padding] duration-300 ease-in-out ${
         isScrolled ? "pt-5 pb-2" : "py-5"
       }`}
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
+      // Slide only: starting at opacity 0 left the navbar invisible whenever
+      // the entrance animation was delayed or skipped.
+      initial={{ y: -20 }}
+      animate={{ y: 0 }}
       transition={{ duration: 0.55, ease: EASE }}
     >
       <div className={`bg-linear-to-b from-white dark:from-black to-transparent w-full h-24 fixed top-0 left-0 right-0 -z-10 ${isScrolled ? "opacity-100" : "opacity-0"}`}></div>
       <div
         className={`mx-auto flex h-14 flex-col justify-center transition-all duration-300 ease-in-out ${
           isScrolled
-            ? "container max-w-7xl px-5 sm:px-10 rounded-full border border-gray-200/50 dark:border-gray-800/50 bg-[#e7e4eb]/80 dark:bg-[#060104]/80 backdrop-blur-md shadow-sm max-md:max-w-[95%]"
+            ? "container max-w-7xl px-5 sm:px-10 rounded-full border border-gray-200/50 dark:border-gray-800/50 bg-[#e7e4eb]/95 dark:bg-[#060104]/95 shadow-sm max-md:max-w-[95%]"
             : "container max-w-7xl px-5 sm:px-10 bg-transparent"
         }`}
       >
