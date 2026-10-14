@@ -2,6 +2,7 @@ export interface CreateAssistantBody {
   name: string;
   description?: string;
   icon?: string;
+  kind?: "SPECIALIST" | "AGENT";
   bgFrom?: string | null;
   bgVia?: string | null;
   bgTo?: string | null;
@@ -18,6 +19,7 @@ export interface UpdateAssistantBody {
   name?: string;
   description?: string;
   icon?: string;
+  kind?: "SPECIALIST" | "AGENT";
   bgFrom?: string | null;
   bgVia?: string | null;
   bgTo?: string | null;

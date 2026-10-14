@@ -3,6 +3,7 @@ export interface Assistant {
   name: string;
   description?: string | null;
   icon: string;
+  kind?: "SPECIALIST" | "AGENT";
   bgFrom?: string | null;
   bgVia?: string | null;
   bgTo?: string | null;

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="image" href="feat/docs-light.webp">
+<link rel="preload" as="image" href="feat/docs-light.webp?v=2">
 <script src="./support.js"></script>
 </head>
 <body>
@@ -51,9 +51,39 @@ input,textarea,button{font-family:inherit}
           <span style="width:10px;height:10px;border-radius:50%;background:var(--chrome)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--chrome)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--chrome)"></span>
           <span style="flex:1;max-width:340px;margin:0 auto;height:24px;border-radius:7px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--faint)"><span style="font-family:'Material Symbols Rounded';font-size:13px">lock</span>chat.colabplatforms.ai</span>
         </div>
-        <div ref="{{ heroBox }}" style="position:relative;width:100%;aspect-ratio:{{ heroAR }};overflow:hidden;background:var(--bg)">
-          <div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:6%;opacity:{{ heroSkel }};transition:opacity .4s;pointer-events:none"><span style="align-self:flex-end;width:40%;height:7%;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out infinite"></span><span style="display:flex;gap:3%;flex:1"><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out infinite"></span><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out .2s infinite"></span><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out .4s infinite"></span></span></div>
-          <iframe src="{{ heroSrc }}" title="Colab AI multi-model chat" loading="eager" tabindex="-1" onLoad="{{ heroLoad }}" style="position:absolute;left:{{ heroX }};top:0;width:{{ vw }};height:{{ vh }};border:0;transform:scale({{ heroK }});transform-origin:0 0;pointer-events:none;opacity:{{ heroOp }};transition:opacity .5s"></iframe>
+        <div ref="{{ heroBox }}" style="position:relative;width:100%;aspect-ratio:{{ heroAR }};overflow:hidden;background:var(--bg);container-type:inline-size">
+          <div style="position:absolute;inset:0;display:flex">
+            <div style="display:{{ hcSideDisp }};width:208px;flex-shrink:0;flex-direction:column;gap:8px;padding:12px 10px 8px;background:var(--sunken);border-right:1px solid var(--border);box-sizing:border-box;overflow:hidden">
+              <span style="display:flex;align-items:center;gap:8px;padding:0 4px 0 6px"><span style="width:24px;height:24px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:16px">all_inclusive</span><span style="flex:1;font-size:14px;font-weight:600;letter-spacing:-.01em">Colab AI</span><span style="font-family:'Material Symbols Rounded';font-size:18px;color:var(--faint)">left_panel_close</span></span>
+              <span style="display:flex;gap:5px"><span style="flex:1;display:flex;align-items:center;gap:7px;height:32px;padding:0 9px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:12.5px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--accent)">edit_square</span>New chat</span><span style="display:flex;align-items:center;gap:3px;height:32px;padding:0 7px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--muted)"><span style="font-family:'Material Symbols Rounded';font-size:16px">search</span><span style="font-family:'Geist Mono';font-size:9.5px;color:var(--faint)">⌘K</span></span></span>
+              <div style="display:flex;flex-direction:column;gap:1px"><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">folder</span><span style="flex:1">Projects</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">support_agent</span><span style="flex:1">Specialists</span><span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--faint);transform:rotate(-90deg)">expand_more</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">smart_toy</span><span style="flex:1">Agents</span><span style="font-family:'Material Symbols Rounded';font-size:16px;color:var(--faint);transform:rotate(-90deg)">expand_more</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">description</span><span style="flex:1">Documents</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:var(--surface);font-size:12.5px;font-weight:500;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--accent)">image</span><span style="flex:1">Image Studio</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">movie</span><span style="flex:1">Video Studio</span><span style="font-size:9.5px;font-weight:600;padding:1px 5px;border-radius:5px;background:var(--accent-soft);color:var(--accent-ink)">New</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">inventory_2</span><span style="flex:1">Assets</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">star</span><span style="flex:1">Starred</span></span><span style="display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:8px;background:transparent;font-size:12.5px;font-weight:400;color:var(--text)"><span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--muted)">graphic_eq</span><span style="flex:1">Voice chats</span><span style="font-size:9.5px;font-weight:600;padding:1px 5px;border-radius:5px;background:var(--sunken);color:var(--muted)">Beta</span></span></div>
+              <div style="display:flex;flex-direction:column;gap:1px;padding-top:6px;border-top:1px solid var(--border)"><span style="padding:4px 9px;font-size:11px;font-weight:500;color:var(--faint)">Today</span><span style="height:28px;padding:0 9px;border-radius:8px;background:var(--surface);display:flex;align-items:center;font-size:12.5px;font-weight:500;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">Menu photo for our new café</span><span style="height:28px;padding:0 9px;display:flex;align-items:center;font-size:12.5px;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis">Weekend offer caption ideas</span></div>
+              <span style="margin-top:auto;display:flex;align-items:center;gap:9px;padding:6px"><span style="width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">A</span><span style="display:flex;flex-direction:column"><span style="font-size:12.5px;font-weight:500">Abhijeet Kumar</span><span style="font-size:11px;color:var(--faint)">Pro plan</span></span></span>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+              <div style="height:{{ hcTop }};flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border)">
+                <span style="display:{{ hcMenuDisp }};font-family:'Material Symbols Rounded';font-size:22px;color:var(--text)">menu</span>
+                <span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 8px 0 9px;border-radius:9px;font-size:13px;font-weight:500"><span style="width:18px;height:18px;border-radius:50%;background:#fff url(logos/openai.svg) center/11px no-repeat;border:1px solid var(--border)"></span>GPT Image 1.5<span style="font-family:'Material Symbols Rounded';font-size:17px;color:var(--faint)">expand_more</span></span>
+                <span style="flex:1"></span>
+                <span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--muted)">ios_share</span>
+                <span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--muted)">more_horiz</span>
+              </div>
+              <div style="flex:1;min-height:0;width:100%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:{{ hcGap }};padding:{{ hcPad }};max-width:720px;margin:0 auto">
+            <span style="align-self:flex-end;max-width:85%;padding:{{ hcBubPad }};border-radius:18px 18px 4px 18px;background:var(--accent-soft);color:var(--text);font-size:{{ hcFs }};line-height:1.45">A menu photo for our new café, warm natural light</span>
+            <div style="display:flex;flex-direction:column;gap:{{ hcInGap }}">
+              <span style="display:flex;align-items:center;gap:8px;font-size:{{ hcSm }};font-weight:600;color:var(--text)"><span style="width:{{ hcAv }};height:{{ hcAv }};border-radius:50%;background:#fff url(logos/openai.svg) center/58% no-repeat;border:1px solid var(--border)"></span>GPT Image 1.5</span>
+              <span style="font-size:{{ hcFs }};line-height:1.45;color:var(--text)">Here’s your photo. You can edit it or download it.</span>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr);width:min(100%,{{ hcOneW }});gap:{{ hcImgGap }}">
+                <sc-for list="{{ heroImgs }}" as="im" hint-placeholder-count="1"><span style="aspect-ratio:16/10;border-radius:12px;background:var(--sunken) url({{ im.src }}) center/cover no-repeat;border:1px solid var(--border)"></span></sc-for>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;height:{{ hcBar }};padding:0 6px 0 16px;border-radius:14px;background:var(--surface);border:1px solid var(--border)">
+              <span style="flex:1;font-size:{{ hcSm }};color:var(--faint)">Ask for changes…</span>
+              <span style="width:calc({{ hcBar }} - 12px);height:calc({{ hcBar }} - 12px);border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:18px">arrow_upward</span>
+            </div>
+          </div>
+            </div>
+          </div>
         </div>
       </div>
       <div style="display:{{ floatDisp }};position:absolute;z-index:3;left:-140px;bottom:60px;animation:bob 6s ease-in-out infinite">
@@ -88,7 +118,7 @@ input,textarea,button{font-family:inherit}
     <div data-reveal="" style="display:flex;flex-direction:column;gap:14px;max-width:720px">
       <span style="font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)">Features</span>
       <h2 style="margin:0;font-size:clamp(30px,4.4vw,52px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">Chat is just the start. Your team gets a full AI studio.</h2>
-      <p style="margin:0;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Documents, images, video, assistants and projects live in the same workspace, so work moves from idea to finished file without switching tools.</p>
+      <p style="margin:0;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Documents, images, video, specialists, agents and projects live in the same workspace, so work moves from idea to finished file without switching tools.</p>
     </div>
 
     <div onMouseEnter="{{ pauseOn }}" onMouseLeave="{{ pauseOff }}" style="display:grid;grid-template-columns:{{ featCols }};gap:clamp(24px,4vw,48px);align-items:center">
@@ -228,32 +258,63 @@ input,textarea,button{font-family:inherit}
   </div>
 </section>
 
-<section id="plans" data-screen-label="Plans" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px)">
+<section id="plans" data-screen-label="Plans" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px);border-top:1px solid var(--border)">
   <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:clamp(28px,4vw,44px)">
-    <div data-reveal="" style="display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
-      <h2 style="margin:0;max-width:720px;font-size:clamp(30px,4.4vw,50px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">One subscription instead of five</h2>
-      <p style="margin:0;max-width:560px;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Chat, documents, images and video in one plan, with every AI model included. Prices are per month, plus GST.</p>
+    <div data-reveal="" style="display:flex;flex-direction:column;gap:18px;align-items:center;text-align:center">
+      <span style="display:flex;align-items:center;gap:10px;height:44px;padding:0 20px 0 16px;border-radius:999px;background:var(--surface);border:1px solid var(--border-strong);font-size:16px;font-weight:500;color:var(--text)"><span style="width:12px;height:12px;border-radius:50%;background:var(--border-strong)"></span>Pricing</span>
+      <h2 style="margin:0;max-width:720px;font-size:clamp(32px,4.6vw,52px);line-height:1.1;font-weight:600;letter-spacing:-.035em;text-wrap:balance">Start free. Upgrade when it pays for itself.</h2>
+      <p style="margin:0;max-width:560px;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Every AI model, plus project folders, context memory and exports to PDF, Word and Excel. Individual plan prices are shown before 18% GST.</p>
+      <div role="tablist" aria-label="Billing period" style="margin-top:6px;display:flex;gap:4px;padding:4px;border-radius:999px;background:var(--surface);border:1px solid var(--border)">
+        <button onClick="{{ setMonthly }}" role="tab" aria-selected="{{ isMonthly }}" style="height:40px;padding:0 20px;border:0;border-radius:999px;background:{{ mBg }};color:{{ mFg }};font-size:14.5px;font-weight:500;cursor:pointer;transition:background .2s,color .2s">Monthly</button>
+        <button onClick="{{ setYearly }}" role="tab" aria-selected="{{ isYearly }}" style="display:flex;align-items:center;gap:8px;height:40px;padding:0 8px 0 20px;border:0;border-radius:999px;background:{{ yBg }};color:{{ yFg }};font-size:14.5px;font-weight:500;cursor:pointer;transition:background .2s,color .2s">Yearly<span style="height:24px;padding:0 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:600;display:flex;align-items:center">Up to 20% off</span></button>
+      </div>
     </div>
-    <div data-car="" style="display:grid;grid-template-columns:{{ planCols }};gap:12px;align-items:stretch;grid-auto-flow:{{ carFlow }};grid-auto-columns:{{ carAuto }};overflow-x:{{ carOv }};margin:{{ carMargin }};padding:{{ carPad }};scroll-padding-left:16px;scroll-snap-type:{{ carSnap }};scrollbar-width:none;cursor:{{ carCursor }}">
-      <sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
-        <div data-reveal="" style="scroll-snap-align:start;display:flex;flex-direction:column;gap:18px;padding:24px;border-radius:20px;background:{{ p.bg }};color:{{ p.fg }};border:1px solid {{ p.border }};box-shadow:{{ p.shadow }}">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px">
-            <span style="font-size:16px;font-weight:600">{{ p.name }}</span>
-            <span style="display:{{ p.badgeDisp }};height:24px;padding:0 9px;border-radius:7px;background:{{ p.badgeBg }};color:{{ p.badgeFg }};font-size:11.5px;font-weight:600;align-items:center;white-space:nowrap">{{ p.badge }}</span>
+    <div style="position:relative">
+      <div style="display:{{ planShellDisp }};position:absolute;left:0;right:0;top:32px;bottom:32px;border-radius:28px;background:var(--surface);border:1px solid var(--border)"></div>
+      <div data-car="" style="position:relative;display:grid;grid-template-columns:{{ planCols }};gap:{{ planGap }};align-items:stretch;grid-auto-flow:{{ planFlow }};grid-auto-columns:{{ planAuto }};overflow-x:{{ planOv }};margin:{{ planMargin }};padding:{{ planCarPad }};scroll-padding-left:clamp(16px,4vw,32px);scroll-snap-type:{{ planSnap }};scrollbar-width:none;cursor:{{ planCursor }}">
+        <sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
+          <div data-reveal="" style="position:relative;scroll-snap-align:start;display:flex;flex-direction:column;padding:{{ p.pad }};border-radius:{{ p.radius }};background:{{ p.bg }};border:{{ p.border }};box-shadow:{{ p.shadow }};color:var(--text);min-width:0">
+            <span style="display:{{ p.badgeDisp }};position:absolute;top:-13px;left:50%;transform:translateX(-50%);height:26px;padding:0 12px;border-radius:999px;background:{{ p.badgeBg }};border:1px solid var(--accent);color:var(--accent);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;align-items:center;gap:6px;white-space:nowrap"><span style="font-family:'Material Symbols Rounded';font-size:14px">auto_awesome</span>{{ p.badge }}</span>
+            <span style="font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ p.labelFg }}">{{ p.label }}</span>
+            <span style="display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;margin-top:18px"><span style="font-size:clamp(40px,4.4vw,50px);line-height:1;font-weight:700;letter-spacing:-.035em;font-variant-numeric:tabular-nums">{{ p.price }}</span><span style="font-size:14.5px;color:var(--muted)">{{ p.per }}</span><sc-if value="{{ p.hasGst }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;font-weight:500;color:var(--muted)">+ 18% GST</span></sc-if><sc-if value="{{ p.showSave }}" hint-placeholder-val="{{ false }}"><s style="font-size:16px;color:var(--faint);font-variant-numeric:tabular-nums">{{ p.strike }}</s></sc-if></span>
+            <span style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:24px"><span style="font-size:13.5px;color:var(--muted)">{{ p.billed }}</span><sc-if value="{{ p.showSave }}" hint-placeholder-val="{{ false }}"><span style="height:24px;padding:0 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent-ink);font-size:12px;font-weight:600;display:flex;align-items:center"><span>Save {{ p.save }} a year</span></span></sc-if></span>
+            <span style="margin-top:16px;font-size:14.5px;line-height:1.5;color:var(--muted);text-wrap:pretty;min-height:44px">{{ p.desc }}</span>
+            <a href="{{ p.href }}" target="_top" style="margin-top:24px;display:flex;align-items:center;justify-content:center;height:46px;border-radius:999px;background:{{ p.ctaBg }};color:{{ p.ctaFg }};border:1px solid {{ p.ctaBorder }};font-size:14.5px;font-weight:500" style-hover="opacity:.88;color:{{ p.ctaFg }}">{{ p.cta }}</a>
+            <div style="margin:{{ p.lineGap }} 0 28px;height:1px;background:{{ p.line }}"></div>
+            <sc-if value="{{ p.hasLead }}" hint-placeholder-val="{{ false }}"><span style="margin:-6px 0 18px;font-size:14px;font-weight:600">{{ p.lead }}</span></sc-if>
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <sc-for list="{{ p.feats }}" as="f" hint-placeholder-count="5">
+                <span style="display:flex;align-items:flex-start;gap:12px;opacity:{{ f.op }}"><span style="width:20px;height:20px;margin-top:1px;flex-shrink:0;border-radius:50%;background:{{ f.iconBg }};color:{{ f.iconFg }};display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:15px;font-weight:600">{{ f.icon }}</span><span style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-size:14.5px;line-height:1.4;font-weight:{{ f.fw }};color:var(--text)">{{ f.t }}</span><sc-if value="{{ f.hasSub }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;line-height:1.45;color:var(--muted);text-wrap:pretty">{{ f.sub }}</span></sc-if></span></span>
+              </sc-for>
+            </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <span style="display:flex;align-items:baseline;gap:4px"><span style="font-size:36px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums">{{ p.price }}</span><span style="font-size:14px;color:{{ p.sub }}">{{ p.per }}</span></span>
-            <span style="font-size:13.5px;line-height:1.45;color:{{ p.sub }};min-height:40px">{{ p.desc }}</span>
-          </div>
-          <a href="{{ p.href }}" target="_top" style="display:flex;align-items:center;justify-content:center;gap:6px;height:46px;border-radius:12px;background:{{ p.ctaBg }};color:{{ p.ctaFg }};border:1px solid {{ p.ctaBorder }};font-size:14.5px;font-weight:500" style-hover="opacity:.88;color:{{ p.ctaFg }}">{{ p.cta }}</a>
-          <div style="height:1px;background:{{ p.line }}"></div>
-          <div style="display:flex;flex-direction:column;gap:11px">
-            <sc-for list="{{ p.feats }}" as="f" hint-placeholder-count="7">
-              <span style="display:flex;gap:10px;font-size:14px;line-height:1.4;color:{{ f.fg }}"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:{{ f.ic }};flex-shrink:0">{{ f.icon }}</span>{{ f.t }}</span>
-            </sc-for>
-          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div data-reveal="" style="display:flex;flex-wrap:wrap;align-items:center;gap:28px 48px;padding:clamp(28px,4vw,44px) clamp(24px,4vw,48px);border-radius:28px;background:var(--surface);border:1px solid var(--border)">
+      <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Business</span>
+        <span style="font-size:clamp(32px,3.6vw,42px);line-height:1;font-weight:700;letter-spacing:-.035em">Custom plan</span>
+        <span style="font-size:15px;line-height:1.55;color:var(--muted);text-wrap:pretty;max-width:560px">Everything in Pro for your whole team, with admin controls, GST invoices for input tax credit and a dedicated account manager.</span>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),max-content));gap:14px 48px;margin-top:10px">
+          <sc-for list="{{ entFeats }}" as="f" hint-placeholder-count="6">
+            <span style="display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.4"><span style="width:20px;height:20px;flex-shrink:0;border-radius:50%;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:15px;font-weight:600">check</span>{{ f }}</span>
+          </sc-for>
         </div>
-      </sc-for>
+      </div>
+      <div style="flex:0 1 280px;display:flex;flex-direction:column;gap:10px">
+        <a href="#demo" style="display:flex;align-items:center;justify-content:center;gap:8px;height:50px;padding:0 24px;border-radius:999px;background:var(--text);color:var(--bg);font-size:15px;font-weight:500" style-hover="opacity:.88;color:var(--bg)">Contact us<span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_forward</span></a>
+        <span style="font-size:13px;color:var(--muted);text-align:center">Tell us about your team and we’ll put a plan together.</span>
+      </div>
+    </div>
+    <div data-reveal="" style="display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:12px 32px;margin-bottom:10px">
+        <span style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--accent)">lock</span>Secure payments by Cashfree</span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--accent)">event_repeat</span>Cancel anytime</span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--accent)">receipt_long</span>GST invoice with every payment</span>
+        <span style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:500"><span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--accent)">shield_lock</span>No training on your data</span>
+      </div>
+      <p style="margin:0;max-width:680px;font-size:14px;line-height:1.65;color:var(--muted);text-wrap:pretty">By subscribing, you agree to our <a href="/terms" target="_top" style="color:var(--text);text-decoration:underline;text-underline-offset:3px" style-hover="color:var(--text)">Terms of Use</a>. Message counts are estimates for an average chat on standard models. Advanced models, images and long documents use more of your monthly allowance, and fair use applies to all plans. See the Terms for full billing details.</p>
     </div>
   </div>
 </section>
@@ -435,7 +496,7 @@ class Component extends DCLogic {
   state = (() => { const w = typeof window !== 'undefined' ? window.innerWidth : 1440;
     const qt = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('theme') : null;
     const sys = qt === 'dark' || qt === 'light' ? qt : typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    return { w, theme: null, sys, nav: false, tab: 0, prog: 0, dept: 0, faq: 0, heroW: 1080, featW: 720,
+    return { w, theme: null, sys, nav: false, yearly: false, tab: 0, prog: 0, dept: 0, faq: 0, heroW: 1080, featW: 720,
       f: { name: '', email: '', phone: '', company: '', msg: '', website: '' }, size: '', want: ['Chat & model compare'], err: {}, sent: false, sending: false, submitErr: '',
       consent: false, paused: false, stopped: false, heroReady: false, loaded: { 0: false }, seen: [0],
       models: { gpt: true, claude: true, gemini: true, ds: false, mistral: false, perplexity: true, qwen: false, kimi: false }, feats: { chat: true, docs: true, img: true, video: false, web: true, voice: true }, mdOpen: false, picked: ['GPT-5.6 Sol', 'Claude Opus 5', 'Gemini 3.8 Flash', 'Perplexity Sonar'], tok: 1000000 }; })();
@@ -444,7 +505,8 @@ class Component extends DCLogic {
     ['docs', 'description', 'Documents', 'Turn notes and files into PDFs, decks, docs and spreadsheets.'],
     ['images', 'image', 'Image Studio', 'Product shots, ads and social visuals from top image models.'],
     ['video', 'movie', 'Video Studio', 'Short clips from a prompt or your reference images.'],
-    ['assistants', 'smart_toy', 'Assistants', 'Ready-made experts, plus ones your admins build.'],
+    ['specialists', 'support_agent', 'Specialists', 'Expert advisors for legal, writing and finance, plus your own.'],
+    ['agents', 'smart_toy', 'Agents', 'Build working apps and websites with live code and preview.'],
     ['projects', 'folder', 'Projects', 'Chats and files under one shared brief.']
   ];
   DEPTS = [
@@ -454,9 +516,20 @@ class Component extends DCLogic {
     ['support_agent', 'HR & Support', [['badge', 'Chat', 'Draft a remote-work policy for a 60-person team in Bengaluru.', 'Claude Opus 5', 'anthropic'], ['forum', 'Assistant', 'Reply to this angry customer email in our support tone, offering a refund.', 'GPT-5.4', 'openai'], ['translate', 'Chat', 'Translate our onboarding guide into Hindi and Tamil.', 'Gemini 3.8 Flash', 'gemini']]]
   ];
   PLANS = [
-    ['Plus', '₹1,799', '/mo', 'For regular work across chat, images and video.', 'Get Plus', '/login', 'pri', [['1M tokens/month', 1], ['All AI models, including paid', 1], ['Document generation', 1], ['Image generation', 1], ['200 video credits/month', 1], ['Unlimited AI models', 1], ['File uploads & attachments', 1], ['Priority support', 1]]],
-    ['Pro', '₹3,699', '/mo', 'For heavy use and more video.', 'Get Pro', '/login', 'pri', [['2M tokens/month', 1], ['All AI models, including paid', 1], ['Document generation', 1], ['Image generation', 1], ['410 video credits/month', 1], ['Unlimited AI models', 1], ['File uploads & attachments', 1], ['Priority Plus support', 1]]],
-    ['Business', 'Custom', '', 'Seats, features and models set up for your team.', 'Book a demo', '#demo', 'biz', [['Everything in Pro, for every seat', 1], ['Pick only the features you need', 1], ['Choose which AI models to allow', 1], ['Admin controls and usage reports', 1], ['Company assistants', 1], ['One GST invoice for the team', 1], ['Dedicated account manager', 1]]]
+    { label: 'Free', mo: 0, yr: 0, desc: 'Try Colab AI on everyday questions before you commit.', cta: 'Start free', ft: false, lead: '', feats: [
+      ['About 40 messages a month', 'Enough to try it out'],
+      ['Every AI model', ''],
+      ['Project folders and context memory', ''],
+      ['Export to PDF, Word and Excel', ''],
+      ['No image generation', '', true],
+      ['No video', '', true]] },
+    { label: 'Plus plan', mo: 1799, yr: 17988, desc: 'For people who use AI every day for work, content and planning.', cta: 'Get started with Plus', ft: true, lead: 'Everything in Free, and:', feats: [
+      ['About 800 messages a month', '20 times Free. Enough for daily work without counting.', false, true],
+      ['Image generation', 'Product shots, posters and social posts from GPT Image, Imagen and Flux.', false, true],
+      ['200 video credits a month', 'About 5 to 13 short videos for reels, ads and product demos.', false, true]] },
+    { label: 'Pro plan', mo: 3699, yr: 35988, desc: 'For heavy users and creators who make video every week.', cta: 'Choose Pro', ft: false, lead: 'Everything in Plus, and:', feats: [
+      ['About 1,600 messages a month', 'Twice Plus, for long documents and research all day.', false, true],
+      ['410 video credits a month', 'About 10 to 27 short videos, twice the video of Plus.', false, true]] }
   ];
   FAQ = [
     ['What is Colab AI for Business?', 'A shared workspace where your team can use leading AI models for chat, model comparison, documents, images and video, with central billing and admin controls.'],
@@ -562,21 +635,38 @@ class Component extends DCLogic {
       mockRef: this.mockRef, heroBox: this.heroBox, featBox: this.featBox,
       heroMax: mob ? '330px' : '1080px', featMax: '100%', frameRadius: mob ? '30px' : '18px', innerRadius: mob ? '22px' : '12px', featPad: mob ? '8px' : 'clamp(10px,2vw,22px)',
       chromeDisp: mob ? 'none' : 'flex', frameAR: '1056/660', vw: VW + 'px', vh: VH + 'px',
-      heroAR: `${VW - CX}/${VH}`, heroX: -(CX * s.heroW / (VW - CX)).toFixed(1) + 'px', heroK: (s.heroW / (VW - CX)).toFixed(4), featK: (s.featW / VW).toFixed(4),
-      heroSrc: src('multi') + '&layout=focus', heroOp: s.heroReady ? 1 : 0, heroSkel: s.heroReady ? 0 : 1,
+      heroAR: mob ? `${VW}/${VH}` : '16/10', hcSideDisp: mob ? 'none' : 'flex', hcMenuDisp: mob ? 'inline' : 'none', hcTop: mob ? '48px' : '52px', heroX: -(CX * s.heroW / (VW - CX)).toFixed(1) + 'px', heroK: (s.heroW / (VW - CX)).toFixed(4), featK: (s.featW / VW).toFixed(4),
+      heroSrc: src('multi') + '&layout=focus',
+      hcOneW: mob ? '220px' : 'min(340px,32cqw)', heroImgs: ['breakfast-flat-lay'].map(n => ({ src: 'media/image-templates/' + n + '.jpg' })),
+      hcGap: mob ? '18px' : '24px', hcInGap: mob ? '10px' : '12px', hcPad: mob ? '20px 16px' : '28px 48px', hcBubPad: mob ? '10px 14px' : '12px 18px', hcFs: mob ? '14px' : '16px', hcSm: mob ? '12.5px' : '14px', hcAv: mob ? '22px' : '26px', hcImgGap: mob ? '8px' : '12px', hcBar: mob ? '44px' : '50px', heroOp: s.heroReady ? 1 : 0, heroSkel: s.heroReady ? 0 : 1,
       heroLoad: () => { this.postTheme(); setTimeout(() => this.setState({ heroReady: true }), 250); },
       featSkel: s.loaded[s.tab] ? 0 : 1,
-      featFrames: this.TABS.map(([k, , title], i) => ({ i, src: `feat/${k}-${theme === 'dark' ? 'dark' : 'light'}.webp`, title: 'Colab AI ' + title, lazy: i === 0 ? 'eager' : 'lazy', op: i === s.tab && s.loaded[i] ? 1 : 0,
+      featFrames: this.TABS.map(([k, , title], i) => ({ i, src: `feat/${k}-${theme === 'dark' ? 'dark' : 'light'}.webp?v=2`, title: 'Colab AI ' + title, lazy: i === 0 ? 'eager' : 'lazy', op: i === s.tab && s.loaded[i] ? 1 : 0,
         load: () => this.setState(st => ({ loaded: { ...st.loaded, [i]: true } })) })),
       pauseOn: () => this.setState({ paused: true }), pauseOff: () => this.setState({ paused: false }),
       leadAlign: 'start', leadPos: stack ? 'static' : 'sticky',
-      planCols: s.w >= 900 ? 'repeat(3,minmax(0,1fr))' : s.w >= 600 ? 'repeat(2,minmax(0,1fr))' : 'none',
-      plans: this.PLANS.map(([name, price, per, desc, cta, href, kind, feats]) => { const biz = kind === 'biz', pri = kind === 'pri';
-        const pop = false;
-        return { name, price, per, desc, cta, href, badge: pop ? 'Most popular' : biz ? 'For teams' : '', badgeDisp: pop || biz ? 'flex' : 'none', badgeBg: biz ? 'rgba(183,166,255,.18)' : 'var(--accent)', badgeFg: biz ? '#CBBBFF' : '#fff',
-          bg: biz ? 'var(--inv)' : 'var(--surface)', fg: biz ? 'var(--inv-fg)' : 'var(--text)', sub: biz ? 'var(--inv-muted)' : 'var(--muted)', border: biz ? 'var(--inv-border)' : pop ? 'var(--accent)' : 'var(--border)', shadow: pop ? '0 0 0 1px var(--accent), var(--pop)' : biz ? 'var(--pop)' : 'none', line: biz ? 'rgba(255,255,255,.1)' : 'var(--border)',
-          ctaBg: biz ? '#FFFFFF' : pri ? 'var(--accent)' : 'var(--sunken)', ctaFg: biz ? '#18161D' : pri ? '#fff' : 'var(--text)', ctaBorder: biz ? '#FFFFFF' : pri ? 'var(--accent)' : 'var(--border)',
-          feats: feats.map(([t, on]) => ({ t, icon: on ? 'check' : 'close', ic: on ? (biz ? '#B7A6FF' : 'var(--ok)') : 'var(--faint)', fg: on ? (biz ? 'var(--inv-fg)' : 'var(--text)') : 'var(--faint)' })) }; }),
+      ...(() => { const pw = s.w >= 1040; return { planCols: pw ? 'repeat(3,minmax(0,1fr))' : 'none', planShellDisp: pw ? 'block' : 'none', planGap: pw ? '0' : '16px',
+        planFlow: pw ? 'row' : 'column', planAuto: pw ? 'auto' : s.w < 600 ? '84%' : '360px', planOv: pw ? 'visible' : 'auto', planSnap: pw ? 'none' : 'x mandatory', planCursor: pw ? 'auto' : 'grab',
+        planMargin: pw ? '0' : '0 calc(-1 * clamp(16px,4vw,32px))', planCarPad: pw ? '0' : '16px clamp(16px,4vw,32px) 8px' }; })(),
+      isMonthly: !s.yearly, isYearly: !!s.yearly,
+      setMonthly: () => this.setState({ yearly: false }), setYearly: () => this.setState({ yearly: true }),
+      mBg: s.yearly ? 'transparent' : 'var(--text)', mFg: s.yearly ? 'var(--muted)' : 'var(--bg)',
+      yBg: s.yearly ? 'var(--text)' : 'transparent', yFg: s.yearly ? 'var(--bg)' : 'var(--muted)',
+      entFeats: ['Admin console and usage reports', 'Choose which AI models to allow', 'GST invoice for input tax credit', 'Dedicated account manager'],
+      plans: this.PLANS.map(({ label, mo, yr, desc, cta, ft, lead, feats }, pi) => { const wide = s.w >= 1040;
+        const inr = n => '₹' + n.toLocaleString('en-IN'), yrOn = !!(s.yearly && mo);
+        return { label, price: !mo ? 'Free' : inr(yrOn ? Math.round(yr / 12) : mo), per: mo ? '/month' : '', showSave: yrOn, hasGst: !!mo, strike: mo ? inr(mo) : '', save: mo ? inr(mo * 12 - yr) : '',
+          billed: !mo ? 'No card needed' : yrOn ? `Billed ${inr(yr)} per year, plus GST` : 'Billed monthly, plus GST', hasLead: !!lead, lead, desc, cta, href: '/login',
+          feats: feats.map(([t, sub, off, strong]) => ({ t, sub, hasSub: !!sub, icon: off ? 'remove' : 'check', iconBg: off ? 'var(--sunken)' : 'var(--text)', iconFg: off ? 'var(--faint)' : 'var(--bg)', op: off ? '.6' : '1', fw: strong ? '600' : '400' })),
+          badge: 'Most popular', badgeDisp: ft ? 'flex' : 'none', badgeBg: 'var(--surface)',
+          labelFg: ft ? 'var(--accent)' : 'var(--muted)',
+          pad: wide ? (ft ? '56px 40px 48px' : '88px 48px 80px') : '32px 24px',
+          radius: ft ? '24px' : wide ? '0' : '24px',
+          bg: ft ? 'var(--surface)' : wide ? 'transparent' : 'var(--surface)',
+          border: ft ? '1.5px solid var(--accent)' : wide ? '0' : '1px solid var(--border)',
+          shadow: ft ? '0 28px 56px -28px color-mix(in oklch,var(--accent) 45%,transparent), 0 2px 8px rgba(24,22,29,.05)' : 'none',
+          ctaBg: ft ? 'var(--text)' : 'var(--sunken)', ctaFg: ft ? 'var(--bg)' : 'var(--text)', ctaBorder: ft ? 'var(--text)' : 'var(--border)',
+          line: ft ? 'color-mix(in oklch,var(--accent) 30%,transparent)' : 'var(--border)', lineGap: wide ? '56px' : '28px' }; }),
       secCols: s.w >= 1000 ? 'minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr)' : s.w >= 640 ? 'repeat(2,minmax(0,1fr))' : car ? 'none' : '1fr',
       secARow: s.w >= 1000 ? 'span 2' : 'auto', secACol: s.w >= 1000 || s.w < 640 ? 'auto' : 'span 2', secDCol: s.w >= 640 ? 'span 2' : 'auto', secBCol: s.w >= 640 ? 'span 2' : 'auto',
       secDDir: s.w >= 640 ? 'row' : 'column', secDAlign: s.w >= 640 ? 'center' : 'stretch',

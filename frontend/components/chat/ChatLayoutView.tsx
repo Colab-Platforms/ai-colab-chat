@@ -57,6 +57,7 @@ interface Assistant {
   name: string;
   description?: string | null;
   icon: string;
+  kind?: "SPECIALIST" | "AGENT";
   bgFrom?: string | null;
   bgVia?: string | null;
   bgTo?: string | null;
@@ -309,6 +310,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
               (a: any, i: number) =>
                 a.id === fetched[i]?.id &&
                 a.name === fetched[i]?.name &&
+                a.kind === fetched[i]?.kind &&
                 a.isActive === fetched[i]?.isActive,
             )
           ) {

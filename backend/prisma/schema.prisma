@@ -646,6 +646,11 @@ model Model {
   @@unique([modelProviderId, externalId])
 }
 
+enum AssistantKind {
+  SPECIALIST
+  AGENT
+}
+
 model Assistant {
   id               Int       @id @default(autoincrement())
   name             String
@@ -662,6 +667,7 @@ model Assistant {
   deletedAt        DateTime?
   greeting         String?
   suggestedPrompts Json?
+  kind             AssistantKind @default(SPECIALIST)
   bgFrom           String?
   bgTo             String?
   bgVia            String?

@@ -178,12 +178,14 @@ export default function Pricing() {
 
     if (cycle === "YEARLY" && plan.yearlyPrice > 0) {
       const fullYear = plan.price * 12;
-      const save = fullYear > plan.yearlyPrice ? Math.round((1 - plan.yearlyPrice / fullYear) * 100) : 0;
+      const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+      const perMonth = Math.round(plan.yearlyPrice / 12);
+      const saved = fullYear - plan.yearlyPrice;
       return {
-        amount: `₹${plan.yearlyPrice.toLocaleString("en-IN")}`,
-        period: "/year + GST",
-        strike: fullYear > plan.yearlyPrice ? `₹${fullYear.toLocaleString("en-IN")}` : "",
-        note: `₹${Math.round(plan.yearlyPrice / 12).toLocaleString("en-IN")}/month effective${save > 0 ? ` · save ${save}%` : ""}. Pay once, tokens added monthly.`,
+        amount: inr(perMonth),
+        period: "/month + GST",
+        strike: saved > 0 ? inr(plan.price) : "",
+        note: `Billed ${inr(plan.yearlyPrice)} per year + GST${saved > 0 ? ` · Save ${inr(saved)} a year` : ""}. Tokens added monthly.`,
       };
     }
 
@@ -242,7 +244,7 @@ export default function Pricing() {
                 >
                   {c === "MONTHLY" ? "Monthly" : "Yearly"}
                   {c === "YEARLY" && cycle !== "YEARLY" && (
-                    <span className="ml-2 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] text-purple-300">Save more</span>
+                    <span className="ml-2 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] text-purple-300">Up to 20% off</span>
                   )}
                 </button>
               ))}

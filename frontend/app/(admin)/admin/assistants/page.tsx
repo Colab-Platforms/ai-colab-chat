@@ -31,6 +31,7 @@ export default function AssistantsAdminPage() {
 
   const defaultForm = {
     name: "",
+    kind: "SPECIALIST",
     icon: "Bot",
     bgFrom: "#f3e8ff",
     bgVia: "#e9d5ff",
@@ -77,6 +78,7 @@ export default function AssistantsAdminPage() {
   const openEdit = (a: any) => {
     setForm({
       name: a.name,
+      kind: a.kind || "SPECIALIST",
       icon: a.icon || "Bot",
       bgFrom: a.bgFrom || "#f3e8ff",
       bgVia: a.bgVia || "#e9d5ff",
@@ -108,6 +110,7 @@ export default function AssistantsAdminPage() {
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         icon: form.icon.trim() || "Bot",
+        kind: form.kind,
         bgFrom: form.bgFrom || null,
         bgVia: form.bgVia || null,
         bgTo: form.bgTo || null,
@@ -172,6 +175,7 @@ export default function AssistantsAdminPage() {
         return <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center"><Icon className="w-4 h-4 text-primary" /></div>;
     }},
     { key: "name", label: "Name", sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
+    { key: "kind", label: "Type", render: (r) => <Badge variant="outline">{r.kind === "AGENT" ? "Agent" : "Specialist"}</Badge> },
     { key: "temperature", label: "Response Style", render: (r) => <Badge variant="secondary" className="font-mono">{r.temperature}</Badge> },
     { key: "isActive", label: "Status", sortable: true, render: (r) => <Badge variant={r.isActive ? "default" : "secondary"} className="cursor-pointer" onClick={() => handleToggleActive(r)}>{r.isActive ? "Active" : "Inactive"}</Badge> },
     {
@@ -232,6 +236,17 @@ export default function AssistantsAdminPage() {
                 <label className="text-sm font-medium">Lucide Icon Name</label>
                 <Input value={form.icon} onChange={e => setForm(p => ({ ...p, icon: e.target.value }))} placeholder="e.g. Bot, Rocket, Code2" />
                 <p className="text-xs text-muted-foreground">Use a valid <a href="https://lucide.dev/icons" target="_blank" rel="noopener noreferrer" className="text-primary underline">Lucide icon name</a></p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Type</label>
+                <Select value={form.kind} onValueChange={v => setForm(p => ({ ...p, kind: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SPECIALIST">Specialist</SelectItem>
+                    <SelectItem value="AGENT">Agent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Shown under Specialists or Agents in the sidebar. Software Engineer must stay an Agent.</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Response Creativity (0.0 – 2.0)</label>

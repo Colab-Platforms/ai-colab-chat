@@ -321,6 +321,7 @@ Every response should answer:
     },
     {
       name: "Software Engineer",
+      kind: "AGENT" as const,
       description:
         "A senior full-stack engineer who helps you write better code, debug issues, and understand engineering concepts.",
       icon: "Code2",
