@@ -115,6 +115,22 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
             >
               Book a demo
             </a> */}
+            <Link href="/try" className="hidden lg:block">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-6 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Try it free
+              </Button>
+            </Link>
+            <Link href="/try" className="lg:hidden">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-3 py-2 h-9 text-sm text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Try free
+              </Button>
+            </Link>
             <Link href="/login" className="hidden lg:block">
               <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-6 transition-all duration-300">
                 Log in

@@ -9,6 +9,7 @@ import {
   useCallback,
 } from "react";
 import api from "@/lib/api";
+import { mergeGuestChatsIntoAccount } from "@/lib/guest";
 
 interface User {
   id: number;
@@ -117,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(tokenData);
     localStorage.setItem("token", tokenData);
     localStorage.setItem("user", JSON.stringify(userData));
+    // Carry over any free-trial chats the visitor had before signing in.
+    void mergeGuestChatsIntoAccount();
   };
 
   const login = async (email: string, password: string) => {

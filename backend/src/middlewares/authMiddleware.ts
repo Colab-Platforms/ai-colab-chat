@@ -3,7 +3,7 @@ import STATUS_CODES from "@/utils/statusCodes.js";
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-export const auth = (...allowedRoles: Array<"USER" | "ADMIN" | "SUPERADMIN">) => {
+export const auth = (...allowedRoles: Array<"USER" | "ADMIN" | "SUPERADMIN" | "GUEST">) => {
     return (req: Request, res: Response, next: NextFunction) => {
         try {
             const authHeader = req.headers.authorization;

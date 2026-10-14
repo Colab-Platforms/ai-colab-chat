@@ -5,7 +5,7 @@ declare global {
     namespace Express {
         interface User {
             id: number;
-            role: "USER" | "ADMIN" | "SUPERADMIN";
+            role: "USER" | "ADMIN" | "SUPERADMIN" | "GUEST";
             timezone: string;
         }
 

@@ -30,6 +30,7 @@ import adminRoutes from "@/modules/admin/admin.route.js";
 import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.js";
 import githubRoutes from "@/modules/github/github.route.js";
 import vercelRoutes from "@/modules/vercel/vercel.route.js";
+import guestRoutes from "@/modules/guest/guest.route.js";
 
 
 
@@ -75,5 +76,6 @@ router.use("/admin", adminRoutes);
 router.use("/code-projects", codeWorkspaceRoutes);
 router.use("/github", githubRoutes);
 router.use("/vercel", vercelRoutes);
+router.use("/guest", guestRoutes);
 
 export default router;

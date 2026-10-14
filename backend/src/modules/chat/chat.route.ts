@@ -15,14 +15,14 @@ const router = Router();
 
 router.post(
   "/",
-  auth("USER", "ADMIN", "SUPERADMIN"),
+  auth("USER", "ADMIN", "SUPERADMIN", "GUEST"),
   chatController.createChat,
 );
-router.get("/", auth("USER", "ADMIN", "SUPERADMIN"), chatController.listChats);
+router.get("/", auth("USER", "ADMIN", "SUPERADMIN", "GUEST"), chatController.listChats);
 router.get("/shared/:shareId", chatController.getSharedChat);
 router.get(
   "/:id",
-  auth("USER", "ADMIN", "SUPERADMIN"),
+  auth("USER", "ADMIN", "SUPERADMIN", "GUEST"),
   chatController.getChatById,
 );
 router.get(
@@ -60,11 +60,11 @@ router.delete(
   auth("USER", "ADMIN", "SUPERADMIN"),
   chatController.deleteChat,
 );
-router.post("/:chatId/send", auth("USER", "ADMIN", "SUPERADMIN"), streamChat);
-router.post("/:chatId/stop", auth("USER", "ADMIN", "SUPERADMIN"), stopChatGeneration);
+router.post("/:chatId/send", auth("USER", "ADMIN", "SUPERADMIN", "GUEST"), streamChat);
+router.post("/:chatId/stop", auth("USER", "ADMIN", "SUPERADMIN", "GUEST"), stopChatGeneration);
 router.post(
   "/:chatId/prepare-multi",
-  auth("USER", "ADMIN", "SUPERADMIN"),
+  auth("USER", "ADMIN", "SUPERADMIN", "GUEST"),
   prepareMulti,
 );
 router.post(

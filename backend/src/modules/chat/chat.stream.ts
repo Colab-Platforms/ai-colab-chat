@@ -39,6 +39,8 @@ import {
 import { CODE_CONTINUE_PROMPT } from "@/modules/code-workspace/code-workspace.protocol.js";
 
 import { abortChatStreams, registerStream } from "./chat.streamRegistry.js";
+import { isGuestRequest, guardGuestSend, guardGuestPrepareMulti } from "@/modules/guest/guest.gate.js";
+import { GUEST_LIMITS } from "@/modules/guest/guest.config.js";
 
 const attachmentService = new AttachmentService();
 
@@ -929,7 +931,11 @@ export async function streamChat(req: Request, res: Response) {
   );
   // The "Code" pill arrives as chatType CODE; from here on the turn is a
   // STANDARD turn plus a forceCode flag (see code-workspace.chat.ts).
-  const { chatType, forceCode } = resolveCodeChatType(requestedChatType);
+  const resolvedChatType = resolveCodeChatType(requestedChatType);
+  // Trial users get plain text chat only.
+  const isGuest = isGuestRequest(req);
+  const chatType = isGuest ? "STANDARD" : resolvedChatType.chatType;
+  const forceCode = isGuest ? false : resolvedChatType.forceCode;
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
 
@@ -970,6 +976,20 @@ export async function streamChat(req: Request, res: Response) {
     }
 
     const isfreeModel = model.isFreeModel
+
+    if (
+      isGuest &&
+      !(await guardGuestSend(req, res, {
+        chatId,
+        model,
+        attachmentIds,
+        replaceModelId,
+        userMessageId,
+        assistantMessageId,
+      }))
+    ) {
+      return;
+    }
 
     // Model choice itself isn't plan-restricted — any plan (including Free)
     // may pick any model, gated purely by wallet balance: a paid model bills
@@ -1124,8 +1144,9 @@ export async function streamChat(req: Request, res: Response) {
     const userPreference = await prisma.userPreference.findUnique({
       where: { userId },
     });
+    // Trial users skip the follow-up block: the lightweight guest UI doesn't parse it.
     const enableFollowUpQuestions =
-      userPreference?.enableFollowUpQuestions !== false;
+      !isGuest && userPreference?.enableFollowUpQuestions !== false;
 
     // -----------------------------------------------------------------------
     // Persona injection – prepend the assistant's system prompt (or the
@@ -1269,18 +1290,20 @@ export async function streamChat(req: Request, res: Response) {
     // Code workspace (Software Engineer assistant only) — decided before the
     // token budget so the protocol prompt and project files are priced in.
     // A code turn replaces the document pipeline for this message.
-    const codeTurn = await prepareCodeTurn({
-      userId,
-      chatId,
-      userPrompt: content,
-      assistantSlug,
-      forceCode,
-    });
+    const codeTurn = isGuest
+      ? null
+      : await prepareCodeTurn({
+          userId,
+          chatId,
+          userPrompt: content,
+          assistantSlug,
+          forceCode,
+        });
     if (codeTurn) {
       injectCodeTurnMessages(conversationHistory, codeTurn, model.externalId);
     }
 
-    const documentTurn = codeTurn
+    const documentTurn = codeTurn || isGuest
       ? null
       : await prepareDocumentTurn({
           chatId,
@@ -1318,7 +1341,11 @@ export async function streamChat(req: Request, res: Response) {
       // Code turns: the follow-up-questions JSON block would land after the
       // <summary> and pollute the parsed output.
       enableFollowUpQuestions && !codeTurn,
-      codeTurn ? CODE_MAX_COMPLETION : undefined,
+      isGuest
+        ? GUEST_LIMITS.maxCompletionTokens
+        : codeTurn
+          ? CODE_MAX_COMPLETION
+          : undefined,
     );
     if (tokenLimits === null) return;
     const { maxCompletionTokens, trimmedHistory } = tokenLimits;
@@ -2650,7 +2677,8 @@ export async function prepareMulti(req: Request, res: Response) {
     chatType?: string;
   };
   // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
-  const { chatType } = resolveCodeChatType(requestedChatType);
+  const isGuest = isGuestRequest(req);
+  const chatType = isGuest ? "STANDARD" : resolveCodeChatType(requestedChatType).chatType;
 
   try {
     if (!content?.trim()) {
@@ -2663,6 +2691,10 @@ export async function prepareMulti(req: Request, res: Response) {
     });
     if (!chat) {
       res.status(404).json({ status: false, message: "Chat not found" });
+      return;
+    }
+
+    if (isGuest && !(await guardGuestPrepareMulti(req, res, attachmentIds))) {
       return;
     }
 
