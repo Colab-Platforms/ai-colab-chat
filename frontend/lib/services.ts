@@ -264,6 +264,10 @@ export const studioTemplateService = {
   recordUse: (id: number) => api.post(`/studio-templates/${id}/use`),
 };
 
+export const promptSuggestionService = {
+  latest: () => api.get("/prompt-suggestions"),
+};
+
 export const demoRequestService = {
   list: (params?: Record<string, string>) => api.get("/demo-requests", { params }),
   export: (params?: Record<string, string>) =>

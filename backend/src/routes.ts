@@ -31,6 +31,7 @@ import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.j
 import githubRoutes from "@/modules/github/github.route.js";
 import vercelRoutes from "@/modules/vercel/vercel.route.js";
 import guestRoutes from "@/modules/guest/guest.route.js";
+import promptSuggestionRoutes from "@/modules/prompt-suggestion/prompt-suggestion.route.js";
 
 
 
@@ -77,5 +78,6 @@ router.use("/code-projects", codeWorkspaceRoutes);
 router.use("/github", githubRoutes);
 router.use("/vercel", vercelRoutes);
 router.use("/guest", guestRoutes);
+router.use("/prompt-suggestions", promptSuggestionRoutes);
 
 export default router;

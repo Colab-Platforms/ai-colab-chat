@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { motion, type Variants } from "framer-motion";
-import { chatService, messageService, modelService, assistantService, folderService, videoService } from "@/lib/services";
+import { chatService, messageService, modelService, assistantService, folderService, videoService, promptSuggestionService } from "@/lib/services";
 import * as LucideIcons from "lucide-react";
 import { ChatInput } from "@/components/chat/chat-input";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
@@ -27,6 +27,19 @@ interface Model {
   defaultForCapabilities?: string[];
 }
 
+// Typed out one at a time in the empty composer; Tab fills the current one.
+// Fallback until the API answers (or if it fails / has no batch yet).
+const FALLBACK_PROMPTS = [
+  "Summarize this PDF into key actions",
+  "Explain inflation in simple terms",
+  "Write a cold email to a potential client",
+  "Plan a 3-day trip to Goa on a budget",
+  "Turn these meeting notes into a checklist",
+  "Debug why my API returns a 500 error",
+  "Create a product launch image prompt",
+  "Compare React and Vue for a small team",
+];
+
 export function NewChatPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -40,6 +53,22 @@ export function NewChatPage() {
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   // Lets a suggestion row preselect a capability in the composer.
   const [suggestedType, setSuggestedType] = useState<"STANDARD" | "WEB_SEARCH" | "IMAGE_GENERATION" | "DEEP_RESEARCH" | undefined>(undefined);
+
+  const [typingPrompts, setTypingPrompts] = useState<string[]>(FALLBACK_PROMPTS);
+
+  useEffect(() => {
+    let cancelled = false;
+    promptSuggestionService
+      .latest()
+      .then((res) => {
+        const texts: string[] = (res.data.data ?? []).map((r: { text: string }) => r.text);
+        if (!cancelled && texts.length > 0) setTypingPrompts(texts);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [assistant, setAssistant] = useState<any | null>(null);
   const [activeFolder, setActiveFolder] = useState<{ name: string; description?: string | null } | null>(null);
@@ -355,6 +384,7 @@ export function NewChatPage() {
             // (and the Assistants link) are hidden; only its own Code pill remains.
             compact={Boolean(assistant)}
             placeholder={assistant ? `Message ${assistant.name}\u2026` : undefined}
+            typingSuggestions={assistant ? undefined : typingPrompts}
             assistantChip={
               assistant && ActiveIcon
                 ? {

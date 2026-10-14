@@ -1205,3 +1205,13 @@ model DemoRequest {
   @@index([status, createdAt])
   @@index([email])
 }
+
+model PromptSuggestion {
+  id        Int      @id @default(autoincrement())
+  text      String
+  batchId   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([batchId])
+}
