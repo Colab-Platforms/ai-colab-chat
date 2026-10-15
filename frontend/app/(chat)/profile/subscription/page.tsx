@@ -7,19 +7,16 @@ import { Button } from "@/components/ui/button";
 import { subscriptionService, planService, paymentService, creditWalletService } from "@/lib/services";
 import { openSubscriptionCheckout, openPaymentCheckout } from "@/lib/cashfree";
 import { getPlanFeatureLines } from "@/lib/planFeatures";
-import { Loader2, Check, X } from "lucide-react";
+import { Loader2, Check, X, CalendarDays, Lock } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function SubscriptionPage() {
   const searchParams = useSearchParams();
@@ -409,6 +406,14 @@ export default function SubscriptionPage() {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   })();
 
+  // Discount differs per plan, so the toggle badge advertises the best one ("up to").
+  const maxYearlySavePercent = plans.reduce((max: number, p: any) => {
+    const monthly = Number(p.monthlyPrice ?? 0);
+    const yearly = Number(p.yearlyPrice ?? 0);
+    if (monthly <= 0 || yearly <= 0 || monthly * 12 <= yearly) return max;
+    return Math.max(max, Math.round((1 - yearly / (monthly * 12)) * 100));
+  }, 0);
+
   return (
     <div>
       <SettingsHeader title="Subscription" description="Manage your plan and billing." />
@@ -426,97 +431,120 @@ export default function SubscriptionPage() {
           subscription.status === "ACTIVE";
         const gstAmount = isFree ? 0 : Number(((basePrice * gstPercent) / 100).toFixed(2));
         const totalAmount = isFree ? 0 : Number((basePrice + gstAmount).toFixed(2));
+        const yearlySavings = isYearlyCheckout
+          ? Math.max(0, Number(planToConfirm.monthlyPrice ?? 0) * 12 - basePrice)
+          : 0;
         const currentMonthlyPrice = Number(subscription?.plan?.monthlyPrice ?? 0);
         const currentIsFree = currentMonthlyPrice === 0;
         const isUpgradeFromFree = Boolean(subscription) && currentIsFree && basePrice > currentMonthlyPrice;
-        const { included, excluded } = getPlanFeatureLines(planToConfirm);
+        const isSwitchFromPaid =
+          Boolean(subscription) &&
+          !currentIsFree &&
+          subscription.status === "ACTIVE" &&
+          subscription.planId !== planToConfirm.id &&
+          !isFree;
+        const money = (n: number) =>
+          `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
         return (
-          <AlertDialog open onOpenChange={(open) => !open && setPlanToConfirm(null)}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{planToConfirm.name} plan</AlertDialogTitle>
-                <AlertDialogDescription asChild>
-                  <div className="space-y-4 text-left">
-                    <ul className="space-y-1.5">
-                      {included.map((line: string) => (
-                        <li key={line} className="flex items-center gap-2 text-sm text-foreground">
-                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                          {line}
-                        </li>
-                      ))}
-                      {excluded.map((line: string) => (
-                        <li key={line} className="flex items-center gap-2 text-sm text-muted-foreground/60">
-                          <X className="w-3.5 h-3.5 shrink-0" />
-                          {line}
-                        </li>
-                      ))}
-                    </ul>
+          <Dialog open onOpenChange={(open) => !open && setPlanToConfirm(null)}>
+            <DialogContent className="max-w-md gap-5 rounded-2xl p-6 sm:max-w-md">
+              <DialogHeader className="gap-1">
+                <p className="text-xs text-muted-foreground">Checkout</p>
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                  {planToConfirm.name} plan
+                  <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-ink">
+                    {isYearlyCheckout ? "Yearly" : "Monthly"}
+                  </span>
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Review the price and GST before paying for the {planToConfirm.name} plan.
+                </DialogDescription>
+              </DialogHeader>
 
-                    <div className="rounded-lg border border-border/50 p-3 space-y-1.5 text-sm">
-                      {isFree ? (
-                        <div className="flex items-center justify-between font-semibold text-foreground">
-                          <span>Total</span>
-                          <span>Free</span>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center justify-between text-muted-foreground">
-                            <span>{isYearlyCheckout ? "Plan price (1 year)" : "Plan price"}</span>
-                            <span>₹{basePrice.toLocaleString("en-IN")}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-muted-foreground">
-                            <span>GST ({gstPercent}%)</span>
-                            <span>₹{gstAmount.toLocaleString("en-IN")}</span>
-                          </div>
-                          <div className="flex items-center justify-between font-semibold text-foreground pt-1.5 border-t border-border/50">
-                            <span>Total to pay</span>
-                            <span>₹{totalAmount.toLocaleString("en-IN")}</span>
-                          </div>
-                        </>
-                      )}
+              <div className="space-y-2.5 rounded-xl border border-border/60 bg-sunken p-4 text-sm">
+                {isFree ? (
+                  <div className="flex items-center justify-between font-semibold text-foreground">
+                    <span>Total</span>
+                    <span>Free</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>{planToConfirm.name} · {isYearlyCheckout ? "12 months" : "1 month"}</span>
+                      <span>{money(basePrice)}</span>
                     </div>
-
-                    {isYearlyCheckout && !isFree && (
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <p>
-                          You pay once for the year. Your plan&apos;s tokens and credits are added to your
-                          account every month, and anything unused stays in your balance.
-                        </p>
-                        {isRenewal && subscription.expiresAt && (
-                          <p>
-                            This adds 12 months after your current end date (
-                            {new Date(subscription.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            ), so no time is lost.
-                          </p>
-                        )}
-                        <p>Yearly plans are non-refundable. There is no auto-renewal.</p>
+                    {yearlySavings > 0 && (
+                      <div className="flex items-center justify-between font-medium text-ok">
+                        <span>You save</span>
+                        <span>{money(yearlySavings)} vs monthly</span>
                       </div>
                     )}
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>GST ({gstPercent}%)</span>
+                      <span>{money(gstAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-dashed border-border pt-3">
+                      <span className="text-sm font-semibold text-foreground">Total to pay</span>
+                      <span className="text-2xl font-semibold tracking-tight text-foreground">{money(totalAmount)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
 
-                    {isUpgradeFromFree && (
-                      <p className="text-xs text-muted-foreground">
-                        You still have remaining tokens in your current plan. If you continue, those tokens will carry over and be added to your new plan&apos;s tokens.
+              <div className="space-y-2 text-xs text-muted-foreground">
+                {isSwitchFromPaid && (
+                  <p className="flex items-start gap-2">
+                    <CalendarDays className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Your {subscription.plan?.name} plan is replaced as soon as payment succeeds. Unused tokens carry over to {planToConfirm.name}.
+                    </span>
+                  </p>
+                )}
+                {isYearlyCheckout && !isFree && (
+                  <>
+                    <p>
+                      You pay once for the year. Your plan&apos;s tokens and credits are added every month,
+                      and anything unused stays in your balance.
+                    </p>
+                    {isRenewal && subscription.expiresAt && (
+                      <p>
+                        This adds 12 months after your current end date (
+                        {new Date(subscription.expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        ), so no time is lost.
                       </p>
                     )}
-                  </div>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={subscribingPlanId !== null}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
+                    <p>Yearly plans are non-refundable. There is no auto-renewal.</p>
+                  </>
+                )}
+                {isUpgradeFromFree && (
+                  <p>
+                    You still have remaining tokens in your current plan. If you continue, those tokens will carry over and be added to your new plan&apos;s tokens.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2.5">
+                <Button
+                  className="h-11 w-full rounded-xl text-sm font-semibold"
+                  disabled={subscribingPlanId !== null}
                   onClick={() => {
                     const planId = planToConfirm.id;
                     setPlanToConfirm(null);
                     void handleSubscribe(planId);
                   }}
-                  disabled={subscribingPlanId !== null}
                 >
-                  {isFree ? "Confirm" : "Proceed to Pay"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                  {isFree ? "Confirm" : `Pay ${money(totalAmount)}`}
+                </Button>
+                {!isFree && (
+                  <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+                    <Lock className="h-3 w-3" />
+                    Secure payment · GST invoice sent to your email
+                  </p>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         );
       })()}
 
@@ -526,6 +554,7 @@ export default function SubscriptionPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-semibold">{subscription.plan?.name}</h2>
+                
                 <span
                   className={`rounded-md px-2 py-0.5 text-xs font-medium ${
                     subscription.status === "ACTIVE" ? "bg-ok/15 text-ok" : "bg-sunken text-muted-foreground"
@@ -544,9 +573,9 @@ export default function SubscriptionPage() {
               </p>
               {subscription.billingCycle === "YEARLY" && !subscription.autoRenew && subscription.status === "ACTIVE" && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Tokens and credits are added every month
+                  Tokens and credits are added every month,
                   {subscription.nextGrantAt && new Date(subscription.nextGrantAt) < new Date(subscription.expiresAt ?? 0)
-                    ? ` — next top-up on ${new Date(subscription.nextGrantAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                    ? ` next top-up on ${new Date(subscription.nextGrantAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
                     : ""}
                   .
                 </p>
@@ -678,6 +707,11 @@ export default function SubscriptionPage() {
                 }`}
               >
                 {c === "MONTHLY" ? "Monthly" : "Yearly"}
+                {c === "YEARLY" && maxYearlySavePercent > 0 && (
+                  <span className="ml-2 rounded-full bg-ok/15 px-2 py-0.5 text-[10px] font-semibold text-ok">
+                    Save up to {maxYearlySavePercent}%
+                  </span>
+                )}
               </button>
             ))}
           </div>

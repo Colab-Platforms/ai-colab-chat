@@ -16,6 +16,7 @@ interface SendEmailPayload {
   subject: string;
   text: string;
   html: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
 }
 
 export const sendEmail = async (payload: SendEmailPayload) => {
@@ -34,6 +35,7 @@ export const sendEmail = async (payload: SendEmailPayload) => {
     subject: payload.subject,
     text: payload.text,
     html: payload.html,
+    ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
   });
 
   if (error) {
