@@ -53,3 +53,38 @@ export const upload = multer({
   fileFilter,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
 });
+
+// Kept separate from ALLOWED_MIME_TYPES so the shared attachment upload
+// (chat, voice, etc.) doesn't start accepting audio as a side effect.
+const AUDIO_MIME_TYPES = [
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/wave",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/aac",
+  "audio/ogg",
+  "audio/webm",
+];
+
+const audioFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  if (AUDIO_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new ApiError(
+        "Audio type not supported. Allowed: MP3, WAV, M4A, AAC, OGG, WEBM.",
+        STATUS_CODES.BAD_REQUEST,
+      ),
+    );
+  }
+};
+
+/** Audio-only multer middleware — used for video reference audio. */
+export const uploadAudio = multer({
+  storage,
+  fileFilter: audioFileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+});

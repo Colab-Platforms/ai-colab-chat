@@ -2,12 +2,18 @@ import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import { debitCredits, creditsToCostBreakdown, USD_PER_CREDIT } from "@/utils/walletUtils.js";
-import { deleteFromCloudinary } from "@/utils/cloudinary.js";
+import { deleteFromCloudinary, uploadToCloudinary } from "@/utils/cloudinary.js";
 import { listVideoModels, type VideoModelInfo } from "@/utils/openrouterVideo.js";
 import { runPendingVideoJobs } from "./video.generation.service.js";
 import { containsDisallowedContent } from "./video.moderation.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
-import { MAX_TITLE_CHARS, type CreateVideoInput, type ListVideosQuery } from "./video.types.js";
+import {
+  AUDIO_REFERENCE_MODELS,
+  MAX_REFERENCE_AUDIO_SECONDS,
+  MAX_TITLE_CHARS,
+  type CreateVideoInput,
+  type ListVideosQuery,
+} from "./video.types.js";
 import { getUserPlanContext, assertCanGenerateVideo } from "@/modules/plan-access/planAccess.service.js";
 
 const DEFAULT_LIMIT = 20;
@@ -236,6 +242,16 @@ class VideoService {
     const planContext = await getUserPlanContext(userId);
     await assertCanGenerateVideo(planContext, model);
 
+    // Other models silently drop an audio reference, so the user would pay
+    // for a clip that ignored their audio — reject up front instead.
+    if (input.referenceAudioUrl && !AUDIO_REFERENCE_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} reference audio rejected — ${model.externalId} doesn't support it`);
+      throw new ApiError(
+        `${model.name} can't use a reference audio. Pick a Seedance model or remove the audio.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
     const duration = input.duration ?? DEFAULT_DURATION;
     const resolution = input.resolution ?? DEFAULT_RESOLUTION;
     const aspectRatio = input.aspectRatio ?? DEFAULT_ASPECT_RATIO;
@@ -286,6 +302,7 @@ class VideoService {
       resolution,
       duration,
       hasImageInput,
+      hasAudioReference: Boolean(input.referenceAudioUrl),
       creditsPerSecond: costPerSecond,
       reservedCredits: reservedTokens,
       estimatedUsd: `$${estimatedCost.usd}`,
@@ -308,6 +325,7 @@ class VideoService {
           aspectRatio,
           firstFrameUrl: input.firstFrameUrl ?? null,
           lastFrameUrl: input.lastFrameUrl ?? null,
+          referenceAudioUrl: input.referenceAudioUrl ?? null,
           reservedTokens,
         },
       });
@@ -357,6 +375,34 @@ class VideoService {
     vlog("create", `job=${video.id} worker kicked`);
 
     return video;
+  }
+
+  /**
+   * Stores a reference audio clip for a later create() call. Cloudinary keeps
+   * audio under the "video" resource type, which is also what reports the
+   * clip's duration — so the length cap is enforced on the real file, not
+   * on whatever the browser claimed.
+   */
+  async uploadReferenceAudio(userId: number, file: Express.Multer.File) {
+    vlog("reference-audio", `user=${userId} uploading ${file.originalname} (${file.mimetype}, ${file.size} bytes)`);
+    const uploaded = await uploadToCloudinary(file.buffer, {
+      folder: "ai-colab-chat/video-reference-audio",
+      resourceType: "video",
+    });
+
+    if (typeof uploaded.duration === "number" && uploaded.duration > MAX_REFERENCE_AUDIO_SECONDS) {
+      await deleteFromCloudinary(uploaded.publicId, "video").catch((error) => {
+        vlogError("reference-audio", `failed to delete over-length upload ${uploaded.publicId}`, error);
+      });
+      vlog("reference-audio", `user=${userId} rejected — ${uploaded.duration}s > ${MAX_REFERENCE_AUDIO_SECONDS}s`);
+      throw new ApiError(
+        `Reference audio can be at most ${MAX_REFERENCE_AUDIO_SECONDS} seconds long.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    vlog("reference-audio", `user=${userId} stored ${uploaded.publicId} (${uploaded.duration ?? "?"}s)`);
+    return { url: uploaded.url, durationSec: uploaded.duration ?? null };
   }
 
   async list(userId: number, query: ListVideosQuery) {

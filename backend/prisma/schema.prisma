@@ -367,6 +367,7 @@ model GeneratedVideo {
   aspectRatio        String               @default("16:9")
   firstFrameUrl      String?
   lastFrameUrl       String?
+  referenceAudioUrl  String?
   externalJobId      String?
   reservedTokens     Int
   reservedFromBundled Int                 @default(0)

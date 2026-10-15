@@ -10,6 +10,8 @@ interface UploadResult {
   bytes?: number;
   width?: number;
   height?: number;
+  /** Seconds — only set for audio/video uploads. */
+  duration?: number;
 }
 
 export interface UploadOptions {
@@ -91,6 +93,7 @@ export const uploadToCloudinary = async (
       bytes: result.bytes,
       width: result.width,
       height: result.height,
+      duration: result.duration,
     };
   } else {
     return new Promise((resolve, reject) => {
@@ -115,6 +118,7 @@ export const uploadToCloudinary = async (
             bytes: result.bytes,
             width: result.width,
             height: result.height,
+            duration: result.duration,
           });
         },
       );

@@ -243,7 +243,16 @@ export const videoService = {
     aspectRatio?: string;
     firstFrameUrl?: string;
     lastFrameUrl?: string;
+    referenceAudioUrl?: string;
   }) => api.post("/videos", data),
+  /** Resolves to `{ url, durationSec }` — the url goes into create()'s referenceAudioUrl. */
+  uploadReferenceAudio: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/videos/reference-audio", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   retry: (id: number) => api.post(`/videos/${id}/retry`),
   delete: (id: number) => api.delete(`/videos/${id}`),
 };

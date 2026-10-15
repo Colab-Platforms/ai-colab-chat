@@ -1,15 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Captions, Crop, ImagePlus, Loader2, Timer, Video, X, Zap } from "lucide-react";
+import { AudioLines, Captions, Crop, ImagePlus, Loader2, Pause, Play, Timer, Video, X, Zap } from "lucide-react";
 import { attachmentService, chatService, creditWalletService, studioTemplateService, videoService } from "@/lib/services";
 import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { toast } from "@/lib/toast";
 import {
+  AUDIO_REFERENCE_MODELS,
   constraintsFor,
   IMAGE_TO_VIDEO_MODELS,
+  MAX_REFERENCE_AUDIO_SECONDS,
   type VideoModelOption,
 } from "@/components/chat/video-generate-dialog";
 import {
@@ -33,6 +35,26 @@ interface StartFrame {
   uploading: boolean;
 }
 
+interface ReferenceAudio {
+  fileUrl: string;
+  previewUrl: string;
+  name: string;
+  durationSec: number;
+  uploading: boolean;
+}
+
+const MAX_REFERENCE_AUDIO_BYTES = 10 * 1024 * 1024;
+
+/** Reads a local audio file's length from its metadata, before uploading it. */
+const readAudioDuration = (url: string) =>
+  new Promise<number>((resolve, reject) => {
+    const el = new Audio();
+    el.preload = "metadata";
+    el.onloadedmetadata = () => resolve(el.duration);
+    el.onerror = () => reject(new Error("Couldn't read this audio file"));
+    el.src = url;
+  });
+
 interface MyVideo {
   id: number;
   chatId?: number | null;
@@ -54,6 +76,9 @@ export default function VideoStudioPage() {
   const [resolution, setResolution] = useState("720p");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [frame, setFrame] = useState<StartFrame | null>(null);
+  const [audio, setAudio] = useState<ReferenceAudio | null>(null);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioElRef = useRef<HTMLAudioElement>(null);
   const [credits, setCredits] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -117,6 +142,15 @@ export default function VideoStudioPage() {
   const model = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
   const constraints = constraintsFor(model);
   const supportsImageToVideo = model ? IMAGE_TO_VIDEO_MODELS.has(model.externalId) : false;
+  const supportsAudioReference = model ? AUDIO_REFERENCE_MODELS.has(model.externalId) : false;
+
+  const clearAudio = useCallback(() => {
+    setAudio((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl);
+      return null;
+    });
+    setAudioPlaying(false);
+  }, []);
 
   // Same guard as the chat dialog: a model switch must not leave a duration /
   // resolution / ratio the new model would reject.
@@ -128,6 +162,7 @@ export default function VideoStudioPage() {
     if (!constraints.resolutions.includes(resolution)) setResolution(constraints.resolutions[0]);
     if (!constraints.aspectRatios.includes(aspectRatio)) setAspectRatio(constraints.aspectRatios[0]);
     if (!supportsImageToVideo) setFrame(null);
+    if (!supportsAudioReference) clearAudio();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model?.id]);
 
@@ -152,10 +187,57 @@ export default function VideoStudioPage() {
     }
   }, []);
 
+  const handleAudio = useCallback(async (file: File) => {
+    if (file.size > MAX_REFERENCE_AUDIO_BYTES) {
+      toast.error("Reference audio must be 10 MB or smaller.");
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    let durationSec: number;
+    try {
+      durationSec = await readAudioDuration(previewUrl);
+    } catch (err: any) {
+      toast.error(err.message);
+      URL.revokeObjectURL(previewUrl);
+      return;
+    }
+    if (durationSec > MAX_REFERENCE_AUDIO_SECONDS) {
+      toast.error(
+        `Reference audio can be at most ${MAX_REFERENCE_AUDIO_SECONDS} seconds long (this one is ${Math.round(durationSec)}s).`,
+      );
+      URL.revokeObjectURL(previewUrl);
+      return;
+    }
+
+    const base = { previewUrl, name: file.name, durationSec };
+    setAudio({ ...base, fileUrl: "", uploading: true });
+    try {
+      const res = await videoService.uploadReferenceAudio(file);
+      setAudio({ ...base, fileUrl: res.data.data.url, uploading: false });
+    } catch (err: any) {
+      toast.error(`Failed to upload ${file.name}: ${err?.response?.data?.message || err.message}`);
+      URL.revokeObjectURL(previewUrl);
+      setAudio(null);
+    }
+  }, []);
+
+  const toggleAudioPreview = () => {
+    const el = audioElRef.current;
+    if (!el) return;
+    if (el.paused) void el.play();
+    else el.pause();
+  };
+
   const pickTemplate = (t: StudioTemplate) => setActiveTemplate(t);
 
   const canSubmit = Boolean(
-    prompt.trim() && modelId && model?.allowedForPlan && videoGenEnabled && !frame?.uploading && !insufficient,
+    prompt.trim() &&
+      modelId &&
+      model?.allowedForPlan &&
+      videoGenEnabled &&
+      !frame?.uploading &&
+      !audio?.uploading &&
+      !insufficient,
   );
 
   /** Same hand-off as the home page's video dialog: new chat, then the video job against it. */
@@ -164,6 +246,7 @@ export default function VideoStudioPage() {
     aspectRatio: string;
     duration: number;
     firstFrameUrl?: string;
+    referenceAudioUrl?: string;
     title: string;
   }) => {
     if (!modelId || busy) return;
@@ -182,6 +265,7 @@ export default function VideoStudioPage() {
         resolution,
         aspectRatio: opts.aspectRatio,
         firstFrameUrl: opts.firstFrameUrl,
+        referenceAudioUrl: opts.referenceAudioUrl,
         chatId,
       });
       router.push(`/c/${chatId}`);
@@ -202,6 +286,7 @@ export default function VideoStudioPage() {
       aspectRatio,
       duration,
       firstFrameUrl: frame?.fileUrl || undefined,
+      referenceAudioUrl: audio?.fileUrl || undefined,
       title: prompt.trim(),
     });
   };
@@ -291,6 +376,55 @@ export default function VideoStudioPage() {
                   title={supportsImageToVideo ? "Start from an image" : "This model can't start from an image"}
                 />
               )}
+              {audio ? (
+                <div
+                  className="inline-flex h-8 max-w-[11rem] shrink-0 items-center gap-1.5 rounded-full border border-border pl-1 pr-2 text-xs"
+                  title={audio.name}
+                >
+                  <audio
+                    ref={audioElRef}
+                    src={audio.previewUrl}
+                    onPlay={() => setAudioPlaying(true)}
+                    onPause={() => setAudioPlaying(false)}
+                    onEnded={() => setAudioPlaying(false)}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    title={audioPlaying ? "Pause" : "Play reference audio"}
+                    onClick={toggleAudioPreview}
+                    className="h-6 w-6 shrink-0 rounded-full bg-muted flex items-center justify-center cursor-pointer"
+                  >
+                    {audioPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                  </button>
+                  <span className="truncate">{audio.name}</span>
+                  <span className="shrink-0 text-faint">{Math.round(audio.durationSec)}s</span>
+                  {audio.uploading ? (
+                    <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                  ) : (
+                    <button
+                      type="button"
+                      title="Remove reference audio"
+                      onClick={clearAudio}
+                      className="shrink-0 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <AttachButton
+                  onFile={handleAudio}
+                  accept="audio/*"
+                  icon={AudioLines}
+                  disabled={!supportsAudioReference}
+                  title={
+                    supportsAudioReference
+                      ? "Add a reference voice / audio (optional)"
+                      : "This model generates its own audio"
+                  }
+                />
+              )}
               {models.length > 0 && (
                 <ChipSelect
                   icon={Video}
@@ -341,6 +475,12 @@ export default function VideoStudioPage() {
           }
         />
 
+        {audio && (
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Tip: say how to use the audio, e.g. &ldquo;the character speaks in the voice from the audio&rdquo;.
+            {frame && " With audio attached, your image guides the character but may not be the exact first frame."}
+          </p>
+        )}
         <p className="mt-2 text-center text-xs text-muted-foreground">
           {!planLoading && !videoGenEnabled ? (
             <>

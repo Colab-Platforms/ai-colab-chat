@@ -21,6 +21,20 @@ export const createVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+export const uploadReferenceAudio = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      sendResponse(res, false, null, "No audio file provided", STATUS_CODES.BAD_REQUEST);
+      return;
+    }
+    const result = await videoService.uploadReferenceAudio(req.user!.id, req.file);
+    sendResponse(res, true, result, "Reference audio uploaded", STATUS_CODES.CREATED);
+  } catch (error: any) {
+    console.error("Upload reference audio error", error);
+    sendResponse(res, false, null, error.message, error.statusCode ?? STATUS_CODES.SERVER_ERROR);
+  }
+};
+
 export const listVideoModels = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await videoService.listAvailableModels(req.user!.id);

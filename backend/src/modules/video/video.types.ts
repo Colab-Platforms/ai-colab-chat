@@ -45,7 +45,26 @@ export interface CreateVideoInput {
   /** Image-to-video: public HTTPS URLs from the existing attachment upload flow. */
   firstFrameUrl?: string;
   lastFrameUrl?: string;
+  /** Optional voice/dialogue/music reference, uploaded via POST /videos/reference-audio. */
+  referenceAudioUrl?: string;
 }
+
+/**
+ * Longest reference audio accepted. Seedance's own reference-to-video caps
+ * the combined audio input at ~15s on the providers that document it.
+ */
+export const MAX_REFERENCE_AUDIO_SECONDS = 15;
+
+/**
+ * Models that actually honour an `audio_url` input reference on OpenRouter
+ * ("BytePlus Seedance generation 2 and newer" per OpenRouter's spec). Every
+ * other model silently ignores audio references, so create() rejects them
+ * rather than charging for a clip that drops the user's audio.
+ */
+export const AUDIO_REFERENCE_MODELS = new Set([
+  "bytedance/seedance-2.0",
+  "bytedance/seedance-2.0-mini",
+]);
 
 export interface ListVideosQuery {
   page?: number;

@@ -93,6 +93,16 @@ export const IMAGE_TO_VIDEO_MODELS = new Set([
   "google/veo-3.1-lite",
 ]);
 
+/**
+ * Models that honour a reference audio (voice / dialogue / music). Mirrors
+ * AUDIO_REFERENCE_MODELS in backend video.types.ts — other models ignore it.
+ */
+export const AUDIO_REFERENCE_MODELS = new Set([
+  "bytedance/seedance-2.0",
+  "bytedance/seedance-2.0-mini",
+]);
+export const MAX_REFERENCE_AUDIO_SECONDS = 15;
+
 export interface VideoGenerateParams {
   prompt: string;
   modelId: number;
