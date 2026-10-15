@@ -66,9 +66,9 @@ export default function UsagePage() {
       </div>
     )},
     { key: "capability", label: "Capability", render: (r: GroupedLog) => <span className="text-xs capitalize text-muted-foreground bg-sunken px-2 py-1 rounded-md">{(r.capability?.replace(/_/g, " ") || "standard").toLowerCase()}</span> },
-    { key: "promptTokens", label: "Prompt", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="text-sm text-muted-foreground">{r.billablePromptTokens?.toLocaleString() || 0}</span> },
-    { key: "completionTokens", label: "Completion", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="text-sm text-muted-foreground">{r.billableCompletionTokens?.toLocaleString() || 0}</span> },
-    { key: "totalTokens", label: "Total", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="font-semibold text-sm text-foreground">{r.billableTotalTokens?.toLocaleString() || 0}</span> },
+    { key: "billablePromptTokens", label: "Prompt", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="text-sm text-muted-foreground">{r.billablePromptTokens?.toLocaleString() || 0}</span> },
+    { key: "billableCompletionTokens", label: "Completion", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="text-sm text-muted-foreground">{r.billableCompletionTokens?.toLocaleString() || 0}</span> },
+    { key: "billableTotalTokens", label: "Total", sortable: true, className: "text-right", render: (r: GroupedLog) => <span className="font-semibold text-sm text-foreground">{r.billableTotalTokens?.toLocaleString() || 0}</span> },
     { key: "createdAt", label: "Date", sortable: true, render: (r: GroupedLog) => <span className="text-muted-foreground text-sm">{new Date(r.createdAt).toLocaleString()}</span> },
     { key: "actions", label: "", className: "w-10", render: (r: GroupedLog) => (
       r.subLogs.length > 1 ? (

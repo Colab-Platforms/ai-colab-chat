@@ -1409,9 +1409,9 @@ export async function streamChat(req: Request, res: Response) {
           cTokens,
         );
 
-        finalPrompt = adjusted.finalRawPrompt;
-        finalCompletion = adjusted.finalRawCompletion;
-        finalTotal = adjusted.finalRawTotal;
+        finalPrompt = adjusted.finalBillablePrompt;
+        finalCompletion = adjusted.finalBillableCompletion;
+        finalTotal = adjusted.finalBillableTotal;
 
         await tx.message.update({
           where: { id: assistantMessage.id },
@@ -1841,9 +1841,9 @@ export async function streamChat(req: Request, res: Response) {
         completionTokens,
       );
 
-      finalPrompt = adjusted.finalRawPrompt;
-      finalCompletion = adjusted.finalRawCompletion;
-      finalTotal = adjusted.finalRawTotal;
+      finalPrompt = adjusted.finalBillablePrompt;
+      finalCompletion = adjusted.finalBillableCompletion;
+      finalTotal = adjusted.finalBillableTotal;
 
       await tx.message.update({
         where: { id: assistantMessage.id },
@@ -2226,9 +2226,9 @@ export async function regenerateChat(req: Request, res: Response) {
           cTokens,
         );
 
-        finalPrompt = adjusted.finalRawPrompt;
-        finalCompletion = adjusted.finalRawCompletion;
-        finalTotal = adjusted.finalRawTotal;
+        finalPrompt = adjusted.finalBillablePrompt;
+        finalCompletion = adjusted.finalBillableCompletion;
+        finalTotal = adjusted.finalBillableTotal;
 
         await tx.modelResponse.create({
           data: {
@@ -2567,9 +2567,9 @@ export async function regenerateChat(req: Request, res: Response) {
         completionTokens,
       );
 
-      finalPrompt = adjusted.finalRawPrompt;
-      finalCompletion = adjusted.finalRawCompletion;
-      finalTotal = adjusted.finalRawTotal;
+      finalPrompt = adjusted.finalBillablePrompt;
+      finalCompletion = adjusted.finalBillableCompletion;
+      finalTotal = adjusted.finalBillableTotal;
 
       const mr = await tx.modelResponse.create({
         data: {
@@ -3228,9 +3228,9 @@ export async function editAndResend(req: Request, res: Response) {
         completionTokens,
       );
 
-      finalPrompt = adjusted.finalRawPrompt;
-      finalCompletion = adjusted.finalRawCompletion;
-      finalTotal = adjusted.finalRawTotal;
+      finalPrompt = adjusted.finalBillablePrompt;
+      finalCompletion = adjusted.finalBillableCompletion;
+      finalTotal = adjusted.finalBillableTotal;
 
       await tx.message.update({
         where: { id: assistantMessage.id },
@@ -3702,6 +3702,7 @@ export async function continueChatStream(req: Request, res: Response) {
     // Update the message by combining old text + new text
     const newCombinedText = modelResponse.content + fullContent;
 
+    let billableDoneCompletion = billableCompletionTokens;
     await prisma.$transaction(async (tx: any) => {
       const adjusted = calculateAdjustedTokens(
         wallet.tokensRemaining,
@@ -3711,6 +3712,7 @@ export async function continueChatStream(req: Request, res: Response) {
         promptTokens,
         completionTokens,
       );
+      billableDoneCompletion = adjusted.finalBillableCompletion;
 
       await tx.message.update({
         where: { id: assistantMessage.id },
@@ -3769,7 +3771,7 @@ export async function continueChatStream(req: Request, res: Response) {
     await maybeEnqueueDistillation(chatId, chat.folderId);
 
     res.write(
-      `data: ${JSON.stringify({ type: "done", promptTokens: 0, completionTokens, totalTokens: completionTokens, finishReason })}\n\n`,
+      `data: ${JSON.stringify({ type: "done", promptTokens: 0, completionTokens: billableDoneCompletion, totalTokens: billableDoneCompletion, finishReason })}\n\n`,
     );
     res.write("data: [DONE]\n\n");
     res.end();
