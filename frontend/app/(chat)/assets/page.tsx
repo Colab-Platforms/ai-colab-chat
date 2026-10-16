@@ -1,424 +1,433 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FolderArchive, Search, LayoutGrid, List, ChevronDown, Check, Film, Image as ImageIcon } from "lucide-react";
-import { documentService, videoService, imageService } from "@/lib/services";
-import { toast }  from "@/lib/toast";
+import { useRouter } from "next/navigation";
+import { PhotoProvider, PhotoView } from "react-photo-view";
+import "react-photo-view/dist/react-photo-view.css";
+import {
+  AlertCircle,
+  Download,
+  File as FileIcon,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+  MessageSquare,
+  MoreHorizontal,
+  Play,
+  PlayCircle,
+  Search,
+  Table2,
+  Trash2,
+} from "lucide-react";
+import { documentService, imageService, videoService } from "@/lib/services";
+import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DocumentCard, type GeneratedDocument } from "@/components/chat/document-card";
-import { VideoCard, type GeneratedVideo } from "@/components/chat/video-card";
-import { ImageCard, type GeneratedImage } from "@/components/chat/image-card";
+import { relativeDate } from "@/components/projects/project-look";
 
-type AssetType = "documents" | "videos" | "images";
-type ViewMode = "grid" | "list";
-type SortKey = "newest" | "oldest" | "title";
-type FormatFilter = "ALL" | "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
+type AssetKind = "document" | "image" | "video";
+type Filter = "all" | "documents" | "images" | "videos";
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "newest", label: "Newest first" },
-  { key: "oldest", label: "Oldest first" },
-  { key: "title", label: "Title A-Z" },
-];
-
-const FORMAT_OPTIONS: { key: FormatFilter; label: string }[] = [
-  { key: "ALL", label: "All formats" },
-  { key: "PDF", label: "PDF" },
-  { key: "DOCX", label: "Word" },
-  { key: "PPTX", label: "PowerPoint" },
-  { key: "XLSX", label: "Excel" },
-  { key: "CSV", label: "CSV" },
-];
-
-interface DocumentRow extends GeneratedDocument {
+interface Asset {
+  key: string;
+  id: number;
+  kind: AssetKind;
+  title: string;
+  /** "<chat> · <date>" for documents/images, "<model> · <date>" for videos. */
+  caption: string;
+  chip: string;
   createdAt: string;
+  chatId: number | null;
+  chatTitle: string;
+  fileUrl: string | null;
+  thumbnailUrl: string | null;
+  status: "READY" | "PENDING" | "FAILED";
 }
 
-interface VideoRow extends GeneratedVideo {
-  createdAt: string;
-}
-
-interface ImageRow extends GeneratedImage {
-  createdAt: string;
-}
-
-const ASSET_TYPES: { key: AssetType; label: string }[] = [
-  { key: "documents", label: "Documents" },
-  { key: "videos", label: "Videos" },
-  { key: "images", label: "Images" },
+const FILTERS: { id: Filter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "documents", label: "Documents" },
+  { id: "images", label: "Images" },
+  { id: "videos", label: "Videos" },
 ];
 
-export default function AssetsVaultPage() {
-  const [assetType, setAssetType] = useState<AssetType>("documents");
-  const [loading, setLoading] = useState(true);
-  const [documents, setDocuments] = useState<DocumentRow[]>([]);
-  const [videos, setVideos] = useState<VideoRow[]>([]);
-  const [images, setImages] = useState<ImageRow[]>([]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sort, setSort] = useState<SortKey>("newest");
-  const [format, setFormat] = useState<FormatFilter>("ALL");
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+const imageExtension = (url: string): string => {
+  const match = url.split("?")[0].match(/\.([a-z0-9]{3,4})$/i);
+  return (match?.[1] ?? "png").toUpperCase();
+};
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+const docStatus = (s: string): Asset["status"] =>
+  s === "COMPLETED" ? "READY" : s === "FAILED" ? "FAILED" : "PENDING";
 
-  useEffect(() => {
-    const stored = localStorage.getItem("assetsViewMode");
-    if (stored === "grid" || stored === "list") setViewMode(stored);
-  }, []);
+function toAssets(docs: any[], images: any[], videos: any[]): Asset[] {
+  const out: Asset[] = [];
+  for (const d of docs) {
+    out.push({
+      key: `d${d.id}`,
+      id: d.id,
+      kind: "document",
+      title: d.title || d.fileName || "Untitled document",
+      caption: [d.chat?.title, relativeDate(d.createdAt)].filter(Boolean).join(" · "),
+      chip: String(d.format || "PDF").toUpperCase(),
+      createdAt: d.createdAt,
+      chatId: d.chatId ?? null,
+      chatTitle: d.chat?.title ?? "",
+      fileUrl: d.fileUrl ?? null,
+      thumbnailUrl: null,
+      status: docStatus(d.status),
+    });
+  }
+  for (const i of images) {
+    out.push({
+      key: `i${i.id}`,
+      id: i.id,
+      kind: "image",
+      title: i.prompt || "Generated image",
+      caption: [i.chat?.title, relativeDate(i.createdAt)].filter(Boolean).join(" · "),
+      chip: imageExtension(i.fileUrl || ""),
+      createdAt: i.createdAt,
+      chatId: i.chatId ?? null,
+      chatTitle: i.chat?.title ?? "",
+      fileUrl: i.fileUrl ?? null,
+      thumbnailUrl: i.fileUrl ?? null,
+      status: "READY",
+    });
+  }
+  for (const v of videos) {
+    out.push({
+      key: `v${v.id}`,
+      id: v.id,
+      kind: "video",
+      title: v.prompt || "Generated video",
+      caption: [v.model?.name, relativeDate(v.createdAt)].filter(Boolean).join(" · "),
+      chip: "MP4",
+      createdAt: v.createdAt,
+      chatId: v.chatId ?? null,
+      chatTitle: v.chat?.title ?? "",
+      fileUrl: v.fileUrl ?? null,
+      thumbnailUrl: v.thumbnailUrl ?? null,
+      status: "READY",
+    });
+  }
+  return out.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
 
-  const changeViewMode = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem("assetsViewMode", mode);
-  };
+function docIcon(chip: string) {
+  if (chip === "XLSX" || chip === "CSV") return Table2;
+  if (chip === "PPTX") return PlayCircle;
+  return FileText;
+}
 
-  const fetchDocuments = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params: Record<string, string> = { limit: "100" };
-      if (format !== "ALL") params.format = format;
-      const res = await documentService.list(params);
-      setDocuments(res.data.data?.items || []);
-    } catch {
-      toast.error("Failed to load your assets");
-    } finally {
-      setLoading(false);
-    }
-  }, [format]);
+/** Diagonal stripe backdrop (palette --stripe) for media placeholders. */
+const STRIPES: React.CSSProperties = {
+  backgroundImage:
+    "repeating-linear-gradient(135deg, var(--cl-stripe) 0 10px, transparent 10px 20px)",
+};
 
-  const fetchVideos = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await videoService.list({ limit: "100", status: "COMPLETED" });
-      setVideos(res.data.data?.items || []);
-    } catch {
-      toast.error("Failed to load your videos");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+function AssetTile({
+  asset,
+  onOpen,
+  onDelete,
+  onDownload,
+  onOpenChat,
+}: {
+  asset: Asset;
+  onOpen: () => void;
+  onDelete: () => void;
+  onDownload: () => void;
+  onOpenChat: () => void;
+}) {
+  const isMedia = asset.kind !== "document";
+  const Icon = asset.kind === "document" ? docIcon(asset.chip) : asset.kind === "image" ? ImageIcon : PlayCircle;
 
-  const fetchImages = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await imageService.list({ limit: "100" });
-      setImages(res.data.data?.items || []);
-    } catch {
-      toast.error("Failed to load your images");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const thumb = (
+    <div
+      className={`relative aspect-[1.6/1] overflow-hidden rounded-xl border border-border ${
+        isMedia ? "bg-sunken" : "bg-surface"
+      } transition-colors group-hover:border-line-strong`}
+      style={isMedia && !asset.thumbnailUrl ? STRIPES : undefined}
+    >
+      {asset.kind === "image" && asset.thumbnailUrl ? (
+        <img src={asset.thumbnailUrl} alt={asset.title} loading="lazy" className="h-full w-full object-cover" />
+      ) : asset.kind === "video" && asset.thumbnailUrl ? (
+        <>
+          <img src={asset.thumbnailUrl} alt={asset.title} loading="lazy" className="h-full w-full object-cover" />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="h-9 w-9 rounded-full bg-black/55 text-white flex items-center justify-center">
+              <Play className="w-3.5 h-3.5 fill-current" />
+            </span>
+          </span>
+        </>
+      ) : asset.kind === "video" && asset.fileUrl ? (
+        <>
+          <video src={asset.fileUrl} preload="metadata" muted className="h-full w-full object-cover" />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="h-9 w-9 rounded-full bg-black/55 text-white flex items-center justify-center">
+              <Play className="w-3.5 h-3.5 fill-current" />
+            </span>
+          </span>
+        </>
+      ) : (
+        <span className="absolute inset-0 flex items-center justify-center text-faint">
+          {asset.status === "PENDING" ? (
+            <Loader2 className="w-6 h-6 animate-spin" />
+          ) : asset.status === "FAILED" ? (
+            <AlertCircle className="w-6 h-6 text-danger" />
+          ) : (
+            <Icon className="w-7 h-7" strokeWidth={1.5} />
+          )}
+        </span>
+      )}
 
-  useEffect(() => {
-    if (assetType === "documents") fetchDocuments();
-    else if (assetType === "videos") fetchVideos();
-    else fetchImages();
-  }, [assetType, fetchDocuments, fetchVideos, fetchImages]);
-
-  const handleVideoDeleted = useCallback((id: number) => {
-    setVideos((prev) => prev.filter((v) => v.id !== id));
-  }, []);
-
-  const handleImageDeleted = useCallback((id: number) => {
-    setImages((prev) => prev.filter((img) => img.id !== id));
-  }, []);
-
-  const visibleDocuments = useMemo(() => {
-    let items = documents;
-    if (debouncedSearch) {
-      items = items.filter((doc) =>
-        (doc.title || doc.fileName || "").toLowerCase().includes(debouncedSearch),
-      );
-    }
-    const sorted = [...items];
-    if (sort === "newest") {
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else if (sort === "oldest") {
-      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    } else {
-      sorted.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-    }
-    return sorted;
-  }, [documents, debouncedSearch, sort]);
-
-  const visibleVideos = useMemo(() => {
-    let items = videos;
-    if (debouncedSearch) {
-      items = items.filter((video) => (video.prompt || "").toLowerCase().includes(debouncedSearch));
-    }
-    const sorted = [...items];
-    if (sort === "newest") {
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else if (sort === "oldest") {
-      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    } else {
-      sorted.sort((a, b) => (a.prompt || "").localeCompare(b.prompt || ""));
-    }
-    return sorted;
-  }, [videos, debouncedSearch, sort]);
-
-  const visibleImages = useMemo(() => {
-    let items = images;
-    if (debouncedSearch) {
-      items = items.filter((image) => (image.prompt || "").toLowerCase().includes(debouncedSearch));
-    }
-    const sorted = [...items];
-    if (sort === "newest") {
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else if (sort === "oldest") {
-      sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    } else {
-      sorted.sort((a, b) => (a.prompt || "").localeCompare(b.prompt || ""));
-    }
-    return sorted;
-  }, [images, debouncedSearch, sort]);
-
-  const sortLabel = useMemo(
-    () => SORT_OPTIONS.find((o) => o.key === sort)?.label ?? "Sort",
-    [sort],
-  );
-  const formatLabel = useMemo(
-    () => FORMAT_OPTIONS.find((o) => o.key === format)?.label ?? "All formats",
-    [format],
+      <span className="absolute left-2.5 top-2.5 rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[10.5px] text-muted-foreground">
+        {asset.status === "FAILED" ? "FAILED" : asset.status === "PENDING" ? "WORKING" : asset.chip}
+      </span>
+    </div>
   );
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex flex-col gap-4 px-6 py-5 border-b border-border/50">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Assets Vault</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Every document, video, and image ColabAI has generated for you, from any chat, in one place.
-          </p>
-        </div>
+    <div className="group relative">
+      {asset.kind === "image" && asset.fileUrl ? (
+        <PhotoView src={asset.fileUrl}>
+          <button type="button" className="block w-full text-left cursor-pointer">
+            {thumb}
+          </button>
+        </PhotoView>
+      ) : (
+        <button type="button" onClick={onOpen} className="block w-full text-left cursor-pointer">
+          {thumb}
+        </button>
+      )}
 
-        {/* Asset type tabs */}
-        <div className="flex items-center gap-1 bg-muted/60 border border-border/40 rounded-full p-0.5 w-fit">
-          {ASSET_TYPES.map((opt) => (
+      <div className="mt-2.5 flex items-start gap-1 px-0.5">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13.5px] font-medium text-foreground" title={asset.title}>
+            {asset.title}
+          </div>
+          <div className="truncate text-xs text-faint" title={asset.caption}>
+            {asset.caption}
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
-              key={opt.key}
-              onClick={() => setAssetType(opt.key)}
-              className={`h-8 px-3.5 flex items-center gap-1.5 rounded-full text-xs font-medium transition-colors ${
-                assetType === opt.key
-                  ? "bg-white dark:bg-background shadow text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              type="button"
+              aria-label="Asset actions"
+              className="h-7 w-7 -mt-0.5 shrink-0 rounded-md text-muted-foreground flex items-center justify-center hover:bg-sidebar-accent hover:text-foreground md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 data-[state=open]:opacity-100 transition-opacity cursor-pointer"
             >
-              {opt.key === "videos" && <Film className="w-3.5 h-3.5" />}
-              {opt.key === "images" && <ImageIcon className="w-3.5 h-3.5" />}
-              {opt.label}
+              <MoreHorizontal className="h-4 w-4" />
             </button>
-          ))}
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {asset.chatId && (
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={onOpenChat}>
+                <MessageSquare className="w-4 h-4" /> Open chat
+              </DropdownMenuItem>
+            )}
+            {asset.fileUrl && asset.status === "READY" && (
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={onDownload}>
+                <Download className="w-4 h-4" /> Download
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="gap-2 cursor-pointer text-destructive focus:text-destructive" onClick={onDelete}>
+              <Trash2 className="w-4 h-4" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
 
-        {/* Toolbar: search / format / sort / view toggle */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+export default function AssetsPage() {
+  const router = useRouter();
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [playing, setPlaying] = useState<Asset | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Each list is independent: a failure in one shouldn't blank the others.
+    Promise.allSettled([
+      documentService.list({ limit: "100" }),
+      imageService.list({ limit: "100" }),
+      videoService.list({ limit: "100", status: "COMPLETED" }),
+    ]).then(([docs, images, videos]) => {
+      if (cancelled) return;
+      const items = (r: PromiseSettledResult<any>) => (r.status === "fulfilled" ? r.value.data?.data?.items || [] : []);
+      if ([docs, images, videos].every((r) => r.status === "rejected")) toast.error("Failed to load your assets");
+      setAssets(toAssets(items(docs), items(images), items(videos)));
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return assets.filter((a) => {
+      if (filter === "documents" && a.kind !== "document") return false;
+      if (filter === "images" && a.kind !== "image") return false;
+      if (filter === "videos" && a.kind !== "video") return false;
+      if (!q) return true;
+      return a.title.toLowerCase().includes(q) || a.chatTitle.toLowerCase().includes(q);
+    });
+  }, [assets, filter, search]);
+
+  const openAsset = useCallback(
+    (a: Asset) => {
+      if (a.kind === "video" && a.fileUrl) {
+        setPlaying(a);
+      } else if (a.kind === "document" && a.status === "READY" && a.fileUrl) {
+        window.open(a.fileUrl, "_blank", "noopener,noreferrer");
+      } else if (a.chatId) {
+        router.push(`/c/${a.chatId}`);
+      }
+    },
+    [router],
+  );
+
+  const download = useCallback(async (a: Asset) => {
+    if (!a.fileUrl) return;
+    try {
+      const res = await fetch(a.fileUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${a.title.slice(0, 60).replace(/[^\w.-]+/g, "_") || "asset"}.${a.chip.toLowerCase()}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Cross-origin fetch can be blocked; fall back to opening the file.
+      window.open(a.fileUrl, "_blank", "noopener,noreferrer");
+    }
+  }, []);
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === "document") await documentService.delete(deleteTarget.id);
+      else if (deleteTarget.kind === "image") await imageService.delete(deleteTarget.id);
+      else await videoService.delete(deleteTarget.id);
+      setAssets((prev) => prev.filter((a) => a.key !== deleteTarget.key));
+      toast.success("Deleted");
+      setDeleteTarget(null);
+    } catch {
+      toast.error("Failed to delete");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1100px] px-6 pt-10 pb-16">
+        <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Assets</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Every document, image and video Colab AI has made for you.
+        </p>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="relative w-full max-w-[360px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search your assets..."
-              className="w-full h-9 pl-9 pr-3 rounded-full border border-border/60 bg-muted/40 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 focus:bg-background transition-colors"
+              placeholder="Search by name or chat"
+              className="h-10 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm text-foreground placeholder:text-faint outline-none transition-colors focus:border-primary/50"
             />
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {assetType === "documents" && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-border/60 bg-background text-xs font-medium text-foreground hover:bg-muted/60 transition-colors">
-                    {formatLabel}
-                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40">
-                  {FORMAT_OPTIONS.map((opt) => (
-                    <DropdownMenuItem
-                      key={opt.key}
-                      onClick={() => setFormat(opt.key)}
-                      className="gap-2 cursor-pointer"
-                    >
-                      <div className="w-3.5 flex justify-center">
-                        {format === opt.key && <Check className="w-3.5 h-3.5 text-primary" />}
-                      </div>
-                      {opt.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-border/60 bg-background text-xs font-medium text-foreground hover:bg-muted/60 transition-colors">
-                  {sortLabel}
-                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {SORT_OPTIONS.map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.key}
-                    onClick={() => setSort(opt.key)}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <div className="w-3.5 flex justify-center">
-                      {sort === opt.key && <Check className="w-3.5 h-3.5 text-primary" />}
-                    </div>
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <div className="flex items-center gap-0.5 bg-muted/60 border border-border/40 rounded-full p-0.5">
+          <div className="inline-flex items-center rounded-lg border border-border bg-sunken p-0.5">
+            {FILTERS.map((f) => (
               <button
-                onClick={() => changeViewMode("grid")}
-                title="Grid view"
-                className={`h-8 w-8 flex items-center justify-center rounded-full transition-colors ${
-                  viewMode === "grid"
-                    ? "bg-white dark:bg-background shadow text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                className={`h-8 rounded-md border px-3 text-[13px] font-medium transition-colors cursor-pointer ${
+                  filter === f.id
+                    ? "border-border bg-surface text-foreground shadow-sm"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <LayoutGrid className="w-4 h-4" />
+                {f.label}
               </button>
-              <button
-                onClick={() => changeViewMode("list")}
-                title="List view"
-                className={`h-8 w-8 flex items-center justify-center rounded-full transition-colors ${
-                  viewMode === "list"
-                    ? "bg-white dark:bg-background shadow text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
+            ))}
           </div>
+        </div>
+
+        <div className="mt-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-24">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="py-20 text-center">
+              <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft text-primary">
+                <FileIcon className="w-5 h-5" />
+              </span>
+              <h2 className="text-sm font-semibold text-foreground">
+                {search || filter !== "all" ? "No matching assets" : "Nothing here yet"}
+              </h2>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+                {search || filter !== "all"
+                  ? "Try a different search or filter."
+                  : "Documents, images and videos you generate will show up here."}
+              </p>
+            </div>
+          ) : (
+            <PhotoProvider>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-6 lg:grid-cols-4">
+                {visible.map((a) => (
+                  <AssetTile
+                    key={a.key}
+                    asset={a}
+                    onOpen={() => openAsset(a)}
+                    onDelete={() => setDeleteTarget(a)}
+                    onDownload={() => download(a)}
+                    onOpenChat={() => a.chatId && router.push(`/c/${a.chatId}`)}
+                  />
+                ))}
+              </div>
+            </PhotoProvider>
+          )}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : assetType === "documents" ? (
-          visibleDocuments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-              <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                <FolderArchive className="w-6 h-6" />
-              </div>
-              <h2 className="text-sm font-semibold">
-                {debouncedSearch || format !== "ALL" ? "No matching assets" : "No documents yet"}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                {debouncedSearch || format !== "ALL"
-                  ? "Try a different search term or format filter."
-                  : "Ask ColabAI to generate a PDF, Word doc, spreadsheet, or slide deck in any chat and it'll show up here."}
-              </p>
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="max-w-5xl mx-auto py-6 px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {visibleDocuments.map((doc) => (
-                <DocumentCard key={doc.id} document={doc} className="mt-0 max-w-none" />
-              ))}
-            </div>
-          ) : (
-            <div className="max-w-2xl mx-auto py-4 px-4 flex flex-col gap-1.5">
-              {visibleDocuments.map((doc) => (
-                <DocumentCard key={doc.id} document={doc} className="mt-0 max-w-none" />
-              ))}
-            </div>
-          )
-        ) : assetType === "videos" ? (
-          visibleVideos.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-              <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-                <Film className="w-6 h-6" />
-              </div>
-              <h2 className="text-sm font-semibold">
-                {debouncedSearch ? "No matching videos" : "No videos yet"}
-              </h2>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                {debouncedSearch
-                  ? "Try a different search term."
-                  : "Use \"Generate Video\" in any chat and it'll show up here."}
-              </p>
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="max-w-5xl mx-auto py-6 px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {visibleVideos.map((video) => (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  className="mt-0 max-w-none"
-                  onDeleted={handleVideoDeleted}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="max-w-2xl mx-auto py-4 px-4 flex flex-col gap-1.5">
-              {visibleVideos.map((video) => (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  className="mt-0 max-w-none"
-                  onDeleted={handleVideoDeleted}
-                />
-              ))}
-            </div>
-          )
-        ) : visibleImages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full px-6 text-center">
-            <div className="h-14 w-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
-              <ImageIcon className="w-6 h-6" />
-            </div>
-            <h2 className="text-sm font-semibold">
-              {debouncedSearch ? "No matching images" : "No images yet"}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-              {debouncedSearch
-                ? "Try a different search term."
-                : "Ask ColabAI to generate an image in any chat and it'll show up here."}
-            </p>
-          </div>
-        ) : viewMode === "grid" ? (
-          <div className="max-w-5xl mx-auto py-6 px-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {visibleImages.map((image) => (
-              <ImageCard
-                key={image.id}
-                image={image}
-                className="mt-0 max-w-none"
-                onDeleted={handleImageDeleted}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="max-w-2xl mx-auto py-4 px-4 flex flex-col gap-1.5">
-            {visibleImages.map((image) => (
-              <ImageCard
-                key={image.id}
-                image={image}
-                className="mt-0 max-w-none"
-                onDeleted={handleImageDeleted}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`Delete ${deleteTarget?.kind ?? "asset"}`}
+        description="This permanently deletes the file. It can't be undone."
+        onConfirm={confirmDelete}
+        loading={deleting}
+      />
+
+      <Dialog open={!!playing} onOpenChange={(open) => !open && setPlaying(null)}>
+        <DialogContent className="sm:max-w-3xl p-3 gap-2">
+          <DialogHeader className="px-1 pt-1">
+            <DialogTitle className="text-sm font-medium truncate pr-8">{playing?.title}</DialogTitle>
+          </DialogHeader>
+          {playing?.fileUrl && (
+            <video src={playing.fileUrl} controls autoPlay className="w-full rounded-lg bg-black max-h-[70dvh]" />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

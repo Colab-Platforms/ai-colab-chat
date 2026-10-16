@@ -1,19 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { creditWalletService } from "@/lib/services";
 import { openPaymentCheckout } from "@/lib/cashfree";
 import { toast } from "@/lib/toast";
+import { SettingsCard } from "@/components/settings/settings-ui";
 
 const PRESET_AMOUNTS = [500, 1000, 2000];
 
@@ -74,54 +67,61 @@ export function CreditTopUpCard({ onCheckoutStart }: CreditTopUpCardProps) {
   };
 
   return (
-    <Card className="border-border/30 bg-card/90 backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <Zap className="w-4 h-4 text-amber-500" /> Top Up Video Credits
-        </CardTitle>
-        <CardDescription>Pay as you go — add credits any time, they never expire.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {PRESET_AMOUNTS.map((preset) => (
-            <Button
-              key={preset}
-              type="button"
-              size="sm"
-              variant={!customAmount && amount === preset ? "default" : "outline"}
-              onClick={() => {
-                setAmount(preset);
-                setCustomAmount("");
-              }}
-            >
-              ₹{preset}
-            </Button>
-          ))}
-          <Input
-            type="number"
-            min={1}
-            placeholder="Custom amount (₹)"
-            value={customAmount}
-            onChange={(e) => setCustomAmount(e.target.value)}
-            className="w-40"
-          />
+    <SettingsCard className="grid gap-5 p-5 md:grid-cols-[1fr_minmax(0,22rem)]">
+      <div>
+        <h2 className="text-base font-semibold">Top up video credits</h2>
+        <p className="mt-1 text-[13px] text-muted-foreground">
+          Pay as you go. Top-up credits are separate from chat tokens and only used for video generation.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {PRESET_AMOUNTS.map((preset) => {
+            const active = !customAmount && amount === preset;
+            return (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => {
+                  setAmount(preset);
+                  setCustomAmount("");
+                }}
+                className={`h-10 cursor-pointer rounded-xl border px-5 text-sm font-medium transition-colors ${
+                  active
+                    ? "border-primary bg-accent-soft text-accent-ink"
+                    : "border-border bg-surface hover:bg-sunken"
+                }`}
+              >
+                ₹{preset.toLocaleString("en-IN")}
+              </button>
+            );
+          })}
+          <label className="flex h-10 w-44 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-sm text-muted-foreground focus-within:border-primary">
+            ₹
+            <input
+              type="number"
+              min={1}
+              placeholder="Custom amount"
+              value={customAmount}
+              onChange={(e) => setCustomAmount(e.target.value)}
+              className="w-full bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </label>
         </div>
+        <p className="mt-3 text-xs text-faint">Top-up credits never expire.</p>
+      </div>
 
-        <div className="rounded-md border border-border/40 bg-muted/30 px-3 py-2 text-sm">
-          {estimatedCredits !== null ? (
-            <span>
-              ₹{effectiveAmount} ≈ <span className="font-semibold">{estimatedCredits} credits</span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">Enter an amount to see how many credits you'll get</span>
-          )}
-        </div>
-
-        <Button className="w-full" onClick={handleTopUp} disabled={submitting}>
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-          Pay with Cashfree
+      <div className="rounded-2xl bg-sunken p-4">
+        <p className="text-xs text-muted-foreground">You&apos;ll get</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight">
+          {estimatedCredits !== null ? `≈ ${estimatedCredits.toLocaleString()} credits` : "—"}
+        </p>
+        <Button className="mt-3 h-10 w-full rounded-xl" onClick={handleTopUp} disabled={submitting || !effectiveAmount}>
+          {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Pay ₹{(effectiveAmount || 0).toLocaleString("en-IN")}
         </Button>
-      </CardContent>
-    </Card>
+        <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+          <Lock className="h-3 w-3" /> Secure payment via Cashfree
+        </p>
+      </div>
+    </SettingsCard>
   );
 }

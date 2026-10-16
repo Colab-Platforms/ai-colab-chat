@@ -109,7 +109,7 @@ const MemoizedCodeBlock = React.memo(
 
     if (!children || String(children).trim() === "") return null;
     return (
-      <code className="px-1.5 py-0.5 rounded-md bg-muted text-sm font-mono text-foreground" {...props}>
+      <code className="px-1.5 py-0.5 rounded-md bg-sunken border border-border text-[0.9em] font-mono text-foreground" {...props}>
         {children}
       </code>
     );
@@ -127,29 +127,29 @@ const markdownComponents: any = {
   },
   code: MemoizedCodeBlock,
   p({ children }: any) {
-    return <p className="mb-3 last:mb-0 leading-7">{children}</p>;
+    return <p className="mb-3.5 last:mb-0 leading-[1.75]">{children}</p>;
   },
   h1({ children }: any) {
-    return <h1 className="text-xl font-bold mt-5 mb-3">{children}</h1>;
+    return <h1 className="text-[19px] font-semibold tracking-tight mt-6 mb-3 first:mt-0">{children}</h1>;
   },
   h2({ children }: any) {
-    return <h2 className="text-lg font-semibold mt-4 mb-2">{children}</h2>;
+    return <h2 className="text-[17px] font-semibold tracking-tight mt-5 mb-2.5 first:mt-0">{children}</h2>;
   },
   h3({ children }: any) {
-    return <h3 className="text-base font-semibold mt-3 mb-2">{children}</h3>;
+    return <h3 className="text-[15.5px] font-semibold mt-4 mb-2 first:mt-0">{children}</h3>;
   },
   ul({ children }: any) {
-    return <ul className="list-disc list-inside space-y-1 mb-3 ml-1">{children}</ul>;
+    return <ul className="list-disc pl-5 space-y-1.5 mb-3.5 marker:text-faint">{children}</ul>;
   },
   ol({ children }: any) {
-    return <ol className="list-decimal list-inside space-y-1 mb-3 ml-1">{children}</ol>;
+    return <ol className="list-decimal pl-5 space-y-1.5 mb-3.5 marker:text-faint">{children}</ol>;
   },
   li({ children }: any) {
-    return <li className="leading-7">{children}</li>;
+    return <li className="leading-[1.7] pl-1">{children}</li>;
   },
   blockquote({ children }: any) {
     return (
-      <blockquote className="border-l-3 border-primary/40 pl-4 my-3 italic text-muted-foreground">
+      <blockquote className="border-l-2 border-accent-ink/40 pl-4 my-3.5 text-muted-foreground">
         {children}
       </blockquote>
     );
@@ -168,23 +168,23 @@ const markdownComponents: any = {
     return <em className="italic">{children}</em>;
   },
   hr() {
-    return <hr className="my-4 border-border/50" />;
+    return <hr className="my-5 border-border" />;
   },
   table({ children }: any) {
     return (
-      <div className="my-3 overflow-x-auto rounded-lg border border-border/50">
+      <div className="my-4 overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full text-sm">{children}</table>
       </div>
     );
   },
   thead({ children }: any) {
-    return <thead className="bg-muted/50 border-b border-border/50">{children}</thead>;
+    return <thead className="bg-sunken border-b border-border">{children}</thead>;
   },
   th({ children }: any) {
     return <th className="px-3 py-2 text-left font-medium">{children}</th>;
   },
   td({ children }: any) {
-    return <td className="px-3 py-2 border-t border-border/30">{children}</td>;
+    return <td className="px-3 py-2 border-t border-border">{children}</td>;
   },
 };
 

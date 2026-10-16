@@ -8,6 +8,15 @@ import {
   formatPaginationResponse,
 } from "@/utils/paginationUtils.js";
 import { buildPrismaQuery } from "prisma-qb";
+import { CODE_ASSISTANT_SLUG } from "@/modules/code-workspace/code-workspace.types.js";
+
+/**
+ * The slug stays internal, but the client needs to know whether this
+ * assistant gets the code workspace (Code pill + live editor panel).
+ */
+function toPublicAssistant<T extends { slug: string }>({ slug, ...rest }: T) {
+  return { ...rest, supportsCodeMode: slug === CODE_ASSISTANT_SLUG };
+}
 
 function slugify(name: string): string {
   return name
@@ -127,8 +136,7 @@ class AssistantService {
       });
     }
 
-    const { slug, ...assistantWithoutSlug } = assistant;
-    return assistantWithoutSlug;
+    return toPublicAssistant(assistant);
   }
 
   async list(query: any) {
@@ -169,7 +177,7 @@ class AssistantService {
       });
     }
 
-    const sanitizedAssistants = assistants.map(({ slug, ...assistant }) => assistant);
+    const sanitizedAssistants = assistants.map(toPublicAssistant);
     return formatPaginationResponse(
       sanitizedAssistants,
       totalRecords,
@@ -195,8 +203,7 @@ class AssistantService {
     if (!assistant) {
       throw new ApiError("Assistant not found", STATUS_CODES.NOT_FOUND);
     }
-    const { slug, ...assistantWithoutSlug } = assistant;
-    return assistantWithoutSlug;
+    return toPublicAssistant(assistant);
   }
 
   async update(assistantId: number, data: UpdateAssistantBody) {
@@ -274,8 +281,7 @@ class AssistantService {
       });
     }
 
-    const { slug, ...updatedWithoutSlug } = updated;
-    return updatedWithoutSlug;
+    return toPublicAssistant(updated);
   }
 
   async toggleActive(assistantId: number) {
@@ -303,8 +309,7 @@ class AssistantService {
       });
     }
 
-    const { slug, ...updatedWithoutSlug } = updated;
-    return updatedWithoutSlug;
+    return toPublicAssistant(updated);
   }
 
   async softDelete(assistantId: number) {

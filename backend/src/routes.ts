@@ -23,8 +23,13 @@ import supportRoutes from "@/modules/support/support.route.js";
 import documentRoutes from "@/modules/document/document.route.js";
 import videoRoutes from "@/modules/video/video.route.js";
 import imageRoutes from "@/modules/image/image.route.js";
+import demoRequestRoutes from "@/modules/demo-request/demo-request.route.js";
+import studioTemplateRoutes from "@/modules/studio-template/studio-template.route.js";
 import voiceRoutes from "@/modules/voice/voice.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
+import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.js";
+import githubRoutes from "@/modules/github/github.route.js";
+import vercelRoutes from "@/modules/vercel/vercel.route.js";
 
 
 
@@ -55,6 +60,8 @@ router.use("/models", modelRoutes);
 router.use("/model-providers", modelProviderRoutes);
 router.use("/preferences", userPreferenceRoutes);
 router.use("/assistants", assistantRoutes);
+router.use("/studio-templates", studioTemplateRoutes);
+router.use("/demo-requests", demoRequestRoutes);
 router.use("/contexts", contextRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/payments", paymentRoutes);
@@ -65,5 +72,8 @@ router.use("/videos", videoRoutes);
 router.use("/images", imageRoutes);
 router.use("/voice", voiceRoutes);
 router.use("/admin", adminRoutes);
+router.use("/code-projects", codeWorkspaceRoutes);
+router.use("/github", githubRoutes);
+router.use("/vercel", vercelRoutes);
 
 export default router;

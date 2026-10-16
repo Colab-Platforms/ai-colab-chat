@@ -92,7 +92,7 @@ export function ContextViewDialog({
             )}
             <div>
               <p className="text-muted-foreground mb-1">Memory Content:</p>
-              <p className="bg-muted/40 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="bg-muted/40 rounded-lg p-3 text-sm leading-relaxed whitespace-pre-wrap break-words max-h-[50vh] overflow-y-auto">
                 {context.memory}
               </p>
             </div>

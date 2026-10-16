@@ -21,13 +21,15 @@ import {
   FileSpreadsheet,
   Camera,
   Paperclip,
+  Plus,
+  ChevronDown,
+  ArrowRight,
   Maximize2,
   Minimize2,
   AudioLines,
   Film,
+  Code2,
   Lock,
-  Check,
-  ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -43,6 +45,7 @@ import { attachmentService } from "@/lib/services";
 import { toast } from "@/lib/toast";
 import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { ModelsModal } from "@/components/chat/models-modal";
+import { ModelAvatar, ModelAvatarStack } from "@/components/chat/model-avatar";
 
 // Dynamically imported so react-speech-recognition never runs on the server
 const MicButton = dynamic(
@@ -91,7 +94,7 @@ interface ChatInputProps {
   onSend: (
     content: string,
     attachmentIds?: number[],
-    chatType?: ChatType,
+    chatType?: SendChatType,
     attachmentObjects?: UploadedAttachment[],
   ) => void;
   onEnhancePrompt?: (content: string) => Promise<{
@@ -113,7 +116,36 @@ interface ChatInputProps {
    * touches chatType/handleChatTypeChange.
    */
   onGenerateVideoClick?: () => void;
+  /**
+   * Software Engineer assistant only: shows the "Code" pill, which forces the
+   * AI to build/edit a project in the code workspace panel. Like video, it is
+   * not a ChatType — it is sent as chatType "CODE" for one turn and never
+   * persisted as the chat's capability (the backend enum has no CODE).
+   */
+  supportsCodeMode?: boolean;
+  /** Overrides the textarea placeholder (e.g. while the code panel is open). */
+  placeholder?: string;
+  /** When set, the capability row ends with an "Assistants →" button that calls this. */
+  onAssistantsClick?: () => void;
+  /**
+   * Conversation layout: drops the capability pills (web search / image /
+   * video live in the Models modal and Studio pages) — only the Code pill is
+   * kept, since it has no other entry point.
+   */
+  compact?: boolean;
+  /** Small caption under the composer. */
+  footerNote?: string;
+  /** Shows which assistant this chat is with, with a × to leave it. */
+  assistantChip?: {
+    name: string;
+    Icon: React.ElementType;
+    color: string;
+    onClear: () => void;
+  };
 }
+
+/** What onSend may receive: a real ChatType, or the code-workspace pill. */
+export type SendChatType = ChatType | "CODE";
 
 type ChatType =
   | "STANDARD"
@@ -343,6 +375,12 @@ export function ChatInput({
   onCapabilityChange,
   chatType: propChatType,
   onGenerateVideoClick,
+  supportsCodeMode = false,
+  placeholder,
+  onAssistantsClick,
+  compact = false,
+  footerNote,
+  assistantChip,
 }: ChatInputProps) {
   const [content, setContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
@@ -350,6 +388,8 @@ export function ChatInput({
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [chatType, setChatType] = useState<ChatType>("STANDARD");
+  const [codeMode, setCodeMode] = useState(false);
+  const codeModeActive = supportsCodeMode && codeMode;
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [enhancedPrompt, setEnhancedPrompt] = useState("");
   const [isDragActive, setIsDragActive] = useState(false);
@@ -451,7 +491,21 @@ export function ChatInput({
   };
 
   const handleChatTypeChange = (type: ChatType) => {
+    setCodeMode(false);
     applyChatType(type, true);
+  };
+
+  // The Code pill: back to STANDARD, and one model — a project is written by
+  // a single model (the backend also refuses multi-model code turns).
+  const toggleCodeMode = () => {
+    if (codeMode) {
+      setCodeMode(false);
+      return;
+    }
+    if (chatType !== "STANDARD") applyChatType("STANDARD", true);
+    if (maxModels !== 1) handleModeToggle("single");
+    else if (selectedModels.length > 1) onModelChange([selectedModels[0]]);
+    setCodeMode(true);
   };
 
   // Auto-capability detection disabled as per user request to use manual selection.
@@ -589,7 +643,7 @@ export function ChatInput({
       .map((a) => a.id);
 
     // Auto-capability detection disabled as per user request to be fully manual.
-    let outgoingChatType = chatType;
+    const outgoingChatType: SendChatType = codeModeActive ? "CODE" : chatType;
     /*
     if (chatType === "STANDARD") {
       const inferred = inferChatTypeFromPrompt(content.trim());
@@ -899,9 +953,9 @@ export function ChatInput({
       <div className="pt-2 pb-6 px-4 w-full">
         <div className="max-w-3xl mx-auto">
           <div
-            className={`border border-border/60 bg-background dark:bg-muted/40 flex flex-col focus-within:ring-1 focus-within:ring-primary/20 transition-all ${isExpanded
+            className={`border border-border bg-surface flex flex-col focus-within:border-line-strong transition-all ${isExpanded
               ? "fixed inset-0 z-[9999] rounded-none h-[100dvh] pt-4 pb-4 px-4 sm:pt-6 sm:px-6"
-              : "relative rounded-[28px] pt-3 pb-3 px-3 max-h-[50vh] md:max-h-[60vh] shadow-[0_4px_20px_-4px_hsl(var(--primary)/0.25),0_0_0_1px_hsl(var(--primary)/0.08)] dark:shadow-[0_4px_24px_-4px_hsl(var(--primary)/0.35),0_0_0_1px_hsl(var(--primary)/0.15)]"
+              : "relative rounded-2xl pt-3 pb-3 px-3 max-h-[50vh] md:max-h-[60vh] shadow-cl"
               }`}
             data-guide="chat-input-area"
           >
@@ -924,10 +978,30 @@ export function ChatInput({
             <div
               className={`flex flex-col gap-1 overflow-y-auto custom-scrollbar min-h-0 ${isExpanded ? "hidden" : ""}`}
             >
+              {assistantChip && (
+                <div className="mb-1 mt-1 flex flex-shrink-0 items-center px-2">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-foreground"
+                    style={{ background: `color-mix(in srgb, ${assistantChip.color} 13%, transparent)` }}
+                  >
+                    <assistantChip.Icon className="h-3.5 w-3.5" style={{ color: assistantChip.color }} />
+                    {assistantChip.name}
+                    <button
+                      type="button"
+                      onClick={assistantChip.onClear}
+                      title={`Leave ${assistantChip.name}`}
+                      className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                </div>
+              )}
+
               {/* Top Row: Chat Type Pill */}
               {chatType !== "STANDARD" && (
                 <div className="flex items-center mb-1 px-2 mt-1 flex-shrink-0">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20 shadow-sm animate-in fade-in zoom-in-95">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent-soft text-accent-ink rounded-full text-xs font-medium animate-in fade-in zoom-in-95">
                     {chatType === "WEB_SEARCH" && (
                       <Search className="w-3.5 h-3.5" />
                     )}
@@ -948,76 +1022,6 @@ export function ChatInput({
                   </div>
                 </div>
               )}
-
-              {/* Selected model chip(s) — shown for single selection too, so the
-                  active model is always visible in the bar, not just in multi
-                  mode. This row is the ONLY trigger for the Models modal —
-                  click any chip (or the placeholder) to open it. */}
-              <div
-                data-guide="model-capability-trigger"
-                className={`flex gap-1.5 px-2 mb-1 mt-1 flex-shrink-0 ${
-                  !isSingle && selectedModels.length > 1
-                    ? "flex-nowrap overflow-x-auto scrollbar-thin"
-                    : "flex-wrap"
-                }`}
-              >
-                {selectedModels.length === 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setModelsModalOpen(true)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-muted text-muted-foreground rounded-full text-xs font-medium border border-border/40 hover:bg-muted/80 hover:text-foreground transition-colors flex-shrink-0"
-                  >
-                    Select model
-                  </button>
-                ) : (
-                  models
-                    .filter((m) => selectedModels.includes(m.id))
-                    .map((model) => (
-                      <button
-                        key={model.id}
-                        type="button"
-                        onClick={() => setModelsModalOpen(true)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium border border-primary/20 flex-shrink-0 hover:bg-primary/15 transition-colors animate-in fade-in-0 slide-in-from-left-1 duration-200"
-                        title="Change model"
-                      >
-                        {model.externalId && getModelIcon(model.externalId) ? (
-                          <img
-                            src={getModelIcon(model.externalId)!}
-                            alt=""
-                            className="w-3.5 h-3.5 rounded-sm object-contain"
-                          />
-                        ) : null}
-                        <span className="max-w-[120px] truncate">
-                          {model.name}
-                        </span>
-                        {selectedModels.length > 1 && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onModelChange(
-                                selectedModels.filter((id) => id !== model.id),
-                              );
-                            }}
-                            className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
-                            title={`Remove ${model.name}`}
-                          >
-                            <X className="w-3 h-3" />
-                          </span>
-                        )}
-                      </button>
-                    ))
-                )}
-                {selectedModels.length > 1 && (
-                  <Badge
-                    variant="secondary"
-                    className="text-[10px] px-1.5 py-0.5 h-5 rounded-full bg-muted text-muted-foreground flex-shrink-0"
-                  >
-                    {selectedModels.length} models
-                  </Badge>
-                )}
-              </div>
 
               {/* Attachment previews */}
               {attachments.length > 0 && (
@@ -1149,7 +1153,10 @@ export function ChatInput({
                   onChange={(e) => setContent(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
-                  placeholder="Ask anything..."
+                  placeholder={
+                    placeholder ??
+                    (codeModeActive ? "Describe the app or change you want…" : "Ask anything…")
+                  }
                   maxLength={50000}
                   rows={1}
                   className={`border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none bg-transparent dark:bg-transparent resize-none p-0 flex-1 min-w-0 min-h-[40px] leading-relaxed py-2.5 text-[15px] overflow-y-auto ${isExpanded
@@ -1185,12 +1192,12 @@ export function ChatInput({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="shrink-0 h-8 w-8 text-muted-foreground bg-muted hover:bg-muted/80 hover:text-foreground rounded-full border border-border/40"
+                      className="shrink-0 h-8 w-8 text-muted-foreground bg-surface hover:bg-sidebar-accent hover:text-foreground rounded-full border border-border"
                       disabled={isSending}
                       data-guide="attach"
                       title="Attach a file"
                     >
-                      <Paperclip className="w-5 h-5" />
+                      <Plus className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -1233,12 +1240,12 @@ export function ChatInput({
                 </DropdownMenu>
 
                 {/* Single / Multi mode toggle — "Single" / "Multi" on all sizes */}
-                <div className="flex items-center ml-2 bg-muted/60 border border-border/40 rounded-full p-0.5 gap-0.5 flex-shrink-0">
+                <div className="flex items-center ml-1 bg-sunken border border-border rounded-lg p-0.5 gap-0.5 flex-shrink-0">
                   <button
                     onClick={() => handleModeToggle("single")}
-                    className={`h-7 px-2.5 rounded-full text-xs font-medium transition-all duration-150 ${isSingle
-                      ? "bg-white dark:bg-background shadow text-foreground dark:text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                    className={`h-7 px-2.5 rounded-md text-xs font-medium transition-all duration-150 ${isSingle
+                      ? "bg-surface border border-border shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground border border-transparent"
                       }`}
                     title="Single model mode"
                   >
@@ -1246,9 +1253,9 @@ export function ChatInput({
                   </button>
                   <button
                     onClick={() => handleModeToggle("multiple")}
-                    className={`h-7 px-2.5 rounded-full text-xs font-medium transition-all duration-150 ${!isSingle
-                      ? "bg-white dark:bg-background shadow text-foreground dark:text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                    className={`h-7 px-2.5 rounded-md text-xs font-medium transition-all duration-150 ${!isSingle
+                      ? "bg-surface border border-border shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground border border-transparent"
                       }`}
                     title="Multi-model comparison mode"
                   >
@@ -1256,14 +1263,51 @@ export function ChatInput({
                   </button>
                 </div>
 
+                {/* Active model(s) — the only trigger for the Models modal */}
+                {(() => {
+                  const picked = models.filter((m) => selectedModels.includes(m.id));
+                  const many = picked.length > 1;
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        data-guide="model-capability-trigger"
+                        onClick={() => setModelsModalOpen(true)}
+                        title={picked.length === 0 ? "Select a model" : many ? "Change models" : "Change model"}
+                        className="ml-1 flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-transparent text-[13px] font-medium text-foreground hover:bg-sidebar-accent transition-colors min-w-0"
+                      >
+                        {picked.length === 0 ? (
+                          <span className="text-muted-foreground">Select model</span>
+                        ) : many ? (
+                          <>
+                            <ModelAvatarStack models={picked} size={16} />
+                            <span>{picked.length} models</span>
+                          </>
+                        ) : (
+                          <>
+                            <ModelAvatar externalId={picked[0].externalId} name={picked[0].name} size={16} />
+                            <span className="max-w-[90px] sm:max-w-[140px] truncate">{picked[0].name}</span>
+                          </>
+                        )}
+                        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      </button>
+                      {!isSingle && (
+                        <button
+                          type="button"
+                          onClick={() => setModelsModalOpen(true)}
+                          title="Add or remove models"
+                          className="h-8 w-8 shrink-0 rounded-lg border border-dashed border-line-strong text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex items-center justify-center transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+
                 {/* Spacer */}
                 <div className="flex-1" />
               </div>
-
-              {/* Separator */}
-              {!isExpanded && (
-                <div className="h-6 w-px bg-border/60 mx-1 flex-shrink-0" />
-              )}
 
               {/* RIGHT: Enhance · Mic (always visible) · Send */}
               <div className="flex items-center gap-0.5 flex-shrink-0">
@@ -1326,7 +1370,7 @@ export function ChatInput({
                     ? "bg-destructive/90 text-white hover:bg-destructive shadow-md scale-100"
                     : content.trim() && !hasUploadingFiles
                       ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-md scale-100"
-                      : "bg-muted text-muted-foreground border border-border/50 scale-100"
+                      : "bg-sunken text-muted-foreground scale-100"
                     }`}
                   onClick={isSending ? onStopStreaming : handleSubmit}
                   disabled={
@@ -1352,16 +1396,16 @@ export function ChatInput({
 
           {/* Quick capability switcher — shortcuts into the same chatType
               state/handler as the "+" menu's Capabilities section. */}
-          {!isExpanded && (
+          {!isExpanded && (!compact || supportsCodeMode) && (
             <div className="flex flex-wrap items-center justify-center gap-2 pt-3">
               {(
-                [
+                compact ? [] : [
                   { type: "STANDARD" as const, label: "Chat", icon: MessageSquare, locked: false },
-                  { type: "WEB_SEARCH" as const, label: "Web Search", icon: Search, locked: false },
-                  { type: "IMAGE_GENERATION" as const, label: "Image Gen", icon: ImageIcon, locked: !imageGenEnabled },
+                  { type: "WEB_SEARCH" as const, label: "Web search", icon: Search, locked: false },
+                  { type: "IMAGE_GENERATION" as const, label: "Image", icon: ImageIcon, locked: !imageGenEnabled },
                 ]
               ).map(({ type, label, icon: Icon, locked }) => {
-                const active = chatType === type;
+                const active = chatType === type && !codeModeActive;
                 return (
                   <motion.button
                     key={type}
@@ -1376,12 +1420,12 @@ export function ChatInput({
                       );
                     }}
                     title={locked ? "Upgrade your plan to unlock this" : undefined}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-medium border transition-colors ${
                       locked
-                        ? "bg-background/40 text-muted-foreground/50 border-border/30 cursor-not-allowed"
+                        ? "bg-surface/60 text-faint border-border cursor-not-allowed"
                         : active
-                          ? "bg-violet-200/70 text-violet-900 border-violet-200 dark:bg-violet-500/20 dark:text-violet-200 dark:border-violet-500/30 shadow-sm cursor-pointer"
-                          : "bg-background/70 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground cursor-pointer"
+                          ? "bg-accent-soft text-accent-ink border-transparent cursor-pointer"
+                          : "bg-surface text-foreground border-border hover:border-line-strong cursor-pointer"
                     }`}
                   >
                     {locked ? <Lock className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
@@ -1389,24 +1433,50 @@ export function ChatInput({
                   </motion.button>
                 );
               })}
-              {onGenerateVideoClick && (
+              {supportsCodeMode && (
                 <motion.button
                   type="button"
-                  whileHover={{ scale: videoGenEnabled ? 1.03 : 1 }}
-                  whileTap={{ scale: videoGenEnabled ? 0.97 : 1 }}
-                  onClick={() => videoGenEnabled && onGenerateVideoClick()}
-                  title={videoGenEnabled ? undefined : "Upgrade your plan to unlock video generation"}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                    videoGenEnabled
-                      ? "cursor-pointer bg-background/70 text-muted-foreground border-border/50 hover:bg-muted hover:text-foreground"
-                      : "cursor-not-allowed bg-background/40 text-muted-foreground/50 border-border/30"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={toggleCodeMode}
+                  aria-pressed={codeModeActive}
+                  title="Build or edit a project in the code workspace"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-medium border transition-colors cursor-pointer ${
+                    codeModeActive
+                      ? "bg-accent-soft text-accent-ink border-transparent"
+                      : "bg-surface text-foreground border-border hover:border-line-strong"
                   }`}
                 >
-                  {videoGenEnabled ? <Film className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                  Video Gen
+                  <Code2 className="w-3.5 h-3.5" />
+                  Code
                 </motion.button>
               )}
+              {onGenerateVideoClick && !compact && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={onGenerateVideoClick}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-medium border transition-colors cursor-pointer bg-surface text-foreground border-border hover:border-line-strong"
+                >
+                  {videoGenEnabled ? <Film className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                  Video
+                </motion.button>
+              )}
+              {onAssistantsClick && (
+                <button
+                  type="button"
+                  onClick={onAssistantsClick}
+                  className="inline-flex items-center gap-1 px-2 py-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Assistants
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
+          )}
+          {footerNote && !isExpanded && (
+            <p className="pt-2.5 text-center text-xs text-faint">{footerNote}</p>
           )}
         </div>
       </div>

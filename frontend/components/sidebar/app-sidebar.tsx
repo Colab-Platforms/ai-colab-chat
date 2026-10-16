@@ -13,13 +13,13 @@ import {
   ShieldCheck,
   PanelLeftOpen,
   PanelLeftClose,
-  MoreHorizontal,
+  ChevronsUpDown,
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "@/context/theme-context";
+import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -49,6 +49,8 @@ export interface AppSidebarProps {
   onMobileClose?: () => void;
   /** Called on logout; if omitted the component calls logout() directly */
   onLogout?: () => void;
+  /** Hide the logo/collapse row (settings pages open with their own header) */
+  hideHeader?: boolean;
 }
 
 export function AppSidebar({
@@ -59,9 +61,11 @@ export function AppSidebar({
   onToggleCollapse,
   onMobileClose,
   onLogout,
+  hideHeader,
 }: AppSidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { planName } = usePlanCapabilities();
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = hasRole("ADMIN") || hasRole("SUPERADMIN");
@@ -83,7 +87,7 @@ export function AppSidebar({
   if (collapsed) {
     return (
       <TooltipProvider delayDuration={0}>
-        <div className="h-full flex flex-col items-center bg-[#ffffff80] dark:bg-[#00000080] text-sidebar-foreground w-[64px] min-w-[64px] py-3 gap-1">
+        <div className="h-full flex flex-col items-center bg-sidebar text-sidebar-foreground w-[64px] min-w-[64px] py-3 gap-1">
           <div className="mb-1">
             <Image src="/black.webp" alt="AI Colab" width={30} height={30} className="dark:hidden opacity-90 h-auto" priority />
             <Image src="/white.webp" alt="AI Colab" width={30} height={30} className="hidden dark:block opacity-90 h-auto" priority />
@@ -112,7 +116,7 @@ export function AppSidebar({
               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full cursor-pointer p-0" data-guide="profile-menu">
                 <Avatar className="w-8 h-8 border border-border/50">
                   {user?.profileImage && <AvatarImage src={user.profileImage} alt="Profile" className="object-cover" />}
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                  <AvatarFallback className="bg-accent-soft text-accent-ink text-xs font-semibold">
                     {user?.firstName?.[0]}{user?.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
@@ -181,8 +185,8 @@ export function AppSidebar({
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#ffffff80] dark:bg-[#00000080] text-sidebar-foreground w-full">
-      <div className="px-5 pt-5 pb-2 flex items-center justify-between">
+    <div className="h-full flex flex-col bg-sidebar text-sidebar-foreground w-full">
+      {!hideHeader && <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div>
           <Image src="/black.webp" alt="AI Colab" width={70} height={28} className="dark:hidden opacity-90 h-auto" priority />
           <Image src="/white.webp" alt="AI Colab" width={70} height={28} className="hidden dark:block opacity-90 h-auto" priority />
@@ -211,27 +215,27 @@ export function AppSidebar({
             </Button>
           )}
         </div>
-      </div>
+      </div>}
 
       {children}
 
-      <Separator className="opacity-50" />
-
-      <div className="p-3" data-guide="sidebar-user-menu">
+      <div className="p-3 border-t border-border" data-guide="sidebar-user-menu">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-3 h-auto py-2 px-2 text-sm cursor-pointer hover:bg-sidebar-accent overflow-hidden" data-guide="profile-menu">
-              <Avatar className="w-9 h-9 border border-border/50">
+            <Button variant="ghost" className="w-full justify-start gap-2.5 h-auto py-2 px-2 text-sm cursor-pointer hover:bg-sidebar-accent rounded-lg overflow-hidden" data-guide="profile-menu">
+              <Avatar className="w-8 h-8">
                 {user?.profileImage && <AvatarImage src={user.profileImage} alt="Profile" className="object-cover" />}
-                <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                <AvatarFallback className="bg-accent-soft text-accent-ink text-xs font-semibold">
                   {user?.firstName?.[0]}{user?.lastName?.[0]}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col items-start min-w-0 flex-1">
                 <span className="truncate w-full text-left font-medium text-sm leading-tight">{user?.firstName} {user?.lastName}</span>
-                {user?.email && <span className="truncate w-full text-left text-xs text-muted-foreground leading-tight mt-0.5">{user?.email}</span>}
+                <span className="truncate w-full text-left text-xs font-normal text-faint leading-tight mt-0.5">
+                  {planName ? `${planName} plan` : user?.email}
+                </span>
               </div>
-              <MoreHorizontal className="w-4 h-4 ml-auto text-muted-foreground flex-shrink-0" />
+              <ChevronsUpDown className="w-3.5 h-3.5 ml-auto text-faint flex-shrink-0" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[240px] z-[9500]" style={{ zIndex: 9500 }}>

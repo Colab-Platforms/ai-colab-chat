@@ -55,7 +55,7 @@ export default function SharedChatPage() {
 
   if (loading) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40">
+      <div className="h-dvh flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -63,7 +63,7 @@ export default function SharedChatPage() {
 
   if (error || !chat) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40 text-center p-6 space-y-4">
+      <div className="h-dvh flex flex-col items-center justify-center bg-background text-center p-6 space-y-4">
         <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-2">
           <AlertCircle className="w-8 h-8 text-destructive" />
         </div>
@@ -74,7 +74,7 @@ export default function SharedChatPage() {
   }
 
   return (
-    <div className="h-dvh min-h-0 flex flex-col bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40 selection:bg-primary/20">
+    <div className="h-dvh min-h-0 flex flex-col bg-background selection:bg-primary/20">
       <header className="h-14 border-b border-border/50 flex items-center px-6 shrink-0 justify-between bg-background/40 backdrop-blur-md sticky top-0 z-10">
         <div className="flex items-center gap-5">
           <div>

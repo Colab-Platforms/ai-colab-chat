@@ -5,8 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import {
-  LayoutDashboard, Wallet, CreditCard, BarChart3,
-  UserCircle, ArrowLeft, Menu, X, Archive, Settings, Brain,
+  LayoutDashboard, Wallet, BarChart3, BadgeCheck, SlidersHorizontal,
+  UserCircle, ArrowLeft, Menu, X, Archive, Brain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,16 +16,27 @@ import {
 } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/sidebar/sidebar";
 
-const userNav = [
-  { label: "Dashboard", href: "/profile", icon: LayoutDashboard },
-  { label: "Wallet", href: "/profile/wallet", icon: Wallet },
-  { label: "Subscription", href: "/profile/subscription", icon: CreditCard },
-  { label: "My Usage", href: "/profile/my-usage", icon: BarChart3 },
-  { label: "My Account", href: "/profile/account", icon: UserCircle },
-  { label: "Archived Chats", href: "/profile/archived", icon: Archive },
-  { label: "Preferences", href: "/profile/preferences", icon: Settings },
-  { label: "Contexts", href: "/profile/contexts", icon: Brain },
+const navGroups = [
+  { label: null, items: [{ label: "Overview", href: "/profile", icon: LayoutDashboard }] },
+  {
+    label: "Account",
+    items: [
+      { label: "Account", href: "/profile/account", icon: UserCircle },
+      { label: "Preferences", href: "/profile/preferences", icon: SlidersHorizontal },
+      { label: "Contexts", href: "/profile/contexts", icon: Brain },
+    ],
+  },
+  {
+    label: "Billing",
+    items: [
+      { label: "Subscription", href: "/profile/subscription", icon: BadgeCheck },
+      { label: "Wallet", href: "/profile/wallet", icon: Wallet },
+      { label: "Usage", href: "/profile/my-usage", icon: BarChart3 },
+    ],
+  },
+  { label: "Data", items: [{ label: "Archived chats", href: "/profile/archived", icon: Archive }] },
 ];
+const userNav = navGroups.flatMap((g) => g.items);
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -117,42 +128,51 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // ─── Expanded inner content ───────────────────────────────────────────────
   const innerContent = (
     <>
-      {/* Back to chat link — sits just below the logo/collapse row */}
-      <div className="px-3 pb-2">
-        <Link href="#" onClick={(e) => {
-          e.preventDefault();
-          setMobileOpen(false);
-          const lastPath = localStorage.getItem("last_chat_path") || "/home";
-          router.push(lastPath);
-        }}>
-          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground justify-start cursor-pointer w-full">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Chat
-          </Button>
-        </Link>
+      <div className="px-3 pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            setMobileOpen(false);
+            const lastPath = localStorage.getItem("last_chat_path") || "/home";
+            router.push(lastPath);
+          }}
+          className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to chat
+        </button>
+        <h2 className="px-2 pt-4 pb-2 text-xl font-semibold tracking-tight text-foreground">Settings</h2>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-3 space-y-1">
-        <p className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">General</p>
-        {userNav.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              data-guide={item.href === "/profile/my-usage" ? "profile-my-usage" : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer
-                ${isActive
-                  ? "bg-gradient-to-r from-primary/15 to-primary/5 text-primary shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
-                }`}
-            >
-              <item.icon className={`w-4 h-4 ${isActive ? "text-primary" : ""}`} />
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 overflow-y-auto px-3 pb-3">
+        {navGroups.map((group, gi) => (
+          <div key={gi} className={gi === 0 ? "" : "mt-4"}>
+            {group.label && (
+              <p className="px-2 pb-1.5 text-[11px] font-medium text-faint">{group.label}</p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileOpen(false)}
+                    data-guide={item.href === "/profile/my-usage" ? "profile-my-usage" : undefined}
+                    className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-surface text-foreground font-medium shadow-cl"
+                        : "text-foreground/80 hover:bg-sidebar-accent"
+                    }`}
+                  >
+                    <item.icon className={`w-4 h-4 ${isActive ? "text-accent-ink" : "text-muted-foreground"}`} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
     </>
   );
@@ -160,6 +180,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const sidebarContent = (
     <AppSidebar
       variant="settings"
+      hideHeader
       collapsed={false}
       onToggleCollapse={toggleCollapsed}
       onMobileClose={() => setMobileOpen(false)}
@@ -172,6 +193,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const collapsedSidebarContent = (
     <AppSidebar
       variant="settings"
+      hideHeader
       collapsed={true}
       onToggleCollapse={toggleCollapsed}
       onMobileClose={() => setMobileOpen(false)}
@@ -186,7 +208,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-full relative bg-gradient-to-br from-purple-100 via-[#EACFEF] to-pink-100 dark:from-purple-950/40 dark:via-background dark:to-pink-950/40 text-foreground">
+    <div className="flex h-full relative bg-background text-foreground">
       {/* Mobile top bar — same pattern as chat layout */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center px-3 bg-background/80 backdrop-blur-md border-b border-border/50 justify-between">
         <Button
@@ -211,26 +233,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         fixed md:relative z-50 h-full flex-shrink-0 border-r border-border/40
         bg-background md:bg-transparent flex flex-col
         transition-all duration-300 ease-in-out overflow-hidden
-        ${mobileOpen ? "translate-x-0 w-[280px]" : "-translate-x-full md:translate-x-0"}
-        ${collapsed ? "md:w-[64px]" : "md:w-[280px]"}
+        ${mobileOpen ? "translate-x-0 w-[240px]" : "-translate-x-full md:translate-x-0"}
+        ${collapsed ? "md:w-[64px]" : "md:w-[240px]"}
       `}>
         {/* Desktop: show collapsed or expanded */}
         <div className="hidden md:flex h-full">
           {collapsed ? collapsedSidebarContent : (
-            <div className="w-[280px] min-w-[280px] h-full flex flex-col">
+            <div className="w-[240px] min-w-[240px] h-full flex flex-col">
               {sidebarContent}
             </div>
           )}
         </div>
         {/* Mobile: always show expanded */}
-        <div className="md:hidden h-full flex flex-col w-[280px] min-w-[280px]">
+        <div className="md:hidden h-full flex flex-col w-[240px] min-w-[240px]">
           {sidebarContent}
         </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="max-w-5xl mx-auto p-4 md:p-6">
+        <div className="max-w-[880px] mx-auto px-4 pb-10 pt-6 md:pt-8">
           {children}
         </div>
       </main>

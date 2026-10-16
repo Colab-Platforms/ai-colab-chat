@@ -38,6 +38,17 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-surface: var(--cl-surface);
+  --color-sunken: var(--cl-sunken);
+  --color-line-strong: var(--cl-border-strong);
+  --color-faint: var(--cl-faint);
+  --color-accent-soft: var(--cl-accent-soft);
+  --color-accent-ink: var(--cl-accent-ink);
+  --color-accent-hover: var(--cl-accent-hover);
+  --color-ok: var(--cl-ok);
+  --color-warn: var(--cl-warn);
+  --shadow-cl: var(--cl-shadow);
+  --shadow-pop: var(--cl-pop);
   --color-landing-primary: var(--landing-primary-color);
   --color-landing-text: var(--landing-text-color);
   --color-landing-text-hover: var(--landing-text-hover-color);
@@ -51,85 +62,127 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-:root {
+/* ── Colab AI v2 palette ─────────────────────────────────────────────
+   Source of truth: "Colab AI Chatbot Color Palette" design handoff.
+   --cl-* are the raw palette tokens; the shadcn variables below are
+   mapped onto them so every existing component picks up the new look. */
+:root,
+html:not(.dark) {
   --radius: 0.625rem;
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
+
+  --cl-bg: #F8F7FA;
+  --cl-surface: #FFFFFF;
+  --cl-sunken: #F2F1F5;
+  --cl-sidebar: #F3F2F7;
+  --cl-border: #E6E4EC;
+  --cl-border-strong: #D3D0DC;
+  --cl-text: #18161D;
+  --cl-muted: #5D5968;
+  --cl-faint: #8A8694;
+  --cl-accent: #6A45D9;
+  --cl-accent-hover: #5A37C6;
+  --cl-accent-soft: #EFEAFD;
+  --cl-accent-ink: #4A2AAE;
+  --cl-ok: oklch(0.58 0.13 155);
+  --cl-warn: oklch(0.66 0.14 70);
+  --cl-danger: oklch(0.58 0.18 25);
+  --cl-hover: rgba(24, 22, 29, .045);
+  --cl-stripe: rgba(106, 69, 217, .07);
+  --cl-shadow: 0 1px 2px rgba(24, 22, 29, .04), 0 8px 28px -10px rgba(40, 24, 90, .12);
+  --cl-pop: 0 18px 44px -12px rgba(20, 10, 50, .28), 0 2px 6px rgba(20, 10, 50, .06);
+
+  --background: var(--cl-bg);
+  --foreground: var(--cl-text);
+  --card: var(--cl-surface);
+  --card-foreground: var(--cl-text);
+  --popover: var(--cl-surface);
+  --popover-foreground: var(--cl-text);
+  --primary: var(--cl-accent);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--cl-sunken);
+  --secondary-foreground: var(--cl-text);
+  --muted: var(--cl-sunken);
+  --muted-foreground: var(--cl-muted);
+  --accent: var(--cl-sunken);
+  --accent-foreground: var(--cl-text);
+  --destructive: var(--cl-danger);
+  --border: var(--cl-border);
+  --input: var(--cl-border-strong);
+  --ring: var(--cl-accent);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
-  /* --landing-primary-color: #861043; */
+  --sidebar: var(--cl-sidebar);
+  --sidebar-foreground: var(--cl-text);
+  --sidebar-primary: var(--cl-accent);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--cl-hover);
+  --sidebar-accent-foreground: var(--cl-text);
+  --sidebar-border: var(--cl-border);
+  --sidebar-ring: var(--cl-accent);
+
   --landing-primary-color: #411283;
   --landing-text-color: #cdcdcd;
   --landing-text-hover-color: #ffffff;
   --landing-primary-hover-color: #310f61;
-
-  /* Hero grid wormhole - dark mode default (root = dark) */
-  --hero-grid-stroke: #DCD0FF;
-  --hero-ray-stroke: #b060ff;
-  --hero-grid-opacity: 0.9;
-  --hero-grid-stroke-width: 1.5;
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
+  --cl-bg: #131217;
+  --cl-surface: #1B1A21;
+  --cl-sunken: #16151B;
+  --cl-sidebar: #0F0E13;
+  --cl-border: #2A2832;
+  --cl-border-strong: #3A3744;
+  --cl-text: #EDEBF2;
+  --cl-muted: #A8A4B3;
+  --cl-faint: #7A7685;
+  --cl-accent: #9677FF;
+  --cl-accent-hover: #A68BFF;
+  --cl-accent-soft: #261F3F;
+  --cl-accent-ink: #CBBBFF;
+  --cl-ok: oklch(0.72 0.13 155);
+  --cl-warn: oklch(0.78 0.13 75);
+  --cl-danger: oklch(0.7 0.16 25);
+  --cl-hover: rgba(255, 255, 255, .05);
+  --cl-stripe: rgba(150, 119, 255, .09);
+  --cl-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px -10px rgba(0, 0, 0, .6);
+  --cl-pop: 0 18px 44px -12px rgba(0, 0, 0, .7);
+
+  --background: var(--cl-bg);
+  --foreground: var(--cl-text);
+  --card: var(--cl-surface);
+  --card-foreground: var(--cl-text);
+  --popover: var(--cl-surface);
+  --popover-foreground: var(--cl-text);
+  --primary: var(--cl-accent);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--cl-sunken);
+  --secondary-foreground: var(--cl-text);
+  --muted: var(--cl-sunken);
+  --muted-foreground: var(--cl-muted);
+  --accent: var(--cl-hover);
+  --accent-foreground: var(--cl-text);
+  --destructive: var(--cl-danger);
+  --border: var(--cl-border);
+  --input: var(--cl-border-strong);
+  --ring: var(--cl-accent);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
-  /* --landing-primary-color: #861043; */
+  --sidebar: var(--cl-sidebar);
+  --sidebar-foreground: var(--cl-text);
+  --sidebar-primary: var(--cl-accent);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--cl-hover);
+  --sidebar-accent-foreground: var(--cl-text);
+  --sidebar-border: var(--cl-border);
+  --sidebar-ring: var(--cl-accent);
+
   --landing-primary-color: #411283;
   --landing-text-color: #cdcdcd;
   --landing-text-hover-color: #ffffff;
@@ -142,43 +195,15 @@
   --hero-grid-stroke-width: 1.5;
 }
 
-/* ── Light mode: override all variables when .dark class is absent ── */
-html:not(.dark) {
-  --background: oklch(0.985 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
-  /* muted: more visible light gray so section headers/accordions separate from bg */
-  --secondary: oklch(0.945 0.006 285);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.945 0.006 285);
-  --muted-foreground: oklch(0.48 0.016 285.938);
-  --accent: oklch(0.945 0.006 285);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* border: slightly stronger so UI elements visually separate */
-  --border: oklch(0.85 0.006 286.32);
-  --input: oklch(0.88 0.005 286.32);
-  --ring: oklch(0.55 0.015 286.067);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  /* sidebar: subtle purple-gray tint so it reads as distinct from main white bg */
-  --sidebar: oklch(0.96 0.008 290);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.92 0.010 288);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.85 0.006 286.32);
-  --sidebar-ring: oklch(0.55 0.015 286.067);
+:root {
+  /* Hero grid wormhole defaults */
+  --hero-grid-stroke: #DCD0FF;
+  --hero-ray-stroke: #b060ff;
+  --hero-grid-opacity: 0.9;
+  --hero-grid-stroke-width: 1.5;
+}
 
+html:not(.dark) {
   /* Hero grid wormhole - light mode: dark violet visible on white */
   --hero-grid-stroke: #5b21b6;
   --hero-ray-stroke: #6d28d9;
@@ -460,4 +485,27 @@ html:not(.dark) .rays-group path[stroke="#a791b6"] {
 .flowing-dash-path {
   stroke-dasharray: 15 150;
   animation: transfer-power 2.0s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Studio template carousel: endless right-to-left drift, paused on hover.
+   The track holds the list twice, so shifting by -50% loops seamlessly. */
+@keyframes studio-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.studio-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: studio-marquee var(--marquee-duration, 40s) linear infinite;
+}
+
+.studio-marquee:hover .studio-marquee-track,
+.studio-marquee:focus-within .studio-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-marquee { overflow-x: auto; }
+  .studio-marquee-track { animation: none; }
 }

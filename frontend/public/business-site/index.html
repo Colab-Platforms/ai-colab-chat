@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="feat/docs-light.webp">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Colab AI for Business</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="light"]{--bg:#F8F7FA;--surface:#FFFFFF;--sunken:#F2F1F5;--border:#E6E4EC;--border-strong:#D3D0DC;--text:#18161D;--muted:#5D5968;--faint:#8A8694;--accent:#6A45D9;--accent-hover:#5A37C6;--accent-soft:#EFEAFD;--accent-ink:#4A2AAE;--ok:oklch(0.58 0.13 155);--danger:oklch(0.58 0.18 25);--shadow:0 1px 2px rgba(24,22,29,.04),0 8px 28px -10px rgba(40,24,90,.12);--pop:0 30px 80px -24px rgba(40,20,110,.35),0 4px 14px rgba(20,10,50,.06);--header:rgba(248,247,250,.82);--glow:#EDE6FF;--glow0:rgba(237,230,255,0);--dots:rgba(24,22,29,.07);--inv:#18161D;--inv-fg:#FFFFFF;--inv-muted:#A8A4B3;--inv-border:#18161D;--sec:#131217;--sec-card:#1B1A21;--sec-line:#2A2832;--chrome:#E3E1E8;--tint:#F1ECFF}
+[data-theme="dark"]{--bg:#131217;--surface:#1B1A21;--sunken:#16151B;--border:#2A2832;--border-strong:#3A3744;--text:#EDEBF2;--muted:#A8A4B3;--faint:#8E8A99;--accent:#9677FF;--accent-hover:#A68BFF;--accent-soft:#261F3F;--accent-ink:#CBBBFF;--ok:oklch(0.72 0.13 155);--danger:oklch(0.7 0.16 25);--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 28px -10px rgba(0,0,0,.6);--pop:0 30px 80px -24px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.02);--header:rgba(19,18,23,.8);--glow:#2A2147;--glow0:rgba(42,33,71,0);--dots:rgba(255,255,255,.06);--inv:#201D2B;--inv-fg:#EDEBF2;--inv-muted:#A8A4B3;--inv-border:#3A3744;--sec:#1A1626;--sec-card:#211D2E;--sec-line:#342E47;--chrome:#3A3744;--tint:#1F1B2E}
+html,body{margin:0;background:#F8F7FA;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+*{box-sizing:border-box}
+a{color:var(--accent);text-decoration:none}a:hover{color:var(--accent-hover)}
+input,textarea,button{font-family:inherit}
+@keyframes skel{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes wave{0%,100%{transform:scaleY(.25)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" style="min-height:100vh;overflow-x:clip;background:var(--bg);color:var(--text);transition:background .3s,color .3s">
+
+<!-- Site header removed: the platform navbar is the only header. -->
+
+<section id="top" data-screen-label="Hero" style="position:relative;padding:clamp(112px,11vw,152px) clamp(16px,4vw,32px) clamp(56px,8vw,100px);background:radial-gradient(60% 50% at 50% 0%,var(--glow) 0%,var(--glow0) 70%),radial-gradient(circle at 1px 1px,var(--dots) 1px,transparent 0) 0 0/24px 24px">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;align-items:center;text-align:center;gap:22px">
+    <a href="#features" data-reveal="" style="display:flex;flex-direction:column;align-items:center;gap:16px;color:var(--text)" style-hover="color:var(--accent)">
+      <span style="display:flex;align-items:center;gap:10px"><sc-for list="{{ heroLogos }}" as="g" hint-placeholder-count="5"><span style="width:44px;height:44px;border-radius:50%;background:#fff url({{ g.src }}) center/24px no-repeat;box-shadow:0 2px 10px rgba(60,40,140,.14)"></span></sc-for><span style="width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(90,60,200,.35)">+25</span></span>
+      <span style="display:flex;align-items:center;gap:8px;font-size:17px;font-weight:500;white-space:nowrap">30+ AI models, one workspace<span style="font-family:'Material Symbols Rounded';font-size:18px;color:var(--accent)">arrow_forward</span></span>
+    </a>
+    <h1 data-reveal="" style="margin:0;max-width:900px;font-size:clamp(38px,6.6vw,78px);line-height:1.02;font-weight:600;letter-spacing:-.04em;text-wrap:balance">Every top AI model, <span style="color:var(--accent)">one workspace</span> for your whole team</h1>
+    <p data-reveal="" style="margin:0;max-width:620px;font-size:clamp(16px,1.7vw,19px);line-height:1.55;color:var(--muted);text-wrap:pretty">Give your team the world’s best AI in one simple workspace. Write, research and create faster, with one login and one bill.</p>
+    <div data-reveal="" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <a href="#demo" style="display:flex;align-items:center;gap:8px;height:50px;padding:0 22px;border-radius:13px;background:var(--accent);color:#fff;font-size:15.5px;font-weight:500;box-shadow:0 10px 24px -10px rgba(106,69,217,.7)" style-hover="background:var(--accent-hover);color:#fff">Book a demo<span style="font-family:'Material Symbols Rounded';font-size:19px">arrow_forward</span></a>
+      <a href="/login" target="_top" style="display:flex;align-items:center;height:50px;padding:0 22px;border-radius:13px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:15.5px;font-weight:500" style-hover="border-color:var(--border-strong);color:var(--text)">Try Colab AI free</a>
+    </div>
+
+    <div style="position:relative;width:100%;max-width:{{ heroMax }};margin-top:clamp(20px,4vw,44px)">
+      <div ref="{{ mockRef }}" style="position:relative;z-index:2;border-radius:{{ frameRadius }};background:var(--surface);border:1px solid var(--border);box-shadow:var(--pop);overflow:hidden;text-align:left;transform-origin:50% 0;transition:transform .1s linear">
+        <div style="display:{{ chromeDisp }};height:40px;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--border);background:var(--sunken)">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--chrome)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--chrome)"></span><span style="width:10px;height:10px;border-radius:50%;background:var(--chrome)"></span>
+          <span style="flex:1;max-width:340px;margin:0 auto;height:24px;border-radius:7px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--faint)"><span style="font-family:'Material Symbols Rounded';font-size:13px">lock</span>chat.colabplatforms.ai</span>
+        </div>
+        <div ref="{{ heroBox }}" style="position:relative;width:100%;aspect-ratio:{{ heroAR }};overflow:hidden;background:var(--bg)">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;padding:6%;opacity:{{ heroSkel }};transition:opacity .4s;pointer-events:none"><span style="align-self:flex-end;width:40%;height:7%;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out infinite"></span><span style="display:flex;gap:3%;flex:1"><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out infinite"></span><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out .2s infinite"></span><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out .4s infinite"></span></span></div>
+          <iframe src="{{ heroSrc }}" title="Colab AI multi-model chat" loading="eager" tabindex="-1" onLoad="{{ heroLoad }}" style="position:absolute;left:{{ heroX }};top:0;width:{{ vw }};height:{{ vh }};border:0;transform:scale({{ heroK }});transform-origin:0 0;pointer-events:none;opacity:{{ heroOp }};transition:opacity .5s"></iframe>
+        </div>
+      </div>
+      <div style="display:{{ floatDisp }};position:absolute;z-index:3;left:-140px;bottom:60px;animation:bob 6s ease-in-out infinite">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:14px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--pop);text-align:left">
+          <span style="width:36px;height:36px;border-radius:10px;background:color-mix(in oklch,oklch(0.62 0.17 30) 16%,transparent);color:oklch(0.62 0.17 30);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">slideshow</span>
+          <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:12.5px;font-weight:600">Q3-board-review.pptx</span><span style="font-size:11.5px;color:var(--ok);display:flex;align-items:center;gap:3px"><span style="font-family:'Material Symbols Rounded';font-size:14px">check_circle</span>Document ready · 12 slides</span></span>
+        </div>
+      </div>
+      <div style="display:{{ floatDisp }};position:absolute;z-index:3;right:-140px;top:90px;animation:bob 7s ease-in-out 1.2s infinite">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:14px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--pop);text-align:left">
+          <span style="width:36px;height:36px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">movie</span>
+          <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:12.5px;font-weight:600">Product clip · 0:05</span><span style="font-size:11.5px;color:var(--ok);display:flex;align-items:center;gap:3px"><span style="font-family:'Material Symbols Rounded';font-size:14px">check_circle</span>Video generated</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="Models" style="padding:8px 0 clamp(48px,7vw,80px)">
+  <p data-reveal="" style="margin:0 0 22px;text-align:center;font-size:13.5px;color:var(--faint);padding:0 16px">Models from the labs your team already relies on</p>
+  <div style="position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)">
+    <div style="display:flex;width:max-content;gap:12px;animation:marq 40s linear infinite" style-hover="animation-play-state:paused">
+      <sc-for list="{{ marquee }}" as="m" hint-placeholder-count="12">
+        <span style="display:flex;align-items:center;gap:10px;height:52px;padding:0 20px 0 12px;border-radius:14px;background:var(--surface);border:1px solid var(--border);white-space:nowrap;font-size:14.5px;font-weight:500"><span style="width:30px;height:30px;border-radius:9px;background:#fff url({{ m.src }}) center/18px no-repeat;border:1px solid var(--border)"></span>{{ m.name }}</span>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section id="features" data-screen-label="Features" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px);background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:clamp(32px,5vw,56px)">
+    <div data-reveal="" style="display:flex;flex-direction:column;gap:14px;max-width:720px">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)">Features</span>
+      <h2 style="margin:0;font-size:clamp(30px,4.4vw,52px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">Chat is just the start. Your team gets a full AI studio.</h2>
+      <p style="margin:0;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Documents, images, video, assistants and projects live in the same workspace, so work moves from idea to finished file without switching tools.</p>
+    </div>
+
+    <div onMouseEnter="{{ pauseOn }}" onMouseLeave="{{ pauseOff }}" style="display:grid;grid-template-columns:{{ featCols }};gap:clamp(24px,4vw,48px);align-items:center">
+      <div data-car="" data-drag="free" style="display:flex;flex-direction:{{ tabDir }};gap:8px;overflow-x:{{ tabOv }};cursor:{{ carCursor }};margin:{{ tabMargin }};padding:{{ tabPad }};scrollbar-width:none">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+          <button onClick="{{ t.pick }}" style="position:relative;flex-shrink:0;display:flex;flex-direction:column;gap:8px;padding:{{ t.pad }};border:1px solid {{ t.border }};border-radius:16px;background:{{ t.bg }};color:var(--text);text-align:left;cursor:pointer;overflow:hidden;transition:background .25s,border-color .25s" style-hover="border-color:var(--border-strong)">
+            <span style="display:flex;align-items:center;gap:10px;font-size:16px;font-weight:600;white-space:nowrap"><span style="width:34px;height:34px;flex-shrink:0;border-radius:10px;background:{{ t.iconBg }};color:{{ t.iconFg }};display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:19px;transition:background .25s">{{ t.icon }}</span>{{ t.title }}</span>
+            <sc-if value="{{ t.showDesc }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:14px;line-height:1.5;color:{{ t.descFg }};text-wrap:pretty;padding-left:44px;transition:color .25s;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ t.desc }}</span>
+            </sc-if>
+            <span style="display:{{ t.barDisp }};position:absolute;left:0;bottom:0;height:3px;width:{{ t.prog }};background:var(--accent);transition:width .06s linear"></span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;min-width:0">
+        <sc-if value="{{ mobDesc }}" hint-placeholder-val="{{ false }}"><p style="margin:0;align-self:stretch;font-size:15px;line-height:1.55;color:var(--muted)">{{ activeDesc }}</p></sc-if>
+        <div style="width:100%;max-width:{{ featMax }};border-radius:{{ frameRadius }};padding:{{ featPad }};background:linear-gradient(160deg,var(--tint) 0%,var(--bg) 70%);border:1px solid var(--border)">
+          <div style="border-radius:{{ innerRadius }};overflow:hidden;border:1px solid var(--border);box-shadow:var(--pop);background:var(--bg)">
+            <div ref="{{ featBox }}" style="position:relative;width:100%;aspect-ratio:{{ frameAR }};overflow:hidden">
+              <div style="position:absolute;inset:0;padding:6%;display:flex;gap:4%;opacity:{{ featSkel }};transition:opacity .4s;pointer-events:none"><span style="width:20%;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out infinite"></span><span style="flex:1;border-radius:12px;background:var(--sunken);animation:skel 1.4s ease-in-out .2s infinite"></span></div>
+              <sc-for list="{{ featFrames }}" as="f" hint-placeholder-count="0">
+                <img src="{{ f.src }}" alt="{{ f.title }}" loading="{{ f.lazy }}" decoding="async" onLoad="{{ f.load }}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:left top;display:block;opacity:{{ f.op }};transition:opacity .5s ease">
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div data-car="" style="display:grid;grid-template-columns:{{ miniCols }};gap:12px;grid-auto-flow:{{ carFlow }};grid-auto-columns:{{ carAuto }};overflow-x:{{ carOv }};margin:{{ carMargin }};padding:{{ carPad }};scroll-padding-left:16px;scroll-snap-type:{{ carSnap }};scrollbar-width:none;cursor:{{ carCursor }}">
+      <div data-reveal="" style="scroll-snap-align:start;padding:22px;border-radius:20px;background:var(--bg);border:1px solid var(--border);display:flex;flex-direction:column;gap:16px" style-hover="border-color:var(--border-strong)">
+        <div style="height:130px;box-sizing:border-box;overflow:hidden;padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:8px;font-size:12.5px;line-height:1.5">
+          <span>GST on restaurant services is 5% without input tax credit<span style="display:inline-flex;margin-left:4px;height:17px;padding:0 5px;border-radius:5px;background:var(--accent-soft);color:var(--accent-ink);font-size:10.5px;font-weight:600;align-items:center">1</span>, unless the outlet is inside a hotel<span style="display:inline-flex;margin-left:4px;height:17px;padding:0 5px;border-radius:5px;background:var(--accent-soft);color:var(--accent-ink);font-size:10.5px;font-weight:600;align-items:center">2</span></span>
+          <div style="display:flex;gap:6px;margin-top:auto;flex-wrap:nowrap;overflow:hidden;white-space:nowrap"><span style="display:flex;align-items:center;gap:4px;height:24px;padding:0 7px;border-radius:7px;background:var(--sunken);font-size:10.5px;color:var(--muted);min-width:0;flex-shrink:1;overflow:hidden"><span style="font-family:'Material Symbols Rounded';font-size:13px;flex-shrink:0">public</span><span style="overflow:hidden;text-overflow:ellipsis">cbic-gst.gov.in</span></span><span style="display:flex;align-items:center;gap:4px;height:24px;padding:0 7px;border-radius:7px;background:var(--sunken);font-size:10.5px;color:var(--muted);min-width:0;flex-shrink:1;overflow:hidden"><span style="font-family:'Material Symbols Rounded';font-size:13px;flex-shrink:0">public</span><span style="overflow:hidden;text-overflow:ellipsis">gstcouncil.gov.in</span></span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:16px;font-weight:600">Web search with sources</span><span style="font-size:14px;line-height:1.5;color:var(--muted)">Live answers that cite where they came from.</span></div>
+      </div>
+      <div data-reveal="" style="scroll-snap-align:start;padding:22px;border-radius:20px;background:var(--bg);border:1px solid var(--border);display:flex;flex-direction:column;gap:16px" style-hover="border-color:var(--border-strong)">
+        <div style="height:130px;border-radius:14px;background:var(--inv);border:1px solid var(--inv-border);display:flex;align-items:center;justify-content:center;gap:5px">
+          <sc-for list="{{ waveBars }}" as="w" hint-placeholder-count="18"><span style="width:5px;height:{{ w.h }};border-radius:5px;background:#B7A6FF;animation:wave 1.2s ease-in-out {{ w.d }} infinite;transform-origin:center"></span></sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:16px;font-weight:600">Voice chat</span><span style="font-size:14px;line-height:1.5;color:var(--muted)">Talk it through out loud. Transcripts are saved like any chat.</span></div>
+      </div>
+      <div data-reveal="" style="scroll-snap-align:start;padding:22px;border-radius:20px;background:var(--bg);border:1px solid var(--border);display:flex;flex-direction:column;gap:16px" style-hover="border-color:var(--border-strong)">
+        <div style="height:130px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <sc-for list="{{ assetTiles }}" as="a" hint-placeholder-count="6"><div style="border-radius:12px;background:color-mix(in oklch,{{ a.c }} 14%,transparent);color:{{ a.c }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:600"><span style="font-family:'Material Symbols Rounded';font-size:26px">{{ a.icon }}</span>{{ a.l }}</div></sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:16px;font-weight:600">One asset library</span><span style="font-size:14px;line-height:1.5;color:var(--muted)">Every file, image and video the team creates, in one place.</span></div>
+      </div>
+      <div data-reveal="" style="scroll-snap-align:start;padding:22px;border-radius:20px;background:var(--bg);border:1px solid var(--border);display:flex;flex-direction:column;gap:16px" style-hover="border-color:var(--border-strong)">
+        <div style="height:130px;padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;gap:8px;justify-content:center">
+          <sc-for list="{{ ctxChips }}" as="c" hint-placeholder-count="3"><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;min-width:0"><span style="height:20px;flex-shrink:0;padding:0 7px;border-radius:6px;background:color-mix(in oklch,{{ c.c }} 16%,transparent);color:{{ c.c }};font-size:10.5px;font-weight:600;display:flex;align-items:center">{{ c.scope }}</span><span style="overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{ c.t }}</span></span></sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:16px;font-weight:600">Shared context</span><span style="font-size:14px;line-height:1.5;color:var(--muted)">Save facts once. Use them in every chat, a project or one chat.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="customize" data-screen-label="Customize" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px)">
+  <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr));gap:clamp(32px,5vw,64px);align-items:center">
+    <div data-reveal="" style="display:flex;flex-direction:column;gap:24px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)">Fully customizable</span>
+        <h2 style="margin:0;font-size:clamp(30px,4.4vw,50px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">Set it up the way your company works</h2>
+        <p style="margin:0;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Every business plan is configured to your requirements. Tell us what you need and we'll shape the workspace around it.</p>
+      </div>
+      <div style="display:{{ custPtsDisp }};flex-direction:column">
+        <sc-for list="{{ custPoints }}" as="p" hint-placeholder-count="4">
+          <div style="display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--border)">
+            <span style="width:36px;height:36px;flex-shrink:0;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">{{ p.icon }}</span>
+            <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:15.5px;font-weight:600">{{ p.t }}</span><span style="font-size:14px;line-height:1.5;color:var(--muted)">{{ p.d }}</span></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div data-reveal="" style="border-radius:22px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--pop);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;height:52px;padding:0 18px;border-bottom:1px solid var(--border)">
+        <span style="font-family:'Material Symbols Rounded';font-size:19px;color:var(--muted)">admin_panel_settings</span>
+        <span style="flex:1;font-size:14px;font-weight:600">Workspace settings</span>
+      </div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;color:var(--muted)"><span>Features your team needs</span><span style="font-weight:500;color:var(--faint)">{{ featCount }}</span></span>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
+            <sc-for list="{{ featToggles }}" as="m" hint-placeholder-count="6">
+              <button onClick="{{ m.toggle }}" title="{{ m.title }}" style="display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;border-radius:12px;border:1px solid {{ m.border }};background:{{ m.bg }};color:var(--text);cursor:{{ m.cursor }};text-align:left;transition:all .2s">
+                <span style="width:26px;height:26px;flex-shrink:0;border-radius:8px;background:{{ m.dot }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:16px;opacity:{{ m.op }}">{{ m.icon }}</span>
+                <span style="flex:1;min-width:0;font-size:13px;font-weight:500;opacity:{{ m.op }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span>
+                <span style="display:{{ m.lockDisp }};font-family:'Material Symbols Rounded';font-size:16px;color:var(--faint)">lock</span>
+                <span style="display:{{ m.swDisp }};width:32px;height:18px;flex-shrink:0;border-radius:999px;background:{{ m.sw }};padding:2px;transition:background .2s"><span style="width:14px;height:14px;border-radius:50%;background:#fff;margin-left:{{ m.knob }};transition:margin .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span></span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <span style="display:flex;align-items:center;gap:8px;margin-top:-10px;font-size:13px;font-weight:500;color:{{ saveFg }}"><span style="font-family:'Material Symbols Rounded';font-size:18px">{{ saveIcon }}</span>{{ saveLabel }}</span>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <span style="display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;color:var(--muted)"><span>AI providers your team can use</span><span style="font-weight:500;color:var(--faint)">{{ modelCount }}</span></span>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <sc-for list="{{ adminModels }}" as="m" hint-placeholder-count="8">
+              <button onClick="{{ m.toggle }}" aria-pressed="{{ m.on }}" style="display:flex;align-items:center;gap:8px;height:40px;padding:0 14px 0 6px;border-radius:999px;border:1px solid {{ m.border }};background:{{ m.bg }};color:{{ m.fg }};font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s">
+                <span style="width:28px;height:28px;flex-shrink:0;border-radius:50%;background:#fff url({{ m.src }}) center/15px no-repeat;border:1px solid var(--border);filter:{{ m.filter }};opacity:{{ m.op }};transition:all .2s"></span>
+                {{ m.name }}
+                <span style="display:{{ m.chkDisp }};font-family:'Material Symbols Rounded';font-size:16px;color:var(--accent)">check</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+        <a href="#demo" style="display:flex;align-items:center;justify-content:center;gap:8px;height:46px;border-radius:12px;background:var(--text);color:var(--bg);font-size:14.5px;font-weight:500" style-hover="opacity:.88;color:var(--bg)">Request this setup<span style="font-family:'Material Symbols Rounded';font-size:18px">arrow_downward</span></a>
+        <span style="margin-top:-12px;text-align:center;font-size:12px;color:var(--faint)">Your picks carry over to the form below.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="usecases" data-screen-label="Use cases" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px);background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <div data-reveal="" style="display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
+      <h2 style="margin:0;max-width:760px;font-size:clamp(30px,4.4vw,50px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">What your teams will do with it on day one</h2>
+    </div>
+    <div data-car="" data-drag="free" style="display:flex;justify-content:{{ deptJustify }};gap:6px;overflow-x:auto;cursor:{{ carCursor }};margin:0 -16px;padding:2px 16px;scrollbar-width:none">
+      <sc-for list="{{ depts }}" as="d" hint-placeholder-count="4">
+        <button onClick="{{ d.pick }}" style="flex-shrink:0;display:flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:999px;border:1px solid {{ d.border }};background:{{ d.bg }};color:{{ d.fg }};font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s"><span style="font-family:'Material Symbols Rounded';font-size:18px">{{ d.icon }}</span>{{ d.label }}</button>
+      </sc-for>
+    </div>
+    <div data-car="" style="display:grid;grid-template-columns:{{ deptCols }};gap:12px;grid-auto-flow:{{ carFlow }};grid-auto-columns:{{ carAuto }};overflow-x:{{ carOv }};margin:{{ carMargin }};padding:{{ carPad }};scroll-padding-left:16px;scroll-snap-type:{{ carSnap }};scrollbar-width:none;cursor:{{ carCursor }}">
+      <sc-for list="{{ deptCards }}" as="c" hint-placeholder-count="3">
+        <div style="scroll-snap-align:start;padding:20px;border-radius:18px;background:var(--bg);border:1px solid var(--border);display:flex;flex-direction:column;gap:16px;transition:transform .2s,border-color .2s" style-hover="border-color:var(--border-strong);transform:translateY(-2px)">
+          <span style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted)"><span style="width:28px;height:28px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:16px">{{ c.icon }}</span>{{ c.tool }}</span>
+          <span style="flex:1;font-size:15.5px;line-height:1.5;text-wrap:pretty">“{{ c.prompt }}”</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--faint)"><span style="width:18px;height:18px;border-radius:50%;background:#fff url({{ c.logo }}) center/10px no-repeat;border:1px solid var(--border)"></span>{{ c.model }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section id="plans" data-screen-label="Plans" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:clamp(28px,4vw,44px)">
+    <div data-reveal="" style="display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center">
+      <h2 style="margin:0;max-width:720px;font-size:clamp(30px,4.4vw,50px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">One subscription instead of five</h2>
+      <p style="margin:0;max-width:560px;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Chat, documents, images and video in one plan, with every AI model included. Prices are per month, plus GST.</p>
+    </div>
+    <div data-car="" style="display:grid;grid-template-columns:{{ planCols }};gap:12px;align-items:stretch;grid-auto-flow:{{ carFlow }};grid-auto-columns:{{ carAuto }};overflow-x:{{ carOv }};margin:{{ carMargin }};padding:{{ carPad }};scroll-padding-left:16px;scroll-snap-type:{{ carSnap }};scrollbar-width:none;cursor:{{ carCursor }}">
+      <sc-for list="{{ plans }}" as="p" hint-placeholder-count="3">
+        <div data-reveal="" style="scroll-snap-align:start;display:flex;flex-direction:column;gap:18px;padding:24px;border-radius:20px;background:{{ p.bg }};color:{{ p.fg }};border:1px solid {{ p.border }};box-shadow:{{ p.shadow }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:24px">
+            <span style="font-size:16px;font-weight:600">{{ p.name }}</span>
+            <span style="display:{{ p.badgeDisp }};height:24px;padding:0 9px;border-radius:7px;background:{{ p.badgeBg }};color:{{ p.badgeFg }};font-size:11.5px;font-weight:600;align-items:center;white-space:nowrap">{{ p.badge }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span style="display:flex;align-items:baseline;gap:4px"><span style="font-size:36px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums">{{ p.price }}</span><span style="font-size:14px;color:{{ p.sub }}">{{ p.per }}</span></span>
+            <span style="font-size:13.5px;line-height:1.45;color:{{ p.sub }};min-height:40px">{{ p.desc }}</span>
+          </div>
+          <a href="{{ p.href }}" target="_top" style="display:flex;align-items:center;justify-content:center;gap:6px;height:46px;border-radius:12px;background:{{ p.ctaBg }};color:{{ p.ctaFg }};border:1px solid {{ p.ctaBorder }};font-size:14.5px;font-weight:500" style-hover="opacity:.88;color:{{ p.ctaFg }}">{{ p.cta }}</a>
+          <div style="height:1px;background:{{ p.line }}"></div>
+          <div style="display:flex;flex-direction:column;gap:11px">
+            <sc-for list="{{ p.feats }}" as="f" hint-placeholder-count="7">
+              <span style="display:flex;gap:10px;font-size:14px;line-height:1.4;color:{{ f.fg }}"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:{{ f.ic }};flex-shrink:0">{{ f.icon }}</span>{{ f.t }}</span>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section id="security" data-screen-label="Security" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px);background:var(--sec);color:#EDEBF2;border-top:1px solid var(--sec-line);border-bottom:1px solid var(--sec-line)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:clamp(28px,4vw,44px)">
+    <div data-reveal="" style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px 40px">
+      <div style="flex:1;min-width:min(100%,420px);display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#B7A6FF">Security and control</span>
+        <h2 style="margin:0;font-size:clamp(30px,4.4vw,50px);line-height:1.06;font-weight:600;letter-spacing:-.035em;text-wrap:balance">Your data stays yours. You stay in charge.</h2>
+      </div>
+      <p style="margin:0;flex:0 1 380px;font-size:16px;line-height:1.55;color:#B4B0BF;text-wrap:pretty">Admins decide who gets access, which models they can use and how much. Nothing your team shares is used to train AI models.</p>
+    </div>
+    <div data-car="" style="display:grid;grid-template-columns:{{ secCols }};gap:12px;grid-auto-flow:{{ carFlow }};grid-auto-columns:{{ carAuto }};overflow-x:{{ carOv }};margin:{{ carMargin }};padding:{{ carPad }};scroll-padding-left:16px;scroll-snap-type:{{ carSnap }};scrollbar-width:none;cursor:{{ carCursor }}">
+      <div data-reveal="" style="scroll-snap-align:start;border-radius:20px;background:var(--sec-card);border:1px solid var(--sec-line);padding:24px;display:flex;flex-direction:column;gap:20px;min-width:0;grid-row:{{ secARow }};grid-column:{{ secACol }};justify-content:space-between">
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600"><span style="width:36px;height:36px;flex-shrink:0;border-radius:10px;background:#2E2650;color:#CBBBFF;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">shield_lock</span>No training on your data</span><span style="font-size:14.5px;line-height:1.55;color:#B4B0BF;text-wrap:pretty">Prompts, files and answers stay in your workspace. They are never used to train models.</span></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:12px;padding:18px;border-radius:16px;background:#1A1726;border:1px solid #2F2A40">
+          <div style="display:grid;grid-template-columns:{{ secFlowCols }};align-items:center;justify-items:stretch;gap:8px"><span style="display:flex;align-items:center;gap:8px;justify-content:center;min-width:0;height:40px;padding:0 10px;border-radius:11px;background:#2A2538;border:1px solid #3A3450;font-size:13.5px;white-space:nowrap;"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:#CBBBFF">person</span>Your prompt</span><span style="justify-self:center;font-family:'Material Symbols Rounded';font-size:18px;color:#7E7894">{{ secArrow }}</span><span style="display:flex;align-items:center;gap:8px;justify-content:center;min-width:0;height:40px;padding:0 10px;border-radius:11px;background:#2A2538;border:1px solid #3A3450;font-size:13.5px;white-space:nowrap;"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:#CBBBFF">auto_awesome</span>AI model</span><span style="justify-self:center;font-family:'Material Symbols Rounded';font-size:18px;color:#7E7894">{{ secArrow }}</span><span style="display:flex;align-items:center;gap:8px;justify-content:center;min-width:0;height:40px;padding:0 10px;border-radius:11px;background:#2A2538;border:1px solid #3A3450;font-size:13.5px;white-space:nowrap;"><span style="font-family:'Material Symbols Rounded';font-size:18px;color:#CBBBFF">chat</span>Answer</span></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 14px;border-radius:11px;border:1px dashed #5A4C2E;background:rgba(255,184,77,.06);font-size:13.5px;color:#E8C88A"><span style="font-family:'Material Symbols Rounded';font-size:18px">block</span>Model training</div>
+        </div>
+      </div>
+      <div data-reveal="" style="scroll-snap-align:start;border-radius:20px;background:var(--sec-card);border:1px solid var(--sec-line);padding:24px;display:flex;flex-direction:column;gap:20px;min-width:0;grid-column:{{ secBCol }}">
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600"><span style="width:36px;height:36px;flex-shrink:0;border-radius:10px;background:#2E2650;color:#CBBBFF;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">admin_panel_settings</span>Admin controls</span><span style="font-size:14.5px;line-height:1.55;color:#B4B0BF;text-wrap:pretty">Invite members and set what each role can do.</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ secMembers }}" as="m" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:30px;height:30px;flex-shrink:0;border-radius:50%;background:{{ m.bg }};color:#fff;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ m.i }}</span><span style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">{{ m.name }}</span><span style="height:24px;padding:0 9px;border-radius:7px;background:{{ m.rb }};color:{{ m.rf }};font-size:11.5px;font-weight:600;display:flex;align-items:center">{{ m.role }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div data-reveal="" style="scroll-snap-align:start;border-radius:20px;background:var(--sec-card);border:1px solid var(--sec-line);padding:24px;display:flex;flex-direction:column;gap:20px;min-width:0;grid-column:{{ secDCol }};flex-direction:{{ secDDir }};align-items:{{ secDAlign }}">
+        <div style="flex:1;min-width:0"><div style="display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:10px;font-size:17px;font-weight:600"><span style="width:36px;height:36px;flex-shrink:0;border-radius:10px;background:#2E2650;color:#CBBBFF;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">receipt_long</span>Simple billing</span><span style="font-size:14.5px;line-height:1.55;color:#B4B0BF;text-wrap:pretty">Pay in rupees through Cashfree. A GST invoice is ready every cycle.</span></div></div>
+        <div style="flex:1.2;min-width:0;width:100%;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px;border-radius:14px;background:#1A1726;border:1px solid #2F2A40">
+          <span style="width:40px;height:40px;flex-shrink:0;border-radius:10px;background:#2A2538;color:#CBBBFF;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:20px">description</span>
+          <span style="flex:1;min-width:150px;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:600">Business plan · October</span><span style="font-family:'Geist Mono';font-size:11.5px;color:#9C97AB">INV-202610-000031 · GST</span></span>
+          <span style="display:flex;align-items:center;gap:10px"><span style="font-size:15px;font-weight:600;font-variant-numeric:tabular-nums">₹43,648</span><span style="height:24px;padding:0 9px;border-radius:7px;background:rgba(74,190,130,.16);color:#7FD8A8;font-size:11.5px;font-weight:600;display:flex;align-items:center">Paid</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo" data-screen-label="Lead form" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px);background:radial-gradient(70% 60% at 100% 0%,var(--glow) 0%,var(--glow0) 70%)">
+  <div style="max-width:1200px;margin:0 auto;display:grid;grid-template-columns:{{ leadCols }};gap:clamp(28px,5vw,64px);align-items:{{ leadAlign }}">
+    <div data-reveal="" style="display:flex;flex-direction:column;gap:28px;position:{{ leadPos }};top:96px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <h2 style="margin:0;font-size:clamp(32px,4.6vw,54px);line-height:1.04;font-weight:600;letter-spacing:-.035em;text-wrap:balance">Let's build your team's plan</h2>
+        <p style="margin:0;font-size:17px;line-height:1.55;color:var(--muted);text-wrap:pretty">Tell us about your team and what you want AI to help with. We'll set up a demo around your use cases.</p>
+      </div>
+      <sc-if value="{{ stepsSide }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column">
+        <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--border)">
+            <span style="width:30px;height:30px;flex-shrink:0;border-radius:50%;background:var(--text);color:var(--bg);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ s.n }}</span>
+            <span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ s.t }}</span><span style="font-size:14px;color:var(--muted);line-height:1.5">{{ s.d }}</span></span>
+          </div>
+        </sc-for>
+      </div></sc-if>
+    </div>
+
+    <div data-reveal="" style="min-width:0;border-radius:24px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--pop);padding:clamp(16px,3vw,32px)">
+      <sc-if value="{{ notSent }}" hint-placeholder-val="{{ true }}">
+        <form onSubmit="{{ submit }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:18px">
+          <div style="display:grid;grid-template-columns:{{ formCols }};gap:14px">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Full name *<input size="1" value="{{ fName }}" onChange="{{ onName }}" placeholder="Priya Sharma" autoComplete="name" style="height:46px;padding:0 14px;border-radius:11px;border:1px solid {{ bName }};background:var(--surface);font-size:16px;color:var(--text);outline:none" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)"><span style="font-size:12px;font-weight:400;color:var(--danger)">{{ eName }}</span></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Work email *<input size="1" type="email" value="{{ fEmail }}" onChange="{{ onEmail }}" placeholder="priya@company.com" autoComplete="email" style="height:46px;padding:0 14px;border-radius:11px;border:1px solid {{ bEmail }};background:var(--surface);font-size:16px;color:var(--text);outline:none" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)"><span style="font-size:12px;font-weight:400;color:var(--danger)">{{ eEmail }}</span></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Phone<span style="display:flex;height:46px;border-radius:11px;border:1px solid {{ bPhone }};overflow:hidden"><span style="display:flex;align-items:center;padding:0 12px;background:var(--sunken);font-size:14px;color:var(--muted);border-right:1px solid var(--border)">+91</span><input size="1" type="tel" inputMode="numeric" maxLength="15" pattern="[0-9]*" value="{{ fPhone }}" onChange="{{ onPhone }}" placeholder="9876543210" autoComplete="tel-national" style="flex:1;min-width:0;padding:0 14px;border:none;background:var(--surface);font-size:16px;color:var(--text);outline:none"></span><span style="font-size:12px;font-weight:400;color:var(--danger)">{{ ePhone }}</span></label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Company *<input size="1" value="{{ fCompany }}" onChange="{{ onCompany }}" placeholder="Acme Pvt Ltd" autoComplete="organization" style="height:46px;padding:0 14px;border-radius:11px;border:1px solid {{ bCompany }};background:var(--surface);font-size:16px;color:var(--text);outline:none" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)"><span style="font-size:12px;font-weight:400;color:var(--danger)">{{ eCompany }}</span></label>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:13px;font-weight:500">Team size *</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <sc-for list="{{ sizes }}" as="o" hint-placeholder-count="5"><button type="button" onClick="{{ o.pick }}" style="height:40px;padding:0 14px;border-radius:10px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};font-size:14px;font-weight:500;cursor:pointer">{{ o.label }}</button></sc-for>
+            </div>
+            <span style="font-size:12px;color:var(--danger)">{{ eSize }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:13px;font-weight:500">Features you need</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <sc-for list="{{ formFeats }}" as="o" hint-placeholder-count="6"><button type="button" onClick="{{ o.pick }}" style="display:flex;align-items:center;gap:5px;height:36px;padding:0 12px;border-radius:999px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }};font-size:13px;font-weight:500;cursor:{{ o.cursor }}"><span style="display:{{ o.chk }};font-family:'Material Symbols Rounded';font-size:15px">check</span>{{ o.label }}</button></sc-for>
+            </div>
+          </div>
+          <div style="position:relative;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:13px;font-weight:500">AI models you need</span>
+            <button type="button" onClick="{{ toggleMd }}" aria-expanded="{{ mdOpen }}" style="display:flex;align-items:center;gap:10px;height:46px;padding:0 12px 0 14px;border-radius:11px;border:1px solid {{ mdBorder }};background:var(--surface);color:var(--text);font-size:15px;text-align:left;cursor:pointer">
+              <span style="display:flex;padding-left:6px"><sc-for list="{{ mdLogos }}" as="g" hint-placeholder-count="3"><span style="width:22px;height:22px;margin-left:-6px;border-radius:50%;background:#fff url({{ g.src }}) center/12px no-repeat;border:1px solid var(--border)"></span></sc-for></span>
+              <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ mdFg }}">{{ mdSummary }}</span>
+              <span style="font-family:'Material Symbols Rounded';font-size:20px;color:var(--muted);transform:rotate({{ mdRot }});transition:transform .2s">expand_more</span>
+            </button>
+            <sc-if value="{{ mdOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;padding:6px;border-radius:14px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--pop);display:flex;flex-direction:column">
+                <div style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column">
+                  <sc-if value="{{ mdEmpty }}" hint-placeholder-val="{{ false }}"><span style="padding:18px 10px;font-size:13.5px;line-height:1.5;color:var(--muted);text-align:center">Pick at least one AI provider in the setup above to see its models.</span></sc-if>
+                  <sc-for list="{{ mdGroups }}" as="g" hint-placeholder-count="2">
+                    <div style="display:flex;flex-direction:column">
+                      <span style="display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;font-size:12px;font-weight:600;color:var(--muted)"><span style="width:18px;height:18px;border-radius:50%;background:#fff url({{ g.src }}) center/10px no-repeat;border:1px solid var(--border)"></span>{{ g.name }}</span>
+                      <sc-for list="{{ g.items }}" as="m" hint-placeholder-count="3">
+                        <button type="button" onClick="{{ m.toggle }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 10px 0 36px;border:none;border-radius:9px;background:transparent;color:var(--text);font-size:14px;text-align:left;cursor:pointer" style-hover="background:var(--sunken)">
+                          <span style="width:18px;height:18px;flex-shrink:0;border-radius:5px;border:1.5px solid {{ m.boxBorder }};background:{{ m.boxBg }};color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:14px">{{ m.check }}</span>
+                          <span style="flex:1">{{ m.name }}</span>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 6px 2px;margin-top:4px;border-top:1px solid var(--border)">
+                  <button type="button" onClick="{{ mdAll }}" style="height:34px;padding:0 10px;border:none;background:transparent;color:var(--accent);font-size:13px;font-weight:500;cursor:pointer">{{ mdAllLabel }}</button>
+                  <button type="button" onClick="{{ toggleMd }}" style="height:34px;padding:0 14px;border-radius:9px;border:none;background:var(--text);color:var(--bg);font-size:13px;font-weight:500;cursor:pointer">Done</button>
+                </div>
+              </div>
+            </sc-if>
+            <span style="font-size:12px;color:var(--danger)">{{ eModels }}</span>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500">Anything specific you need?<textarea rows="3" value="{{ fMsg }}" onChange="{{ onMsg }}" placeholder="e.g. 40 seats, a brand-voice assistant for marketing" style="padding:12px 14px;border-radius:11px;border:1px solid var(--border);background:var(--surface);font-size:16px;line-height:1.5;color:var(--text);outline:none;resize:vertical" style-focus="border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)"></textarea></label>
+          <label style="display:flex;align-items:flex-start;gap:10px;font-size:13px;line-height:1.5;color:var(--muted);cursor:pointer"><input type="checkbox" checked="{{ consent }}" onChange="{{ onConsent }}" style="width:18px;height:18px;margin:1px 0 0;flex-shrink:0;accent-color:#7B5BE6;cursor:pointer"><span>I agree to ColabPlatforms contacting me about this request and processing my details as described in the <a href="#privacy">Privacy Policy</a>. *<span style="display:block;font-size:12px;color:var(--danger)">{{ eConsent }}</span></span></label>
+          <input name="website" tabindex="-1" autoComplete="off" aria-hidden="true" value="{{ fHp }}" onChange="{{ onHp }}" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+          <span style="font-size:13px;color:var(--danger)">{{ eSubmit }}</span>
+          <button type="submit" disabled="{{ sending }}" style="opacity:{{ sendOpacity }};display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border:none;border-radius:13px;background:var(--accent);color:#fff;font-size:16px;font-weight:500;cursor:pointer" style-hover="background:var(--accent-hover)">{{ btnLabel }}<span style="font-family:'Material Symbols Rounded';font-size:19px">arrow_forward</span></button>
+          </form>
+      </sc-if>
+      <sc-if value="{{ sent }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:420px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px">
+          <span style="width:64px;height:64px;border-radius:50%;background:color-mix(in oklch,var(--ok) 15%,transparent);color:var(--ok);display:flex;align-items:center;justify-content:center;font-family:'Material Symbols Rounded';font-size:34px">check</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:-.02em">Thanks, {{ firstName }}</span>
+          <span style="max-width:340px;font-size:15px;line-height:1.55;color:var(--muted)">We've got your request. Someone from our team will email {{ fEmail }} to set up your demo.</span>
+          <button onClick="{{ reset }}" style="margin-top:6px;height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;cursor:pointer">Send another request</button>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</section>
+
+<sc-if value="{{ stepsBelow }}" hint-placeholder-val="{{ false }}"><div style="padding:0 clamp(16px,4vw,32px) clamp(48px,8vw,80px);margin-top:calc(-1 * clamp(24px,6vw,60px))"><div style="max-width:1200px;margin:0 auto;display:flex;flex-direction:column"><sc-for list="{{ steps }}" as="s" hint-placeholder-count="3"><div style="display:flex;gap:14px;padding:14px 0;border-top:1px solid var(--border)"><span style="width:30px;height:30px;flex-shrink:0;border-radius:50%;background:var(--text);color:var(--bg);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ s.n }}</span><span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:15px;font-weight:600">{{ s.t }}</span><span style="font-size:14px;color:var(--muted);line-height:1.5">{{ s.d }}</span></span></div></sc-for></div></div></sc-if>
+
+<section id="faq" data-screen-label="FAQ" style="padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px);background:var(--surface);border-top:1px solid var(--border)">
+  <div style="max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:32px">
+    <h2 data-reveal="" style="margin:0;text-align:center;font-size:clamp(30px,4.4vw,46px);font-weight:600;letter-spacing:-.035em">Questions</h2>
+    <div style="display:flex;flex-direction:column">
+      <sc-for list="{{ faqs }}" as="q" hint-placeholder-count="6">
+        <div style="border-bottom:1px solid var(--border)">
+          <button onClick="{{ q.toggle }}" style="width:100%;display:flex;align-items:center;gap:16px;min-height:64px;padding:16px 0;border:none;background:transparent;color:var(--text);font-size:17px;font-weight:500;text-align:left;cursor:pointer"><span style="flex:1">{{ q.q }}</span><span style="font-family:'Material Symbols Rounded';font-size:22px;color:var(--muted);transform:rotate({{ q.rot }});transition:transform .25s">add</span></button>
+          <sc-if value="{{ q.open }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:0 40px 20px 0;font-size:15.5px;line-height:1.6;color:var(--muted);text-wrap:pretty">{{ q.a }}</p></sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section data-screen-label="CTA" style="padding:clamp(48px,7vw,80px) clamp(16px,4vw,32px)">
+  <div data-reveal="" style="max-width:1200px;margin:0 auto;border-radius:28px;background:var(--inv);border:1px solid var(--inv-border);color:var(--inv-fg);padding:clamp(36px,6vw,72px) clamp(22px,5vw,64px);display:flex;flex-wrap:wrap;align-items:center;gap:28px;position:relative;overflow:hidden">
+    <div style="position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(150,119,255,.45),rgba(150,119,255,0) 70%);pointer-events:none"></div>
+    <div style="flex:1;min-width:min(100%,320px);display:flex;flex-direction:column;gap:10px;position:relative">
+      <h2 style="margin:0;font-size:clamp(28px,4vw,44px);line-height:1.08;font-weight:600;letter-spacing:-.03em;text-wrap:balance">Give your team every AI model by next week</h2>
+      <p style="margin:0;font-size:16px;color:var(--inv-muted)">Book a 30-minute demo. We'll tailor the plan to your team.</p>
+    </div>
+    <a href="#demo" style="position:relative;display:flex;align-items:center;gap:8px;height:52px;padding:0 24px;border-radius:13px;background:#fff;color:#18161D;font-size:16px;font-weight:500;white-space:nowrap" style-hover="background:#EFEAFD;color:#18161D">Book a demo<span style="font-family:'Material Symbols Rounded';font-size:19px">arrow_forward</span></a>
+  </div>
+</section>
+
+<footer style="padding:40px clamp(16px,4vw,32px) 48px;border-top:1px solid var(--border)">
+  <div style="max-width:1200px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:20px 32px">
+    <img src="logos/colab-light.webp" alt="Colab" style="height:40px;width:auto;display:{{ logoLightDisp }}"><img src="logos/colab-dark.webp" alt="Colab" style="height:40px;width:auto;display:{{ logoDarkDisp }}">
+    <div style="flex:1"></div>
+    <nav style="display:flex;flex-wrap:wrap;gap:0 22px;font-size:14px">
+      <a href="#features" style="display:flex;align-items:center;min-height:44px;color:var(--muted)" style-hover="color:var(--text)">Features</a>
+      <a href="#security" style="display:flex;align-items:center;min-height:44px;color:var(--muted)" style-hover="color:var(--text)">Security</a>
+      <a href="#faq" style="display:flex;align-items:center;min-height:44px;color:var(--muted)" style-hover="color:var(--text)">FAQ</a>
+      <a href="/login" target="_top" style="display:flex;align-items:center;min-height:44px;color:var(--muted)" style-hover="color:var(--text)">Sign in</a>
+      <a href="#privacy" style="display:flex;align-items:center;min-height:44px;color:var(--muted)" style-hover="color:var(--text)">Privacy Policy</a>
+      <a href="#terms" style="display:flex;align-items:center;min-height:44px;color:var(--muted)" style-hover="color:var(--text)">Terms</a>
+    </nav>
+    <span style="width:100%;font-size:13px;color:var(--faint)">© 2026 ColabPlatforms. All rights reserved.</span>
+  </div>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;auto&quot;,&quot;tsType&quot;:&quot;'auto'|'light'|'dark'&quot;}}">
+class Component extends DCLogic {
+  APP = 'app.html';
+  state = (() => { const w = typeof window !== 'undefined' ? window.innerWidth : 1440;
+    const qt = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('theme') : null;
+    const sys = qt === 'dark' || qt === 'light' ? qt : typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return { w, theme: null, sys, nav: false, tab: 0, prog: 0, dept: 0, faq: 0, heroW: 1080, featW: 720,
+      f: { name: '', email: '', phone: '', company: '', msg: '', website: '' }, size: '', want: ['Chat & model compare'], err: {}, sent: false, sending: false, submitErr: '',
+      consent: false, paused: false, stopped: false, heroReady: false, loaded: { 0: false }, seen: [0],
+      models: { gpt: true, claude: true, gemini: true, ds: false, mistral: false, perplexity: true, qwen: false, kimi: false }, feats: { chat: true, docs: true, img: true, video: false, web: true, voice: true }, mdOpen: false, picked: ['GPT-5.6 Sol', 'Claude Opus 5', 'Gemini 3.8 Flash', 'Perplexity Sonar'], tok: 1000000 }; })();
+  mockRef = React.createRef(); heroBox = React.createRef(); featBox = React.createRef();
+  TABS = [
+    ['docs', 'description', 'Documents', 'Turn notes and files into PDFs, decks, docs and spreadsheets.'],
+    ['images', 'image', 'Image Studio', 'Product shots, ads and social visuals from top image models.'],
+    ['video', 'movie', 'Video Studio', 'Short clips from a prompt or your reference images.'],
+    ['assistants', 'smart_toy', 'Assistants', 'Ready-made experts, plus ones your admins build.'],
+    ['projects', 'folder', 'Projects', 'Chats and files under one shared brief.']
+  ];
+  DEPTS = [
+    ['campaign', 'Sales & Marketing', [['mail', 'Chat', 'Write five cold emails for CFOs at mid-size logistics firms, each under 90 words.', 'Claude Opus 5', 'anthropic'], ['image', 'Image Studio', 'Create four Instagram visuals for our Diwali sale in our brand colours.', 'GPT Image 1.5', 'openai'], ['movie', 'Video Studio', 'Turn this product photo into a 5-second rotating hero clip.', 'Kling', 'kling']]],
+    ['code', 'Product & Tech', [['view_column', 'Compare', 'Review this API design and list breaking changes. Compare GPT and DeepSeek.', 'DeepSeek V4 Pro', 'deepseek'], ['description', 'Documents', 'Write a PRD for bulk invoice upload from these call notes.', 'GPT-5.4', 'openai'], ['travel_explore', 'Web search', 'What changed in the latest RBI payment aggregator guidelines?', 'Perplexity Sonar', 'perplexity']]],
+    ['account_balance', 'Finance & Ops', [['table_chart', 'Documents', 'Build an XLSX cash-flow forecast for the next two quarters from this ledger.', 'GPT-5.4', 'openai'], ['gavel', 'Assistant', 'Flag risky clauses in this vendor contract and suggest safer wording.', 'Claude Opus 5', 'anthropic'], ['slideshow', 'Documents', 'Make a 10-slide monthly ops review from these three reports.', 'Gemini 3.8 Flash', 'gemini']]],
+    ['support_agent', 'HR & Support', [['badge', 'Chat', 'Draft a remote-work policy for a 60-person team in Bengaluru.', 'Claude Opus 5', 'anthropic'], ['forum', 'Assistant', 'Reply to this angry customer email in our support tone, offering a refund.', 'GPT-5.4', 'openai'], ['translate', 'Chat', 'Translate our onboarding guide into Hindi and Tamil.', 'Gemini 3.8 Flash', 'gemini']]]
+  ];
+  PLANS = [
+    ['Plus', '₹1,799', '/mo', 'For regular work across chat, images and video.', 'Get Plus', '/login', 'pri', [['1M tokens/month', 1], ['All AI models, including paid', 1], ['Document generation', 1], ['Image generation', 1], ['200 video credits/month', 1], ['Unlimited AI models', 1], ['File uploads & attachments', 1], ['Priority support', 1]]],
+    ['Pro', '₹3,699', '/mo', 'For heavy use and more video.', 'Get Pro', '/login', 'pri', [['2M tokens/month', 1], ['All AI models, including paid', 1], ['Document generation', 1], ['Image generation', 1], ['410 video credits/month', 1], ['Unlimited AI models', 1], ['File uploads & attachments', 1], ['Priority Plus support', 1]]],
+    ['Business', 'Custom', '', 'Seats, features and models set up for your team.', 'Book a demo', '#demo', 'biz', [['Everything in Pro, for every seat', 1], ['Pick only the features you need', 1], ['Choose which AI models to allow', 1], ['Admin controls and usage reports', 1], ['Company assistants', 1], ['One GST invoice for the team', 1], ['Dedicated account manager', 1]]]
+  ];
+  FAQ = [
+    ['What is Colab AI for Business?', 'A shared workspace where your team can use leading AI models for chat, model comparison, documents, images and video, with central billing and admin controls.'],
+    ['Which AI models are included?', 'Models from OpenAI, Anthropic, Google, DeepSeek, Mistral, Perplexity, Qwen, NVIDIA and more, plus image and video models. Admins choose which ones the team can use.'],
+    ['How does billing work?', 'Each member gets a monthly token allowance that resets every month. Video generation uses separate video credits, which can be topped up. You pay in rupees with GST invoices.'],
+    ['Can we customise the plan?', 'Yes. Seat count, token limits, model access and company assistants are set to your requirements. Use the form above and we\u2019ll put a plan together.'],
+    ['Is our data used to train AI models?', 'No. Your chats and files are not used to train models.'],
+    ['How quickly can we get started?', 'Once your plan is set up, you invite members by email and they can start chatting right away.']
+  ];
+  curTheme() { return this.state.theme || this.props.theme && this.props.theme !== 'auto' && this.props.theme || this.state.sys; }
+  initTheme = null;
+  postTheme = () => { const th = this.curTheme(); document.querySelectorAll('iframe').forEach(f => { try { f.contentWindow.postMessage({ colabTheme: th }, '*'); } catch (e) {} }); };
+  dragDown = e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const el = e.target.closest && e.target.closest('[data-car]');
+    if (!el || el.scrollWidth <= el.clientWidth) return;
+    this.drag = { el, x: e.clientX, sl: el.scrollLeft, moved: false, snap: el.style.scrollSnapType, cur: el.style.cursor, free: el.dataset.drag === 'free' };
+    el.style.scrollSnapType = 'none'; el.style.cursor = 'grabbing'; el.style.userSelect = 'none';
+  };
+  dragMove = e => { const d = this.drag; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 4) d.moved = true; d.el.scrollLeft = d.sl - dx; };
+  dragUp = () => {
+    const d = this.drag; if (!d) return; this.drag = null;
+    const el = d.el, kids = [...el.children].filter(c => c.offsetWidth), pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+    const target = kids.reduce((best, c) => Math.abs(c.offsetLeft - pad - el.scrollLeft) < Math.abs(best - el.scrollLeft) ? c.offsetLeft - pad : best, 0);
+    if (!d.free) el.scrollTo({ left: target, behavior: 'smooth' });
+    setTimeout(() => { el.style.scrollSnapType = d.snap; el.style.cursor = d.cur; el.style.userSelect = ''; }, d.free ? 0 : 400);
+    if (d.moved) { const stop = ev => { ev.stopPropagation(); ev.preventDefault(); }; window.addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 50); }
+  };
+  componentDidMount() {
+    document.addEventListener('pointerdown', this.dragDown); window.addEventListener('pointermove', this.dragMove); window.addEventListener('pointerup', this.dragUp);
+    this.onR = () => this.setState({ w: window.innerWidth });
+    window.addEventListener('resize', this.onR);
+    this.mq = matchMedia('(prefers-color-scheme: dark)'); this.onMq = e => this.setState({ sys: e.matches ? 'dark' : 'light' }); this.mq.addEventListener && this.mq.addEventListener('change', this.onMq);
+    this.ro = new ResizeObserver(() => { const h = this.heroBox.current, f = this.featBox.current;
+      this.setState({ heroW: h ? h.clientWidth : this.state.heroW, featW: f ? f.clientWidth : this.state.featW }); });
+    this.heroBox.current && this.ro.observe(this.heroBox.current); this.featBox.current && this.ro.observe(this.featBox.current);
+    this.timer = setInterval(() => this.setState(s => { if (s.paused || s.stopped) return null; const p = s.prog + 0.0085; if (p >= 1) { const tab = (s.tab + 1) % this.TABS.length; return { prog: 0, tab, seen: s.seen.includes(tab) ? s.seen : [...s.seen, tab] }; } return { prog: p }; }), 60);
+    this.onS = () => { const el = this.mockRef.current; if (!el) return;
+      const r = el.getBoundingClientRect(); const k = Math.max(0, Math.min(1, (r.top - 80) / (window.innerHeight * 0.6)));
+      el.style.transform = this.state.w < 860 ? 'none' : `perspective(2200px) rotateX(${(k * 9).toFixed(2)}deg) scale(${(1 - k * 0.03).toFixed(3)})`; };
+    window.addEventListener('scroll', this.onS, { passive: true }); this.onS();
+    if ('IntersectionObserver' in window) {
+      this.io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.style.opacity = '1'; e.target.style.transform = 'none'; this.io.unobserve(e.target); } }), { threshold: 0.12 });
+      setTimeout(() => document.querySelectorAll('[data-reveal]').forEach((el, i) => { if (this.state.w < 600 && el.closest('[data-car]')) return;
+        el.style.opacity = '0'; el.style.transform = 'translateY(24px)';
+        el.style.transition = `opacity .7s ease ${(i % 4) * 70}ms, transform .7s cubic-bezier(.2,.8,.2,1) ${(i % 4) * 70}ms`;
+        this.io.observe(el);
+      }), 50);
+    }
+  }
+  componentDidUpdate() { const th = this.curTheme(); if (th !== this.lastTheme) { this.lastTheme = th; this.postTheme(); } }
+  componentWillUnmount() { document.removeEventListener('pointerdown', this.dragDown); window.removeEventListener('pointermove', this.dragMove); window.removeEventListener('pointerup', this.dragUp); clearInterval(this.timer); window.removeEventListener('resize', this.onR); window.removeEventListener('scroll', this.onS); this.ro && this.ro.disconnect(); this.io && this.io.disconnect(); this.mq && this.mq.removeEventListener && this.mq.removeEventListener('change', this.onMq); }
+  set = k => e => { const v = e.target.value; this.setState(s => ({ f: { ...s.f, [k]: v }, err: { ...s.err, [k]: null } })); };
+  pickedVisible = () => { const st = this.state, C = { gpt: 'GPT', claude: 'Claude', gemini: 'Gem', ds: 'DeepSeek', mistral: 'Mistral', perplexity: 'Perplexity', qwen: 'Qwen', kimi: 'Kimi' }; return st.picked.filter(n => Object.keys(C).some(k => st.models[k] && n.startsWith(C[k]))); };
+  submit = e => { e.preventDefault(); const f = this.state.f, err = {};
+    if (!f.name.trim()) err.name = 'Please enter your name';
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.trim())) err.email = 'Enter a valid work email';
+    if (!this.pickedVisible().length) err.models = 'Pick at least one AI model';
+    if (f.phone && !/^\d{10,15}$/.test(f.phone)) err.phone = 'Enter 10–15 digits, numbers only';
+    if (!f.company.trim()) err.company = 'Please enter your company';
+    if (!this.state.size) err.size = 'Pick a team size';
+    if (!this.state.consent) err.consent = 'Please agree so we can contact you';
+    if (Object.keys(err).length) return this.setState({ err });
+    if (this.state.sending) return;
+    const st = this.state, FEAT = { chat: 'Chat & compare', docs: 'Documents', img: 'Image generation', video: 'Video generation', web: 'Web search', voice: 'Voice chat' };
+    const payload = { name: f.name.trim(), email: f.email.trim(), phone: f.phone.trim() ? '+91 ' + f.phone.trim() : '',
+      company: f.company.trim(), teamSize: st.size, features: Object.keys(FEAT).filter(k => st.feats[k]).map(k => FEAT[k]),
+      models: this.pickedVisible(), message: f.msg.trim(), consent: st.consent, website: f.website };
+    // The platform page passes its API address in ?api= (this file is static, so it cannot read app config).
+    const api = (new URLSearchParams(location.search).get('api') || '/api').replace(/\/$/, '');
+    this.setState({ sending: true, submitErr: '', err: {} });
+    fetch(api + '/demo-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      .then(r => r.json().catch(() => ({})).then(j => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => ok ? this.setState({ sent: true, sending: false }) : this.setState({ sending: false, submitErr: (j && j.message) || 'Something went wrong. Please try again.' }))
+      .catch(() => this.setState({ sending: false, submitErr: 'Could not reach the server. Please try again.' })); };
+  renderVals() {
+    const s = this.state, mob = s.w < 860, car = s.w < 600, L = k => `logos/${k}.svg`, theme = this.curTheme();
+    if (!this.initTheme) this.initTheme = theme;
+    const VW = mob ? 390 : 1280, VH = mob ? 780 : 800, CX = mob ? 0 : 257, stack = s.w < 1100, fstack = s.w < 1100;
+    const src = sc => `${this.APP}?screen=${sc}&theme=${this.initTheme}`;
+    const MS = [['gpt', 'OpenAI', 'openai'], ['claude', 'Anthropic', 'anthropic'], ['gemini', 'Google', 'gemini'], ['ds', 'DeepSeek', 'deepseek'], ['mistral', 'Mistral', 'mistral'], ['perplexity', 'Perplexity', 'perplexity'], ['qwen', 'Alibaba', 'qwen'], ['kimi', 'Moonshot', 'moonshot']];
+    const CAT = { gpt: ['GPT-5.6 Sol', 'GPT-5.6 Terra', 'GPT-5.6 Luna', 'GPT-5.4', 'GPT-5.1', 'GPT-4.1', 'GPT-OSS 20B'], claude: ['Claude Opus 5', 'Claude Sonnet 5', 'Claude Opus 4.7', 'Claude Sonnet 4.6', 'Claude Haiku 4.5'], gemini: ['Gemini 3.8 Flash', 'Gemini 3.1 Flash', 'Gemma 4 31B', 'Gemma 4 26B'], ds: ['DeepSeek V4 Pro', 'DeepSeek V4 Flash', 'DeepSeek V3.2'], mistral: ['Mistral Medium 3.5', 'Mistral Small 4'], perplexity: ['Perplexity Sonar'], qwen: ['Qwen 3.8 Max'], kimi: ['Kimi K2.5'] };
+    const MAKER = { gpt: 'GPT models', claude: 'Claude models', gemini: 'Gemini models', ds: 'DeepSeek models', mistral: 'Mistral models', perplexity: 'Sonar models', qwen: 'Qwen models', kimi: 'Kimi models' };
+    const FT = [['chat', 'forum', 'Chat & compare', 30, 'oklch(0.58 0.19 290)'], ['docs', 'description', 'Documents', 15, 'oklch(0.6 0.14 255)'], ['img', 'image', 'Image generation', 20, 'oklch(0.64 0.17 340)'], ['video', 'movie', 'Video generation', 25, 'oklch(0.7 0.15 60)'], ['web', 'travel_explore', 'Web search', 5, 'oklch(0.62 0.13 160)'], ['voice', 'graphic_eq', 'Voice chat', 5, 'oklch(0.66 0.12 210)']];
+    const onF = FT.filter(f => s.feats[f[0]]), wSum = onF.reduce((a, f) => a + f[3], 0), saved = 100 - wSum;
+    const togF = k => () => { if (k !== 'chat') this.setState(st => ({ feats: { ...st.feats, [k]: !st.feats[k] } })); };
+    const togM = k => () => this.setState(st => ({ models: { ...st.models, [k]: !st.models[k] }, err: { ...st.err, models: null } }));
+    const selM = MS.filter(m => s.models[m[0]]), avail = selM.flatMap(m => CAT[m[0]]), pk = s.picked.filter(n => avail.includes(n));
+    const pill = on => ({ border: on ? 'var(--accent)' : 'var(--border)', bg: on ? 'var(--accent-soft)' : 'var(--surface)', fg: on ? 'var(--accent-ink)' : 'var(--text)' });
+    const fmtTok = v => v >= 1e6 ? (v / 1e6).toFixed(2).replace(/\.?0+$/, '') + 'M' : Math.round(v / 1000) + 'K';
+    const mk = ['openai', 'anthropic', 'gemini', 'deepseek', 'mistral', 'qwen', 'perplexity', 'nvidia', 'moonshot', 'cohere', 'zhipu', 'gemma', 'flux', 'ideogram', 'recraft', 'kling', 'hailuo', 'minimax'];
+    const NM = { openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini', deepseek: 'DeepSeek', mistral: 'Mistral', qwen: 'Qwen', perplexity: 'Perplexity', nvidia: 'NVIDIA', moonshot: 'Kimi', cohere: 'Cohere', zhipu: 'GLM', gemma: 'Gemma', flux: 'Flux', ideogram: 'Ideogram', recraft: 'Recraft', kling: 'Kling', hailuo: 'Hailuo', minimax: 'MiniMax' };
+    const err = s.err, bc = k => err[k] ? 'var(--danger)' : 'var(--border)';
+    return {
+      theme, themeIcon: theme === 'dark' ? 'light_mode' : 'dark_mode', themeTitle: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode',
+      toggleTheme: () => this.setState({ theme: theme === 'dark' ? 'light' : 'dark' }),
+      navDisp: s.w < 1000 ? 'none' : 'flex', burgerDisp: s.w < 1000 ? 'flex' : 'none', navOpen: s.w < 1000 && s.nav, navIcon: s.nav ? 'close' : 'menu',
+      floatDisp: s.w >= 1480 ? 'block' : 'none',
+      toggleNav: () => this.setState({ nav: !s.nav }), closeNav: () => this.setState({ nav: false }),
+      navLinks: [['#features', 'Features'], ['#customize', 'Customize'], ['#plans', 'Plans'], ['#security', 'Security'], ['#faq', 'FAQ']].map(([href, label]) => ({ href, label })),
+      logoLightDisp: theme === 'dark' ? 'none' : 'block', logoDarkDisp: theme === 'dark' ? 'block' : 'none',
+      heroLogos: ['openai', 'anthropic', 'gemini', 'deepseek', 'mistral'].map(k => ({ src: L(k) })),
+      mockRef: this.mockRef, heroBox: this.heroBox, featBox: this.featBox,
+      heroMax: mob ? '330px' : '1080px', featMax: '100%', frameRadius: mob ? '30px' : '18px', innerRadius: mob ? '22px' : '12px', featPad: mob ? '8px' : 'clamp(10px,2vw,22px)',
+      chromeDisp: mob ? 'none' : 'flex', frameAR: '1056/660', vw: VW + 'px', vh: VH + 'px',
+      heroAR: `${VW - CX}/${VH}`, heroX: -(CX * s.heroW / (VW - CX)).toFixed(1) + 'px', heroK: (s.heroW / (VW - CX)).toFixed(4), featK: (s.featW / VW).toFixed(4),
+      heroSrc: src('multi') + '&layout=focus', heroOp: s.heroReady ? 1 : 0, heroSkel: s.heroReady ? 0 : 1,
+      heroLoad: () => { this.postTheme(); setTimeout(() => this.setState({ heroReady: true }), 250); },
+      featSkel: s.loaded[s.tab] ? 0 : 1,
+      featFrames: this.TABS.map(([k, , title], i) => ({ i, src: `feat/${k}-${theme === 'dark' ? 'dark' : 'light'}.webp`, title: 'Colab AI ' + title, lazy: i === 0 ? 'eager' : 'lazy', op: i === s.tab && s.loaded[i] ? 1 : 0,
+        load: () => this.setState(st => ({ loaded: { ...st.loaded, [i]: true } })) })),
+      pauseOn: () => this.setState({ paused: true }), pauseOff: () => this.setState({ paused: false }),
+      leadAlign: 'start', leadPos: stack ? 'static' : 'sticky',
+      planCols: s.w >= 900 ? 'repeat(3,minmax(0,1fr))' : s.w >= 600 ? 'repeat(2,minmax(0,1fr))' : 'none',
+      plans: this.PLANS.map(([name, price, per, desc, cta, href, kind, feats]) => { const biz = kind === 'biz', pri = kind === 'pri';
+        const pop = false;
+        return { name, price, per, desc, cta, href, badge: pop ? 'Most popular' : biz ? 'For teams' : '', badgeDisp: pop || biz ? 'flex' : 'none', badgeBg: biz ? 'rgba(183,166,255,.18)' : 'var(--accent)', badgeFg: biz ? '#CBBBFF' : '#fff',
+          bg: biz ? 'var(--inv)' : 'var(--surface)', fg: biz ? 'var(--inv-fg)' : 'var(--text)', sub: biz ? 'var(--inv-muted)' : 'var(--muted)', border: biz ? 'var(--inv-border)' : pop ? 'var(--accent)' : 'var(--border)', shadow: pop ? '0 0 0 1px var(--accent), var(--pop)' : biz ? 'var(--pop)' : 'none', line: biz ? 'rgba(255,255,255,.1)' : 'var(--border)',
+          ctaBg: biz ? '#FFFFFF' : pri ? 'var(--accent)' : 'var(--sunken)', ctaFg: biz ? '#18161D' : pri ? '#fff' : 'var(--text)', ctaBorder: biz ? '#FFFFFF' : pri ? 'var(--accent)' : 'var(--border)',
+          feats: feats.map(([t, on]) => ({ t, icon: on ? 'check' : 'close', ic: on ? (biz ? '#B7A6FF' : 'var(--ok)') : 'var(--faint)', fg: on ? (biz ? 'var(--inv-fg)' : 'var(--text)') : 'var(--faint)' })) }; }),
+      secCols: s.w >= 1000 ? 'minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr)' : s.w >= 640 ? 'repeat(2,minmax(0,1fr))' : car ? 'none' : '1fr',
+      secARow: s.w >= 1000 ? 'span 2' : 'auto', secACol: s.w >= 1000 || s.w < 640 ? 'auto' : 'span 2', secDCol: s.w >= 640 ? 'span 2' : 'auto', secBCol: s.w >= 640 ? 'span 2' : 'auto',
+      secDDir: s.w >= 640 ? 'row' : 'column', secDAlign: s.w >= 640 ? 'center' : 'stretch',
+      secMembers: [['RS', 'Rohit Saundalkar', 'Owner', '#7B5BE6'], ['RK', 'Rahul Kumar', 'Admin', '#2E8A57'], ['AM', 'Aisha Mehta', 'Member', '#C8412F']].map(([i, name, role, bg]) => ({ i, name, role, bg,
+        rb: role === 'Owner' ? 'rgba(183,166,255,.18)' : role === 'Admin' ? 'rgba(127,216,168,.14)' : '#2A2538', rf: role === 'Owner' ? '#CBBBFF' : role === 'Admin' ? '#7FD8A8' : '#B4B0BF' })),
+      secUsage: [['Marketing · 12 members', '8.4M', '84%'], ['Sales · 9 members', '5.1M', '51%'], ['Product · 6 members', '3.2M', '32%']].map(([name, v, w]) => ({ name, v, w })),
+      deptCols: s.w >= 900 ? 'repeat(3,minmax(0,1fr))' : car ? 'none' : '1fr', miniCols: car ? 'none' : 'repeat(auto-fit,minmax(min(100%,260px),1fr))',
+      carFlow: car ? 'column' : 'row', carAuto: car ? '84%' : 'auto', carOv: car ? 'auto' : 'visible', carMargin: car ? '-10px -16px 0' : '0', carPad: car ? '10px 16px 12px' : '0', carSnap: car ? 'x mandatory' : 'none', carCursor: car ? 'grab' : 'auto',
+      pillCta: s.w < 480 ? 'none' : 'flex', bizChip: s.w < 420 ? 'none' : 'flex', hdrGap: s.w < 420 ? '8px' : '16px', ctaPadX: s.w < 420 ? '12px' : '16px', custPtsDisp: car ? 'none' : 'flex',
+      leadCols: stack ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1.15fr)', formCols: s.w >= 560 ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)', stepsSide: !stack, stepsBelow: stack && !car,
+      consent: s.consent, onConsent: e => this.setState({ consent: e.target.checked, err: { ...s.err, consent: null } }), eConsent: err.consent || '',
+      marquee: [...mk, ...mk].map(k => ({ src: L(k), name: NM[k] })),
+      featCols: fstack ? '1fr' : 'minmax(260px,320px) minmax(0,1fr)', tabDir: fstack ? 'row' : 'column', tabOv: fstack ? 'auto' : 'visible',
+      tabMargin: fstack ? '0 -16px' : '0', tabPad: fstack ? '2px 16px' : '0',
+      tabs: this.TABS.map(([k, icon, title, desc], i) => { const on = i === s.tab;
+        return { icon, title, desc, showDesc: on && !fstack, pad: fstack ? '10px 14px 12px 10px' : '14px 16px', border: on ? 'var(--border-strong)' : fstack ? 'var(--border)' : 'transparent', bg: on ? 'var(--bg)' : fstack ? 'var(--surface)' : 'transparent',
+          iconBg: on ? 'var(--accent)' : 'var(--sunken)', iconFg: on ? '#fff' : 'var(--muted)', barDisp: on && !s.stopped ? 'block' : 'none', prog: (s.prog * 100).toFixed(1) + '%',
+          descFg: on ? 'var(--muted)' : 'var(--faint)',
+          pick: () => this.setState(st => ({ tab: i, prog: 0, stopped: true, seen: st.seen.includes(i) ? st.seen : [...st.seen, i] })) }; }),
+      mobDesc: fstack, activeDesc: this.TABS[s.tab][3],
+      waveBars: Array.from({ length: 18 }, (_, i) => ({ h: [40, 70, 55, 90, 64, 80, 46, 96, 72][i % 9] + 'px', d: (i * 0.07).toFixed(2) + 's' })),
+      assetTiles: [['picture_as_pdf', 'PDF', 'oklch(0.62 0.17 30)'], ['image', 'PNG', 'oklch(0.62 0.15 300)'], ['article', 'DOCX', 'oklch(0.6 0.14 255)'], ['slideshow', 'PPTX', 'oklch(0.66 0.15 55)'], ['table_chart', 'XLSX', 'oklch(0.6 0.13 155)'], ['movie', 'MP4', 'oklch(0.6 0.05 280)']].map(([icon, l, c]) => ({ icon, l, c })),
+      ctxChips: [['Global', 'Our company is Acme Pvt Ltd, a B2B SaaS', 'oklch(0.6 0.17 290)'], ['Project', 'Launch date is Nov 15', 'oklch(0.6 0.13 155)'], ['Chat', 'Use the Q3 numbers from the board deck', 'oklch(0.6 0.03 280)']].map(([scope, t, c]) => ({ scope, t, c })),
+      custPoints: [['toggle_on', 'Pick only the features you need', 'Turn off what you don\u2019t use, like video, and the plan costs less.'], ['tune', 'Choose your AI models', 'Allow only the models your team should use.'], ['smart_toy', 'Build company assistants', 'Give the AI your brand voice, policies and playbooks.']].map(([icon, t, d]) => ({ icon, t, d })),
+      adminModels: MS.map(([k, name, lg]) => { const on = !!s.models[k];
+        return { name, on, src: L(lg), op: on ? 1 : 0.55, filter: on ? 'none' : 'grayscale(1)', border: on ? 'var(--accent)' : 'var(--border)', bg: on ? 'var(--accent-soft)' : 'var(--surface)', fg: on ? 'var(--accent-ink)' : 'var(--muted)', chkDisp: on ? 'block' : 'none', toggle: togM(k) }; }),
+      featToggles: FT.map(([k, icon, name, , c]) => { const on = !!s.feats[k], lock = k === 'chat';
+        return { name, icon, dot: c, title: lock ? 'Included in every plan' : '', cursor: lock ? 'default' : 'pointer', op: on ? 1 : 0.45, border: on ? 'var(--border-strong)' : 'var(--border)', bg: on ? 'var(--surface)' : 'var(--sunken)', sw: on ? 'var(--accent)' : 'var(--border-strong)', knob: on ? '14px' : '0px', lockDisp: lock ? 'block' : 'none', swDisp: lock ? 'none' : 'flex', toggle: togF(k) }; }),
+      featCount: `${onF.length} of ${FT.length} on`,
+      tokSplit: onF.map(([k, , name, w, c]) => ({ name, c, w: (w / wSum * 100) + '%', v: fmtTok(s.tok * w / wSum) })),
+      saveLabel: saved > 0 ? `About ${saved}% lower cost than every feature on` : 'Every feature included', saveIcon: saved > 0 ? 'savings' : 'check_circle', saveFg: saved > 0 ? 'var(--ok)' : 'var(--muted)',
+      secFlowCols: s.w >= 1000 || s.w < 640 ? '1fr' : 'minmax(0,1fr) auto minmax(0,1fr) auto minmax(0,1fr)', secArrow: s.w >= 1000 || s.w < 640 ? 'arrow_downward' : 'arrow_forward',
+      formFeats: FT.map(([k, , name]) => { const on = !!s.feats[k], lock = k === 'chat'; return { label: name, ...pill(on), chk: on ? 'inline' : 'none', cursor: lock ? 'default' : 'pointer', pick: togF(k) }; }),
+      mdOpen: s.mdOpen, toggleMd: () => this.setState(st => ({ mdOpen: !st.mdOpen })), mdRot: s.mdOpen ? '180deg' : '0deg', mdBorder: s.mdOpen ? 'var(--accent)' : s.err.models ? 'var(--danger)' : 'var(--border)',
+      mdLogos: selM.filter(m => CAT[m[0]].some(n => pk.includes(n))).slice(0, 4).map(m => ({ src: L(m[2]) })), mdFg: pk.length ? 'var(--text)' : 'var(--faint)',
+      mdSummary: pk.length ? (pk.length <= 2 ? pk.join(', ') : `${pk[0]}, ${pk[1]} +${pk.length - 2} more`) : (selM.length ? 'Select models' : 'Pick a provider above first'),
+      mdEmpty: !selM.length,
+      mdGroups: selM.map(([k, name, lg]) => ({ name, src: L(lg), items: CAT[k].map(n => { const on = pk.includes(n); return { name: n, check: on ? 'check' : '', boxBg: on ? 'var(--accent)' : 'transparent', boxBorder: on ? 'var(--accent)' : 'var(--border-strong)', toggle: () => this.setState(st => ({ picked: st.picked.includes(n) ? st.picked.filter(x => x !== n) : [...st.picked, n], err: { ...st.err, models: null } })) }; }) })),
+      mdAllLabel: avail.length && pk.length === avail.length ? 'Clear all' : 'Select all', mdAll: () => this.setState(st => ({ picked: pk.length === avail.length ? [] : avail, err: { ...st.err, models: null } })),
+      eModels: s.err.models || '',
+      modelCount: `${Object.values(s.models).filter(Boolean).length} of ${MS.length} on`,
+      tok: s.tok, tokLabel: fmtTok(s.tok), onTok: e => this.setState({ tok: +e.target.value }),
+      deptJustify: mob ? 'flex-start' : 'center',
+      depts: this.DEPTS.map(([icon, label], i) => { const on = i === s.dept; return { icon, label, border: on ? 'var(--text)' : 'var(--border)', bg: on ? 'var(--text)' : 'var(--surface)', fg: on ? 'var(--bg)' : 'var(--text)', pick: () => this.setState({ dept: i }) }; }),
+      deptCards: this.DEPTS[s.dept][2].map(([icon, tool, prompt, model, lg]) => ({ icon, tool, prompt, model, logo: L(lg) })),
+      cmpOld: ['A separate login and bill for each tool', 'Each tool gives you one company\u2019s models', 'Files and chats scattered across apps', 'No shared context between tools', 'No single view of who uses what'],
+      cmpNew: ['One login and one invoice in \u20b9', '30+ models, side by side in one chat', 'Every document, image and video in one library', 'Projects and context shared across the team', 'Admin controls and usage for every member'],
+      secItems: [['shield_lock', 'No training on your data', 'Your chats and files are not used to train AI models.'], ['admin_panel_settings', 'Admin controls', 'Manage members, model access and limits from one dashboard.'], ['monitoring', 'Usage visibility', 'See tokens and credits used by each member and model.'], ['receipt_long', 'Simple billing', 'Pay in rupees through Cashfree with GST invoices every cycle.']].map(([icon, t, d]) => ({ icon, t, d })),
+      steps: [['1', 'Tell us about your team', 'Size, tools you use today and what you want to do with AI.'], ['2', 'Get a tailored demo', 'We walk through Colab AI using your own use cases.'], ['3', 'Start with your team', 'We set up your plan, models and limits, then invite members.']].map(([n, t, d]) => ({ n, t, d })),
+      notSent: !s.sent, sent: s.sent, submit: this.submit, reset: () => this.setState({ sent: false, consent: false, f: { name: '', email: '', phone: '', company: '', msg: '', website: '' }, size: '', submitErr: '' }),
+      fName: s.f.name, fEmail: s.f.email, fPhone: s.f.phone, fCompany: s.f.company, fHp: s.f.website, onHp: this.set('website'), sending: s.sending, eSubmit: s.submitErr, sendOpacity: s.sending ? .7 : 1, btnLabel: s.sending ? 'Sending\u2026' : 'Request a demo',
+      fMsg: s.f.msg, firstName: s.f.name.trim().split(' ')[0],
+      onName: this.set('name'), onEmail: this.set('email'), onPhone: e => { const v = String(e.target.value).replace(/\D/g, '').slice(0, 15); this.setState(st => ({ f: { ...st.f, phone: v }, err: { ...st.err, phone: null } })); }, onCompany: this.set('company'), onMsg: this.set('msg'),
+      bName: bc('name'), bEmail: bc('email'), bCompany: bc('company'), bPhone: bc('phone'), eName: err.name || '', eEmail: err.email || '', eCompany: err.company || '', ePhone: err.phone || '', eSize: err.size || '',
+      sizes: ['1\u201310', '11\u201350', '51\u2013200', '201\u20131,000', '1,000+'].map(l => ({ label: l, ...pill(s.size === l), pick: () => this.setState({ size: l, err: { ...s.err, size: null } }) })),
+      wants: ['Chat & model compare', 'Documents', 'Image generation', 'Video generation', 'Company assistants', 'Admin & usage controls'].map(l => { const on = s.want.includes(l);
+        return { label: l, ...pill(on), chk: on ? 'inline' : 'none', pick: () => this.setState({ want: on ? s.want.filter(x => x !== l) : [...s.want, l] }) }; }),
+      faqs: this.FAQ.map(([q, a], i) => ({ q, a, open: s.faq === i, rot: s.faq === i ? '45deg' : '0deg', toggle: () => this.setState({ faq: s.faq === i ? -1 : i }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

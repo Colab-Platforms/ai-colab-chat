@@ -20,6 +20,7 @@ export const createVideoSchema = Joi.object({
   // uses — a model-facing URL is never trusted to be http(s)-safe otherwise.
   firstFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   lastFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
+  referenceAudioUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   // Duration/resolution are further checked in the service against the
   // chosen model's actual supported_durations/supported_resolutions — this
   // just keeps obviously-bad input out.

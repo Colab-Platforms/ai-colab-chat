@@ -7,6 +7,7 @@ import {
   submitVideoJob,
   VideoSubmitError,
   type FrameImage,
+  type InputReference,
   type VideoJobPollResult,
 } from "@/utils/openrouterVideo.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
@@ -156,16 +157,30 @@ export const submitPendingVideoJobs = async (): Promise<void> => {
         const callbackUrl = CALLBACK_BASE_URL
           ? `${CALLBACK_BASE_URL.replace(/\/+$/, "")}/api/videos/webhooks/openrouter`
           : undefined;
-        const frameImages: FrameImage[] = [
-          ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
-          ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
-        ];
+        // OpenRouter gives frame_images precedence over input_references, which
+        // would drop the audio — so with a reference audio, the frames go in as
+        // image references instead (they guide the subject rather than pin the
+        // exact first/last frame).
+        const frameImages: FrameImage[] = video.referenceAudioUrl
+          ? []
+          : [
+              ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
+              ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
+            ];
+        const inputReferences: InputReference[] = video.referenceAudioUrl
+          ? [
+              ...(video.firstFrameUrl ? [{ type: "image_url" as const, url: video.firstFrameUrl }] : []),
+              ...(video.lastFrameUrl ? [{ type: "image_url" as const, url: video.lastFrameUrl }] : []),
+              { type: "audio_url" as const, url: video.referenceAudioUrl },
+            ]
+          : [];
         vlogBlock("submit", `job=${video.id} submitting to OpenRouter`, {
           model: video.model.externalId,
           duration: video.duration,
           resolution: video.resolution,
           aspectRatio: video.aspectRatio,
-          frameImages: frameImages.length > 0 ? frameImages : "(text-to-video)",
+          frameImages: frameImages.length > 0 ? frameImages : "(none)",
+          inputReferences: inputReferences.length > 0 ? inputReferences : "(none)",
           callbackUrl: callbackUrl ?? "(none — BACKEND_PUBLIC_URL not set, poll-only)",
         });
 
@@ -177,6 +192,7 @@ export const submitPendingVideoJobs = async (): Promise<void> => {
           aspectRatio: video.aspectRatio,
           callbackUrl,
           frameImages: frameImages.length > 0 ? frameImages : undefined,
+          inputReferences: inputReferences.length > 0 ? inputReferences : undefined,
         });
 
         await prisma.generatedVideo.update({

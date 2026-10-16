@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { auth } from "@/middlewares/authMiddleware.js";
 import { requirePlanCapability } from "@/middlewares/planAccessMiddleware.js";
+import { uploadAudio } from "@/middlewares/upload.js";
 import * as videoController from "./video.controller.js";
 import { openRouterVideoWebhook } from "./video.webhook.controller.js";
 
@@ -8,6 +9,13 @@ const router = Router();
 
 // Registered before "/:id" so Express doesn't treat "models" as an :id param.
 router.get("/models", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideoModels);
+router.post(
+  "/reference-audio",
+  auth("USER", "ADMIN", "SUPERADMIN"),
+  requirePlanCapability("VIDEO_GENERATION"),
+  uploadAudio.single("file"),
+  videoController.uploadReferenceAudio,
+);
 // Image sequences — registered before "/:id" for the same reason as "/models".
 router.get("/sequences", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideoSequences);
 router.get("/sequences/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.getVideoSequenceById);

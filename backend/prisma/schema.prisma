@@ -68,9 +68,12 @@ model User {
   generatedVideos               GeneratedVideo[]
   videoSequences               VideoSequence[]
   generatedImages               GeneratedImage[]
+  codeProjects                  CodeProject[]
   payments                      Payment[]
   invoices                      Invoice[]
   supportRequests               SupportRequest[]
+  githubConnection              GithubConnection?
+  vercelConnection              VercelConnection?
 }
 
 model UserPreference {
@@ -207,6 +210,10 @@ model Folder {
   id          Int             @id @default(autoincrement())
   name        String
   description String?
+  // Cosmetic only: a key from the frontend's project icon set and one of its
+  // colour keys. Null falls back to a default folder icon / id-derived colour.
+  icon        String?
+  color       String?
   userId      Int
   isDeleted   Boolean         @default(false)
   createdAt   DateTime        @default(now())
@@ -247,6 +254,7 @@ model Chat {
   generatedVideos    GeneratedVideo[]
   videoSequences    VideoSequence[]
   generatedImages    GeneratedImage[]
+  codeProjects       CodeProject[]
 
   @@index([userId])
   @@index([folderId])
@@ -361,6 +369,7 @@ model GeneratedVideo {
   aspectRatio        String               @default("16:9")
   firstFrameUrl      String?
   lastFrameUrl       String?
+  referenceAudioUrl  String?
   // Set when this row is one clip of an image sequence (see VideoSequence) —
   // clips are internal and hidden from the normal video list; the stitched
   // result is a separate GeneratedVideo row linked via VideoSequence.finalVideoId.
@@ -466,6 +475,83 @@ model GeneratedImage {
   @@index([modelResponseId])
 }
 
+// ---------------------------------------------------------------------------
+// Code workspace (AI coding assistant — Software Engineer assistant only).
+// A generated multi-file project lives in a chat; every AI turn that touches
+// it records a version snapshot so edits can be reverted. See
+// src/modules/code-workspace/README.md for the full flow.
+// ---------------------------------------------------------------------------
+enum CodeProjectStatus {
+  GENERATING
+  READY
+  FAILED
+}
+
+model CodeProject {
+  id                 Int                  @id @default(autoincrement())
+  userId             Int
+  chatId             Int
+  title              String
+  // react | vue | vanilla | static | node | python | other
+  framework          String               @default("react")
+  // Whether the Sandpack preview can run it (browser-only web projects).
+  previewable        Boolean              @default(false)
+  // Latest snapshot number in CodeProjectVersion; 0 until the first AI turn ends.
+  currentVersion     Int                  @default(0)
+  // Set by manual edits from the editor; cleared whenever a snapshot is taken,
+  // so an AI edit or a restore can first preserve the user's own changes.
+  dirtySinceSnapshot Boolean              @default(false)
+  status             CodeProjectStatus    @default(GENERATING)
+  isDeleted          Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  user               User                 @relation(fields: [userId], references: [id])
+  chat               Chat                 @relation(fields: [chatId], references: [id])
+  files              CodeFile[]
+  versions           CodeProjectVersion[]
+  githubLink         GithubRepoLink?
+  vercelLink         VercelProjectLink?
+  vercelDeployments  VercelDeployment[]
+
+  @@index([userId])
+  @@index([chatId])
+}
+
+model CodeFile {
+  id        Int         @id @default(autoincrement())
+  projectId Int
+  path      String
+  language  String      @default("plaintext")
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  project   CodeProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, path])
+}
+
+model CodeProjectVersion {
+  id              Int            @id @default(autoincrement())
+  projectId       Int
+  version         Int
+  // AI (end of an AI turn) | USER (manual edits preserved before an AI edit/restore) | RESTORE
+  source          String
+  // The AI turn that produced this version — how a chat bubble finds its project card.
+  modelResponseId Int?
+  // The model's <plan> for this turn, shown again in the chat after a reload.
+  plan            String?
+  // Paths this turn wrote or deleted (the steps list in the chat bubble).
+  changedPaths    String[]       @default([])
+  // [{ path, language, content }]
+  filesSnapshot   Json
+  createdAt       DateTime       @default(now())
+  project         CodeProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  modelResponse   ModelResponse? @relation(fields: [modelResponseId], references: [id])
+
+  @@unique([projectId, version])
+  @@index([modelResponseId])
+}
+
 model Message {
   id                 Int                 @id @default(autoincrement())
   chatId             Int
@@ -511,6 +597,7 @@ model ModelResponse {
   model              Model               @relation(fields: [modelId], references: [id])
   generatedDocuments GeneratedDocument[]
   generatedImages    GeneratedImage[]
+  codeVersions       CodeProjectVersion[]
   createdAt          DateTime            @default(now())
   completedAt        DateTime?
 
@@ -937,4 +1024,210 @@ enum DistillationStatus {
   PROCESSING
   DONE
   FAILED
+}
+
+// ---------------------------------------------------------------------------
+// GitHub integration. A CodeProject can be mirrored to a GitHub repo: every
+// CodeProjectVersion becomes a commit. GitHub is a mirror, never the source of
+// truth - CodeFile rows stay authoritative, and everything below is optional.
+// See src/modules/github/README.md.
+// ---------------------------------------------------------------------------
+model GithubConnection {
+  id                    Int              @id @default(autoincrement())
+  userId                Int              @unique
+  // GitHub App installation. String, not BigInt - BigInt breaks JSON.stringify.
+  installationId        String
+  accountLogin          String
+  // User | Organization
+  accountType           String           @default("User")
+  accountAvatarUrl      String?
+  // User-to-server token (ghu_) + refresh (ghr_), AES-256-GCM via utils/crypto.
+  // Null when the App is configured without user authorization.
+  userTokenEnc          String?          @db.Text
+  userTokenExpiresAt    DateTime?
+  refreshTokenEnc       String?          @db.Text
+  refreshTokenExpiresAt DateTime?
+  // Cleared by the installation.deleted webhook instead of a hard delete.
+  isActive              Boolean          @default(true)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  user                  User             @relation(fields: [userId], references: [id])
+  links                 GithubRepoLink[]
+
+  @@index([installationId])
+}
+
+model GithubRepoLink {
+  id                Int              @id @default(autoincrement())
+  projectId         Int              @unique
+  connectionId      Int
+  repoId            String
+  owner             String
+  repo              String
+  branch            String           @default("main")
+  htmlUrl           String
+  isPrivate         Boolean          @default(true)
+  // Whether an AI turn auto-commits. Manual edits always need the Push button.
+  autoPush          Boolean          @default(true)
+  lastCommitSha     String?
+  lastPushedVersion Int?
+  lastSyncedAt      DateTime?
+  // IDLE | SYNCING | ERROR - polled by the header button.
+  syncState         String           @default("IDLE")
+  lastError         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  project           CodeProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection        GithubConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+}
+
+
+// ---------------------------------------------------------------------------
+// Vercel integration. A CodeProject can be published to the user's own Vercel
+// account, either from the CodeFile rows directly or from a linked GitHub repo.
+// Vercel is a destination, never a source of truth - nothing is ever pulled
+// back, and a server with no VERCEL_* vars hides the feature entirely.
+// See src/modules/vercel/README.md.
+// ---------------------------------------------------------------------------
+model VercelConnection {
+  id               Int                 @id @default(autoincrement())
+  userId           Int                 @unique
+  // Integration install id (icfg_...). Needed to revoke on disconnect.
+  configurationId  String
+  vercelUserId     String
+  // Non-null when installed onto a Team: every API call must then carry
+  // ?teamId=<this>, or Vercel answers 403.
+  teamId           String?
+  // Display only - the account/team shown in the dropdown and dashboard links.
+  accountName      String?
+  accountSlug      String?
+  accountAvatarUrl String?
+  // Long-lived Bearer token, AES-256-GCM via utils/crypto. Vercel has no
+  // refresh flow - a rejected token means the user must reconnect.
+  accessTokenEnc   String              @db.Text
+  // Cleared (not deleted) when Vercel reports the integration disabled/revoked.
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  user             User                @relation(fields: [userId], references: [id])
+  links            VercelProjectLink[]
+
+  @@index([configurationId])
+}
+
+model VercelProjectLink {
+  id                  Int                @id @default(autoincrement())
+  projectId           Int                @unique
+  connectionId        Int
+  vercelProjectId     String
+  vercelProjectName   String
+  source              String             @default("FILES")
+  framework           String?
+  buildCommand        String?
+  installCommand      String?
+  outputDirectory     String?
+  rootDirectory       String?
+  devCommand          String?
+  nodeVersion         String?
+  gitRepoId           String?
+  gitOwner            String?
+  gitRepo             String?
+  gitBranch           String?
+  productionUrl       String?
+  lastDeploymentId    String?
+  lastDeploymentUrl   String?
+  lastDeployState     String             @default("IDLE")
+  lastDeployedVersion Int?
+  lastDeployedAt      DateTime?
+  lastError           String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  project             CodeProject        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  connection          VercelConnection   @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  deployments         VercelDeployment[]
+
+  @@index([connectionId])
+}
+
+model VercelDeployment {
+  id                 Int               @id @default(autoincrement())
+  linkId             Int
+  projectId          Int
+  vercelDeploymentId String            @unique
+  source             String            @default("FILES")
+  target             String            @default("production")
+  readyState         String            @default("QUEUED")
+  url                String?
+  aliasUrl           String?
+  branch             String?
+  commitSha          String?
+  version            Int?
+  fileCount          Int?
+  logTail            String?           @db.Text
+  errorMessage       String?
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
+  link               VercelProjectLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  project            CodeProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, startedAt])
+  @@index([linkId])
+}
+
+enum StudioTemplateType {
+  IMAGE
+  VIDEO
+}
+
+model StudioTemplate {
+  id              Int                @id @default(autoincrement())
+  type            StudioTemplateType
+  title           String
+  category        String?
+  prompt          String
+  previewUrl      String
+  previewVideoUrl String?
+  aspectRatio     String             @default("1:1")
+  duration        Int?
+  requiresPhoto   Boolean            @default(true)
+  sortOrder       Int                @default(0)
+  usageCount      Int                @default(0)
+  isActive        Boolean            @default(true)
+  isDeleted       Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([type, isActive, isDeleted, sortOrder])
+}
+
+enum DemoRequestStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CLOSED
+}
+
+model DemoRequest {
+  id         Int               @id @default(autoincrement())
+  name       String
+  email      String
+  phone      String?
+  company    String
+  teamSize   String
+  features   String[]
+  models     String[]
+  message    String?
+  status     DemoRequestStatus @default(NEW)
+  adminNotes String?
+  consentAt  DateTime
+  ipAddress  String?
+  userAgent  String?
+  isDeleted  Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
 }
