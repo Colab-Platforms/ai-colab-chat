@@ -294,7 +294,8 @@ input,textarea,button{font-family:inherit}
     <div data-reveal="" style="display:flex;flex-wrap:wrap;align-items:center;gap:28px 48px;padding:clamp(28px,4vw,44px) clamp(24px,4vw,48px);border-radius:28px;background:var(--surface);border:1px solid var(--border)">
       <div style="flex:1 1 420px;min-width:0;display:flex;flex-direction:column;gap:14px">
         <span style="font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">Business</span>
-        <span style="font-size:clamp(32px,3.6vw,42px);line-height:1;font-weight:700;letter-spacing:-.035em">Custom plan</span>
+        <span style="font-size:clamp(32px,3.6vw,42px);line-height:1;font-weight:700;letter-spacing:-.035em">Per-seat plan</span>
+        <sc-if value="{{ hasEntPrice }}" hint-placeholder-val="{{ false }}"><span style="font-size:16px;font-weight:600;color:var(--accent-ink)">{{ entPriceLine }}</span></sc-if>
         <span style="font-size:15px;line-height:1.55;color:var(--muted);text-wrap:pretty;max-width:560px">Everything in Pro for your whole team, with admin controls, GST invoices for input tax credit and a dedicated account manager.</span>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),max-content));gap:14px 48px;margin-top:10px">
           <sc-for list="{{ entFeats }}" as="f" hint-placeholder-count="6">
@@ -515,6 +516,8 @@ class Component extends DCLogic {
     ['account_balance', 'Finance & Ops', [['table_chart', 'Documents', 'Build an XLSX cash-flow forecast for the next two quarters from this ledger.', 'GPT-5.4', 'openai'], ['gavel', 'Assistant', 'Flag risky clauses in this vendor contract and suggest safer wording.', 'Claude Opus 5', 'anthropic'], ['slideshow', 'Documents', 'Make a 10-slide monthly ops review from these three reports.', 'Gemini 3.8 Flash', 'gemini']]],
     ['support_agent', 'HR & Support', [['badge', 'Chat', 'Draft a remote-work policy for a 60-person team in Bengaluru.', 'Claude Opus 5', 'anthropic'], ['forum', 'Assistant', 'Reply to this angry customer email in our support tone, offering a refund.', 'GPT-5.4', 'openai'], ['translate', 'Chat', 'Translate our onboarding guide into Hindi and Tamil.', 'Gemini 3.8 Flash', 'gemini']]]
   ];
+  // Business per-seat pricing set these once pricing is decided; the price line stays hidden while null.
+  ENT_SEAT_PRICE = null; ENT_MIN_SEATS = null;
   PLANS = [
     { label: 'Free', mo: 0, yr: 0, desc: 'Try Colab AI on everyday questions before you commit.', cta: 'Start free', ft: false, lead: '', feats: [
       ['About 40 messages a month', 'Enough to try it out'],
@@ -652,7 +655,8 @@ class Component extends DCLogic {
       setMonthly: () => this.setState({ yearly: false }), setYearly: () => this.setState({ yearly: true }),
       mBg: s.yearly ? 'transparent' : 'var(--text)', mFg: s.yearly ? 'var(--muted)' : 'var(--bg)',
       yBg: s.yearly ? 'var(--text)' : 'transparent', yFg: s.yearly ? 'var(--bg)' : 'var(--muted)',
-      entFeats: ['Admin console and usage reports', 'Choose which AI models to allow', 'GST invoice for input tax credit', 'Dedicated account manager'],
+      hasEntPrice: this.ENT_SEAT_PRICE != null, entPriceLine: this.ENT_SEAT_PRICE != null ? `Starting at ₹${this.ENT_SEAT_PRICE.toLocaleString('en-IN')}/seat/month${this.ENT_MIN_SEATS ? ` · minimum ${this.ENT_MIN_SEATS} seats` : ''}, plus GST` : '',
+      entFeats: ['Admin console and usage reports', 'Custom roles with per-role limits', 'Choose which AI models to allow', 'GST invoice for input tax credit', 'Data stored in India', 'No training on your data', 'Admins see usage, not conversations', 'Dedicated account manager'],
       plans: this.PLANS.map(({ label, mo, yr, desc, cta, ft, lead, feats }, pi) => { const wide = s.w >= 1040;
         const inr = n => '₹' + n.toLocaleString('en-IN'), yrOn = !!(s.yearly && mo);
         return { label, price: !mo ? 'Free' : inr(yrOn ? Math.round(yr / 12) : mo), per: mo ? '/month' : '', showSave: yrOn, hasGst: !!mo, strike: mo ? inr(mo) : '', save: mo ? inr(mo * 12 - yr) : '',

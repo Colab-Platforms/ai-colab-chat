@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -16,7 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { AppSidebar } from "@/components/sidebar/sidebar";
 
-const navGroups = [
+const allNavGroups = [
   { label: null, items: [{ label: "Overview", href: "/profile", icon: LayoutDashboard }] },
   {
     label: "Account",
@@ -36,10 +37,20 @@ const navGroups = [
   },
   { label: "Data", items: [{ label: "Archived chats", href: "/profile/archived", icon: Archive }] },
 ];
-const userNav = navGroups.flatMap((g) => g.items);
+// Org seats are billed through their organization: no personal plan or wallet to manage.
+const ORG_HIDDEN = new Set(["/profile/subscription", "/profile/wallet"]);
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const isOrgSeat = Boolean(user?.orgMembership) && user?.orgMembership?.takesSeat !== false;
+  const navGroups = React.useMemo(
+    () =>
+      allNavGroups
+        .map((g) => ({ ...g, items: g.items.filter((i) => !(isOrgSeat && ORG_HIDDEN.has(i.href))) }))
+        .filter((g) => g.items.length > 0),
+    [isOrgSeat],
+  );
+  const userNav = React.useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -54,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (isLoading) return;
 
     if (!user) {
-      // Check if this was an intentional logout — if so, go to the landing
+      // Check if this was an intentional logout if so, go to the landing
       // page rather than /login with a redirect parameter.
       const isExplicitLogout = sessionStorage.getItem("explicit_logout") === "1";
       sessionStorage.removeItem("explicit_logout");
@@ -209,7 +220,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-full relative bg-background text-foreground">
-      {/* Mobile top bar — same pattern as chat layout */}
+      {/* Mobile top bar same pattern as chat layout */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 z-50 flex items-center px-3 bg-background/80 backdrop-blur-md border-b border-border/50 justify-between">
         <Button
           variant="ghost"

@@ -2,7 +2,7 @@ import type { DeployBody, DeployStreamEvent, EnvVarInput } from "./types";
 
 /**
  * The deploy and log endpoints stream Server-Sent Events from a POST, the same
- * way /chats/:id/send does — read with fetch() + getReader(), because
+ * way /chats/:id/send does read with fetch() + getReader(), because
  * EventSource can't send the Authorization header (and axios can't stream).
  *
  * A failure *before* the stream starts (VERCEL_GIT_NOT_CONNECTED,
@@ -86,7 +86,7 @@ export function streamRedeploy(
   return stream(`/vercel/projects/${projectId}/redeploy`, { envVars }, onEvent, signal);
 }
 
-/** Re-attaches to a deployment — live if it is still building, a replay if it finished. */
+/** Re-attaches to a deployment live if it is still building, a replay if it finished. */
 export function attachLogs(
   projectId: number,
   deploymentId: string,

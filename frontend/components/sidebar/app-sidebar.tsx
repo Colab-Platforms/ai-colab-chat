@@ -14,6 +14,7 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   ChevronsUpDown,
+  Briefcase,
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
@@ -65,7 +66,8 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { user, logout, hasRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { planName } = usePlanCapabilities();
+  const { planName, org } = usePlanCapabilities();
+  const isOrgAdmin = user?.orgMembership?.status === "ACTIVE" && ["OWNER", "ADMIN"].includes(user.orgMembership.memberRole);
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = hasRole("ADMIN") || hasRole("SUPERADMIN");
@@ -232,7 +234,7 @@ export function AppSidebar({
               <div className="flex flex-col items-start min-w-0 flex-1">
                 <span className="truncate w-full text-left font-medium text-sm leading-tight">{user?.firstName} {user?.lastName}</span>
                 <span className="truncate w-full text-left text-xs font-normal text-faint leading-tight mt-0.5">
-                  {planName ? `${planName} plan` : user?.email}
+                  {org ? org.name : planName ? `${planName} plan` : user?.email}
                 </span>
               </div>
               <ChevronsUpDown className="w-3.5 h-3.5 ml-auto text-faint flex-shrink-0" />
@@ -278,6 +280,11 @@ export function AppSidebar({
             {isAdmin && !isAdminArea && (
               <DropdownMenuItem onClick={() => { handleClose(); router.push("/admin"); }} className="gap-2 cursor-pointer">
                 <ShieldCheck className="w-4 h-4" /> Admin Panel
+              </DropdownMenuItem>
+            )}
+            {isOrgAdmin && !isAdminArea && (
+              <DropdownMenuItem onClick={() => { handleClose(); router.push("/org"); }} className="gap-2 cursor-pointer">
+                <Briefcase className="w-4 h-4" /> Organization
               </DropdownMenuItem>
             )}
             {!isAdminArea && (

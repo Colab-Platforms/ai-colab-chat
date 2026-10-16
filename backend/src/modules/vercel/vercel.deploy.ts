@@ -70,7 +70,7 @@ export interface VercelDeploymentRaw {
 
 /* ------------------------------------------------------------------ *
  * Serialisation: one deploy per project at a time, per process. A copy of
- * github.sync.ts's serialise() — importing it would couple the two features.
+ * github.sync.ts's serialise() importing it would couple the two features.
  * ------------------------------------------------------------------ */
 
 const queues = new Map<number, Promise<unknown>>();
@@ -101,7 +101,7 @@ function gitNotConnected() {
 
 function nameTaken(name: string, suggestion: string | null) {
   return Object.assign(
-    new ApiError(`The Vercel project name "${name}" is already taken — choose another`, STATUS_CODES.CONFLICT),
+    new ApiError(`The Vercel project name "${name}" is already taken choose another`, STATUS_CODES.CONFLICT),
     { code: "PROJECT_NAME_TAKEN", details: { suggestion } },
   );
 }
@@ -131,7 +131,7 @@ async function findProject(ctx: VercelCtx, idOrName: string): Promise<VercelProj
 
 /**
  * Whether `name` is free in the installation's scope. A project that is already
- * ours (`ownProjectId`) counts as free — redeploys reuse it.
+ * ours (`ownProjectId`) counts as free redeploys reuse it.
  */
 export async function checkName(
   ctx: VercelCtx,
@@ -215,7 +215,7 @@ export async function ensureVercelProject(
     return (await findProject(ctx, existing.id)) ?? existing;
   }
 
-  // Not linked yet, or the linked project was deleted on vercel.com — create.
+  // Not linked yet, or the linked project was deleted on vercel.com create.
   const createPath = "/v11/projects";
   const created = await vercelRaw<VercelProjectRaw>(createPath, {
     ...ctx,
@@ -244,8 +244,8 @@ export async function ensureVercelProject(
  * ------------------------------------------------------------------ */
 
 /**
- * Upserts every row in one call. Never throws for a rejected key — a bad env
- * var must not abort a deploy — and returns the failures as warnings instead.
+ * Upserts every row in one call. Never throws for a rejected key a bad env
+ * var must not abort a deploy and returns the failures as warnings instead.
  * Values are write-through: nothing is stored on our side.
  */
 export async function syncEnvVars(
@@ -284,7 +284,7 @@ export interface EncodedFiles {
 /**
  * CodeFile rows -> Vercel's inline `files`. Base64 so JSX, emoji and odd bytes
  * survive the JSON round trip. Every path goes through the workspace's own
- * normalizeCodePath — a `..` segment would be a write outside the build root.
+ * normalizeCodePath a `..` segment would be a write outside the build root.
  */
 export function encodeFiles(files: CodeFileSnapshot[]): EncodedFiles {
   const out: EncodedFiles["files"] = [];
@@ -313,7 +313,7 @@ export function encodeFiles(files: CodeFileSnapshot[]): EncodedFiles {
 
 // skipAutoDetectionConfirmation: without it Vercel 400s whenever its own
 // framework detection disagrees with the settings we send. forceNew: never
-// dedupe against an earlier identical deploy — the user pressed Deploy.
+// dedupe against an earlier identical deploy the user pressed Deploy.
 const CREATE_DEPLOYMENT_PATH = "/v13/deployments?forceNew=1&skipAutoDetectionConfirmation=1";
 
 export async function deployFiles(
@@ -394,7 +394,7 @@ export function withHttps(hostOrUrl: string | null | undefined): string | null {
 
 /**
  * The project's stable production URL, from GET /v9/projects. Null before the
- * first production deploy — `<name>.vercel.app` is NOT a safe guess, Vercel
+ * first production deploy `<name>.vercel.app` is NOT a safe guess, Vercel
  * suffixes it when that subdomain is taken globally.
  */
 export function productionUrlOf(project: VercelProjectRaw): string | null {

@@ -93,7 +93,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Must run before hydration — see features/code-workspace/lib/nodeboxErrorFilter.ts */}
+        {/* Must run before hydration see features/code-workspace/lib/nodeboxErrorFilter.ts */}
         <Script
           id="code-workspace-nodebox-error-filter"
           strategy="beforeInteractive"

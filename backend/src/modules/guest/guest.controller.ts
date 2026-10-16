@@ -24,7 +24,7 @@ const fail = (res: Response, error: any) => {
   );
 };
 
-/** POST /guest/session — start a trial for a logged-out visitor. */
+/** POST /guest/session start a trial for a logged-out visitor. */
 export const startSession = async (req: Request, res: Response) => {
   try {
     const result = await guestService.startSession(
@@ -38,7 +38,7 @@ export const startSession = async (req: Request, res: Response) => {
   }
 };
 
-/** GET /guest/status — remaining trial messages for the calling guest. */
+/** GET /guest/status remaining trial messages for the calling guest. */
 export const getStatus = async (req: Request, res: Response) => {
   try {
     const result = await guestService.getStatus(req.user!.id);
@@ -48,7 +48,7 @@ export const getStatus = async (req: Request, res: Response) => {
   }
 };
 
-/** GET /guest/config — limits and model list the trial UI needs. */
+/** GET /guest/config limits and model list the trial UI needs. */
 export const getConfig = async (req: Request, res: Response) => {
   try {
     const [models, ipMessagesLeft] = await Promise.all([
@@ -73,7 +73,7 @@ export const getConfig = async (req: Request, res: Response) => {
   }
 };
 
-/** POST /guest/merge — called with the NEW account's token after signup/login. */
+/** POST /guest/merge called with the NEW account's token after signup/login. */
 export const merge = async (req: Request, res: Response) => {
   try {
     const guestToken = req.body?.guestToken;

@@ -19,9 +19,9 @@ interface State {
  *
  * Only catches errors thrown while rendering. Sandpack's *async* failures
  * (e.g. Nodebox's unhandled stat rejection on Vite's temp config file) never
- * pass through React — those are handled by lib/nodeboxErrorFilter.ts.
+ * pass through React those are handled by lib/nodeboxErrorFilter.ts.
  *
- * Must be a class component — React has no hook equivalent for
+ * Must be a class component React has no hook equivalent for
  * `getDerivedStateFromError` / `componentDidCatch`.
  */
 export class PreviewErrorBoundary extends Component<Props, State> {
@@ -47,7 +47,7 @@ export class PreviewErrorBoundary extends Component<Props, State> {
           <AlertTriangle className="h-6 w-6 text-amber-500" />
           <p className="font-medium">The preview crashed.</p>
           <p className="max-w-sm text-xs text-muted-foreground">
-            This is a known instability in the in-browser bundler, not your project — your files are unaffected.
+            This is a known instability in the in-browser bundler, not your project your files are unaffected.
           </p>
           <Button size="sm" variant="outline" className="gap-1.5" onClick={this.reload}>
             <RotateCw className="h-3.5 w-3.5" /> Reload preview

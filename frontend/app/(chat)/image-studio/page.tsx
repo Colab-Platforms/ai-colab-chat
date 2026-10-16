@@ -49,7 +49,7 @@ interface MyImage {
 
 export default function ImageStudioPage() {
   const router = useRouter();
-  const { imageGenEnabled, restrictToFreeModels, loading: planLoading } = usePlanCapabilities();
+  const { imageGenEnabled, isModelLocked, org: planOrg, loading: planLoading } = usePlanCapabilities();
 
   const [models, setModels] = useState<ImageModel[]>([]);
   const [modelId, setModelId] = useState<number | null>(null);
@@ -143,10 +143,10 @@ export default function ImageStudioPage() {
       models.map((m) => ({
         value: m.id,
         label: m.name,
-        disabled: restrictToFreeModels && !m.isFreeModel,
-        hint: restrictToFreeModels && !m.isFreeModel ? "Paid" : undefined,
+        disabled: isModelLocked(m),
+        hint: isModelLocked(m) ? (planOrg ? "Not enabled" : "Paid") : undefined,
       })),
-    [models, restrictToFreeModels],
+    [models, isModelLocked, planOrg],
   );
 
   const canSubmit = Boolean(prompt.trim() && modelId && imageGenEnabled && !reference?.uploading);
@@ -155,7 +155,7 @@ export default function ImageStudioPage() {
    * Runs the same pipeline as an IMAGE_GENERATION turn in chat: create the
    * chat, park the first message in sessionStorage (exactly as NewChatPage
    * does) and let /c/[id] stream it. The aspect ratio travels as a prompt
-   * hint — the chat stream has no dedicated size parameter yet.
+   * hint the chat stream has no dedicated size parameter yet.
    */
   const generate = async (opts: {
     text: string;
@@ -323,7 +323,7 @@ export default function ImageStudioPage() {
         {tab === "templates" ? (
           <TemplateStrip templates={templates} expanded={expanded} variant="image" onPick={pickTemplate} />
         ) : mine.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No images yet — generate your first one above.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">No images yet generate your first one above.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {mine.map((img) => {

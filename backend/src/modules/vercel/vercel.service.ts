@@ -44,7 +44,7 @@ import {
 import { ensureWatched } from "./vercel.logs.js";
 
 /* ------------------------------------------------------------------ *
- * OAuth state — a signed, 10-minute JWT, exactly as github.service.ts.
+ * OAuth state a signed, 10-minute JWT, exactly as github.service.ts.
  * The callback arrives from Vercel with no Bearer header, so the user id has
  * to travel inside the state.
  * ------------------------------------------------------------------ */
@@ -79,14 +79,14 @@ function verifyState(state: string): VercelOauthState {
       redirectPath: sanitizeRedirectPath(decoded.redirectPath),
     };
   } catch {
-    throw Object.assign(new ApiError("Invalid or expired Vercel authorization — try connecting again", STATUS_CODES.BAD_REQUEST), {
+    throw Object.assign(new ApiError("Invalid or expired Vercel authorization try connecting again", STATUS_CODES.BAD_REQUEST), {
       code: "invalid_oauth_state",
     });
   }
 }
 
 /* ------------------------------------------------------------------ *
- * Shared lookups (every one is scoped by userId — never trust the body)
+ * Shared lookups (every one is scoped by userId never trust the body)
  * ------------------------------------------------------------------ */
 
 function assertConfigured() {
@@ -185,7 +185,7 @@ export function toDeploymentDto(row: DeploymentRow): VercelDeploymentDto {
 }
 
 /* ------------------------------------------------------------------ *
- * Status — polled every 2 s by the header. Never calls Vercel.
+ * Status polled every 2 s by the header. Never calls Vercel.
  * ------------------------------------------------------------------ */
 
 const NOT_CONFIGURED: VercelStatusDto = {
@@ -224,7 +224,7 @@ export async function getStatus(userId: number, projectId: number | null): Promi
         try {
           ensureWatched(active.id, ctxFor(connection!));
         } catch {
-          // Token unreadable — the next real action surfaces the reconnect prompt.
+          // Token unreadable the next real action surfaces the reconnect prompt.
         }
       }
     }
@@ -273,7 +273,7 @@ function avatarUrl(hash: string | null | undefined): string | null {
 
 /**
  * Vercel redirects the popup here after the user installs the integration.
- * Returns the frontend URL to send the popup to — success or a readable error,
+ * Returns the frontend URL to send the popup to success or a readable error,
  * never a raw exception page.
  *
  * `next` (also in the query) is deliberately ignored: it points back into
@@ -301,7 +301,7 @@ export async function handleCallback(query: {
     }
     if (!query.state) throw new ApiError("Missing authorization state", STATUS_CODES.BAD_REQUEST);
     const state = verifyState(query.state);
-    if (!query.code) throw new ApiError("Vercel did not return an authorization code — try again", STATUS_CODES.BAD_REQUEST);
+    if (!query.code) throw new ApiError("Vercel did not return an authorization code try again", STATUS_CODES.BAD_REQUEST);
 
     const token = await exchangeCodeForToken(query.code);
     // Trust the token exchange, not the query string, for scope.
@@ -352,7 +352,7 @@ export async function handleCallback(query: {
 
 /**
  * Removes the connection (links and deployment history cascade). Nothing on
- * Vercel is deleted — not the projects, not the live sites. The integration
+ * Vercel is deleted not the projects, not the live sites. The integration
  * install is removed best-effort so it doesn't linger in the user's dashboard.
  */
 export async function disconnect(userId: number) {
@@ -370,7 +370,7 @@ export async function disconnect(userId: number) {
       });
       revoked = true;
     } catch {
-      // Token already dead, or the scope is missing — disconnect locally anyway.
+      // Token already dead, or the scope is missing disconnect locally anyway.
     }
   }
   await prisma.vercelConnection.delete({ where: { id: connection.id } });
@@ -394,11 +394,11 @@ export async function detect(userId: number, projectId: number, source: "files" 
   const link = await prisma.vercelProjectLink.findUnique({ where: { projectId } });
 
   const detected = detectVercelConfig(await readFiles(projectId), project.framework);
-  // A Git deploy builds the repo, not these files — don't block on the editor's contents.
+  // A Git deploy builds the repo, not these files don't block on the editor's contents.
   if (source === "git" && !detected.deployable) {
     detected.deployable = true;
     detected.blockedReason = null;
-    detected.reason = "Couldn't detect a framework from this project's files — Vercel will detect it from the repo.";
+    detected.reason = "Couldn't detect a framework from this project's files Vercel will detect it from the repo.";
   }
 
   const suggestedName = link?.vercelProjectName ?? slugifyProjectName(project.title);
@@ -479,7 +479,7 @@ export async function unlinkProject(userId: number, projectId: number) {
 }
 
 /* ------------------------------------------------------------------ *
- * Deploy — pre-flight only. Everything that can fail with a code the UI
+ * Deploy pre-flight only. Everything that can fail with a code the UI
  * branches on happens here, before the controller opens the SSE stream.
  * ------------------------------------------------------------------ */
 
@@ -524,7 +524,7 @@ export async function startDeploy(userId: number, projectId: number, input: Depl
   const project = await requireOwnProject(userId, projectId);
   if (project.status === "GENERATING") {
     throw Object.assign(
-      new ApiError("The AI is still writing this project — publish it when it finishes", STATUS_CODES.CONFLICT),
+      new ApiError("The AI is still writing this project publish it when it finishes", STATUS_CODES.CONFLICT),
       { code: "PROJECT_GENERATING" },
     );
   }
@@ -657,13 +657,13 @@ export async function startDeploy(userId: number, projectId: number, input: Depl
   });
 }
 
-/** Redeploy with the link's stored settings — no dialog, no questions. */
+/** Redeploy with the link's stored settings no dialog, no questions. */
 export async function redeploy(userId: number, projectId: number, envVars: VercelEnvVarInput[]): Promise<StartedDeploy> {
   const link = await prisma.vercelProjectLink.findUnique({ where: { projectId } });
   if (!link) throw new ApiError("This project hasn't been published yet", STATUS_CODES.NOT_FOUND);
   const isGit = link.source === "GIT";
   if (isGit && (!link.gitRepoId || !link.gitOwner || !link.gitRepo)) {
-    throw new ApiError("This project's GitHub link is incomplete — publish it again from the Publish dialog", STATUS_CODES.BAD_REQUEST);
+    throw new ApiError("This project's GitHub link is incomplete publish it again from the Publish dialog", STATUS_CODES.BAD_REQUEST);
   }
   return startDeploy(userId, projectId, {
     source: isGit ? "git" : "files",

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
 import { getUserPlanContext, assertCanGenerateImage } from "@/modules/plan-access/planAccess.service.js";
+import { guardOrgModelAccess } from "@/modules/org/org.policy.service.js";
 import { createOpenRouterStream } from "@/utils/openrouter.js";
 import { estimateMessageTokens } from "@/utils/tokenCounter.js";
 import { checkPredefinedResponse } from "@/utils/predefinedResponses.js";
@@ -55,7 +56,7 @@ function isAbortError(error: any) {
 }
 
 /**
- * Wires a generation to the stop control — NOT to the browser connection.
+ * Wires a generation to the stop control NOT to the browser connection.
  *
  * This used to abort the generation whenever the client disconnected, so
  * navigating to another page, switching tab or a network blip stopped a
@@ -78,7 +79,7 @@ function setupClientAbortTracking(
   return () => abortController.signal.aborted;
 }
 
-/** POST /chats/:chatId/stop — the user pressed Stop. */
+/** POST /chats/:chatId/stop the user pressed Stop. */
 export async function stopChatGeneration(req: Request, res: Response) {
   const stopped = abortChatStreams(req.user!.id, Number(req.params.chatId));
   res.status(200).json({ status: true, data: { stopped }, message: "Stopped" });
@@ -93,7 +94,7 @@ async function touchChat(chatId: number) {
 
 // Debounced enqueue for the background context-distillation worker
 // (see crons/contextDistillation.ts). Only chats inside a folder have
-// shared project memory worth updating. Never throws — a failure here
+// shared project memory worth updating. Never throws a failure here
 // must not break the chat response it's attached to.
 async function maybeEnqueueDistillation(
   chatId: number,
@@ -309,7 +310,7 @@ async function buildAttachmentContentParts(
     const mime = att.mimeType;
 
     if (IMAGE_MIME_TYPES.includes(mime)) {
-      // Fetch image from Cloudinary and send as base64 — avoids URL fetch issues on OpenRouter
+      // Fetch image from Cloudinary and send as base64 avoids URL fetch issues on OpenRouter
       try {
         const dataUrl = await urlToBase64DataUrl(att.fileUrl, mime);
         parts.push({ type: "image_url", image_url: { url: dataUrl } });
@@ -619,9 +620,11 @@ async function checkTokenLimitsAndSetupStream(
 
   // Set a hard absolute upper limit of 10,000 raw tokens for generating tokens in a single response
   // Note: For models with multipliers, this could incur up to 30k billable tokens (e.g. 3x Opus)
-  // Code-workspace turns pass a higher cap (CODE_MAX_COMPLETION) — a whole
+  // Code-workspace turns pass a higher cap (CODE_MAX_COMPLETION) a whole
   // multi-file project does not fit in 10k tokens.
-  const ABSOLUTE_MAX_COMPLETION = absoluteMaxCompletion;
+  // Org seats may have a per-request response cap set by their role.
+  const orgCap = Number(res.locals?.orgCompletionCap) || Infinity;
+  const ABSOLUTE_MAX_COMPLETION = Math.min(absoluteMaxCompletion, orgCap);
 
   const maxCompletionTokens = Math.min(
     Math.max(1, maxAffordableTokens - currentHistoryTokens),
@@ -648,8 +651,8 @@ interface SendMessageBody {
  * Flattens a history entry's content to plain text.
  *
  * History content is either a bare string or the multipart array used for
- * attachments/images, so the document intent classifier — which only ever
- * reasons about words — needs the text parts pulled back out.
+ * attachments/images, so the document intent classifier which only ever
+ * reasons about words needs the text parts pulled back out.
  */
 function historyContentToText(content: any): string {
   if (typeof content === "string") return content;
@@ -975,6 +978,8 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
+    if (!(await guardOrgModelAccess(req, res, userId, model))) return;
+
     const isfreeModel = model.isFreeModel
 
     if (
@@ -991,7 +996,7 @@ export async function streamChat(req: Request, res: Response) {
       return;
     }
 
-    // Model choice itself isn't plan-restricted — any plan (including Free)
+    // Model choice itself isn't plan-restricted any plan (including Free)
     // may pick any model, gated purely by wallet balance: a paid model bills
     // real cost against tokensRemaining like normal, and once that hits zero
     // only free models (which bill $0) keep working. Image generation is
@@ -1189,7 +1194,7 @@ export async function streamChat(req: Request, res: Response) {
       console.log(
         `[DEBUG] Adding User Context (${contextStrings.length} items)`,
       );
-      const systemContent = `User context (personalisation — always keep in mind):\n${contextStrings.map((c: any) => `- ${c}`).join("\n")}`;
+      const systemContent = `User context (personalisation always keep in mind):\n${contextStrings.map((c: any) => `- ${c}`).join("\n")}`;
       conversationHistory.unshift(
         buildSystemMessage(systemContent, model.externalId),
       );
@@ -1271,7 +1276,7 @@ export async function streamChat(req: Request, res: Response) {
     // ---------------------------------------
 
     // -----------------------------------------------------------------------
-    // Document generation — pre-stream pass.
+    // Document generation pre-stream pass.
     //
     // Classifying BEFORE the answer streams is what stops the model from
     // refusing ("I can't create files, paste the text again") while the
@@ -1287,7 +1292,7 @@ export async function streamChat(req: Request, res: Response) {
       .map((m: any) => historyContentToText(m.content))
       .find((text: string) => text.trim().length > 0);
 
-    // Code workspace (Software Engineer assistant only) — decided before the
+    // Code workspace (Software Engineer assistant only) decided before the
     // token budget so the protocol prompt and project files are priced in.
     // A code turn replaces the document pipeline for this message.
     const codeTurn = isGuest
@@ -1379,7 +1384,7 @@ export async function streamChat(req: Request, res: Response) {
       const tTokens = pTokens + cTokens;
       const tokenMultiplierPre = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
       // No OpenRouter call happens for a predefined/canned response, so there's
-      // no real costUsd to report here — this always falls back to the
+      // no real costUsd to report here this always falls back to the
       // legacy multiplier math via computeBillableTokens's null-cost branch.
       const { billablePromptTokens: billablePromptPre, billableCompletionTokens: billableCompletionPre } =
         computeBillableTokens({
@@ -1933,7 +1938,7 @@ export async function streamChat(req: Request, res: Response) {
     // (the bubble finds its project card through it) and unlock the editor.
     if (codeSession) await codeSession.complete((res as any).modelResponseId);
 
-    // Document generation — enqueue pass. Intent was already resolved before
+    // Document generation enqueue pass. Intent was already resolved before
     // the stream (see prepareDocumentTurn above) and is handed back here, so
     // the classifier is never paid for twice in one turn. The enqueue itself
     // still has to wait for the answer, which is the document's source text.
@@ -1991,7 +1996,7 @@ export async function regenerateChat(req: Request, res: Response) {
     modelId: number;
     chatType?: string;
   };
-  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  // "CODE" (the code-workspace pill) is not a ModelCapability see resolveCodeChatType.
   const { chatType } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
@@ -2020,6 +2025,8 @@ export async function regenerateChat(req: Request, res: Response) {
         .json({ status: false, message: "Model not found or inactive" });
       return;
     }
+
+    if (!(await guardOrgModelAccess(req, res, userId, model))) return;
 
     const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
@@ -2084,7 +2091,7 @@ export async function regenerateChat(req: Request, res: Response) {
       userPreference?.enableFollowUpQuestions !== false;
 
     // Prepend the persona (assistant prompt, or the platform default for
-    // normal chats), then context memory on top — same order as streamChat.
+    // normal chats), then context memory on top same order as streamChat.
     let personaPromptRegen: string | null = null;
     if (chat.assistantId) {
       const chatAssistant = await prisma.assistant.findFirst({
@@ -2109,7 +2116,7 @@ export async function regenerateChat(req: Request, res: Response) {
     const contextStringsRegen = selectedContextsRegen.map((c: any) => c.memory);
 
     if (contextStringsRegen.length > 0) {
-      const systemContent = `User context (personalisation — always keep in mind):\n${contextStringsRegen.map((c: any) => `- ${c}`).join("\n")}`;
+      const systemContent = `User context (personalisation always keep in mind):\n${contextStringsRegen.map((c: any) => `- ${c}`).join("\n")}`;
       conversationHistory.unshift(
         buildSystemMessage(systemContent, model.externalId),
       );
@@ -2196,7 +2203,7 @@ export async function regenerateChat(req: Request, res: Response) {
       const tTokens = pTokens + cTokens;
       const tokenMultiplierRegen = model.tokenMultiplier ?? 1.0; // fallback only, for the rare case costUsd wasn't reported
       // No OpenRouter call happens for a predefined/canned response, so there's
-      // no real costUsd to report here — falls back to the legacy multiplier
+      // no real costUsd to report here falls back to the legacy multiplier
       // math via computeBillableTokens's null-cost branch.
       const { billablePromptTokens: billablePromptRegen, billableCompletionTokens: billableCompletionRegen } =
         computeBillableTokens({
@@ -2546,7 +2553,7 @@ export async function regenerateChat(req: Request, res: Response) {
     let finalCompletion = completionTokens;
     let finalTotal = promptTokens + completionTokens;
 
-    // The regenerate flow has no fresh user prompt of its own — reuse the
+    // The regenerate flow has no fresh user prompt of its own reuse the
     // user turn this assistant message is answering, same "prompt" a normal
     // send would have stored.
     const regeneratedPrompt =
@@ -2676,7 +2683,7 @@ export async function prepareMulti(req: Request, res: Response) {
     attachmentIds?: number[];
     chatType?: string;
   };
-  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  // "CODE" (the code-workspace pill) is not a ModelCapability see resolveCodeChatType.
   const isGuest = isGuestRequest(req);
   const chatType = isGuest ? "STANDARD" : resolveCodeChatType(requestedChatType).chatType;
 
@@ -2758,7 +2765,7 @@ export async function editAndResend(req: Request, res: Response) {
     modelId: number;
     chatType?: string;
   };
-  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  // "CODE" (the code-workspace pill) is not a ModelCapability see resolveCodeChatType.
   const { chatType } = resolveCodeChatType(requestedChatType);
   const abortController = new AbortController();
   const isClientAborted = setupClientAbortTracking(req, res, abortController);
@@ -2804,6 +2811,8 @@ export async function editAndResend(req: Request, res: Response) {
         .json({ status: false, message: "Model not found or inactive" });
       return;
     }
+
+    if (!(await guardOrgModelAccess(req, res, userId, model))) return;
 
     // Check wallet
     const usdPerToken = await getUsdPerToken();
@@ -3347,7 +3356,7 @@ export async function prepareEditMulti(req: Request, res: Response) {
     content: string;
     chatType?: string;
   };
-  // "CODE" (the code-workspace pill) is not a ModelCapability — see resolveCodeChatType.
+  // "CODE" (the code-workspace pill) is not a ModelCapability see resolveCodeChatType.
   const { chatType } = resolveCodeChatType(requestedChatType);
 
   try {
@@ -3480,6 +3489,8 @@ export async function continueChatStream(req: Request, res: Response) {
       return;
     }
 
+    if (!(await guardOrgModelAccess(req, res, userId, model))) return;
+
     const usdPerToken = await getUsdPerToken();
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
@@ -3593,7 +3604,7 @@ export async function continueChatStream(req: Request, res: Response) {
 
     // Push the continue prompt with context-aware instruction
     const continueInstruction = isInCodeBlock
-      ? "Continue the code block immediately. Do NOT start with triple backticks or the language name—you are already inside the block. Just resume the raw code character-by-character."
+      ? "Continue the code block immediately. Do NOT start with triple backticks or the language name you are already inside the block. Just resume the raw code character-by-character."
       : "Continue your response exactly where you left off. Do not repeat previous text and do not add any introductory framing. Just seamless continuation.";
 
     conversationHistory.push({ role: "user", content: continueInstruction });

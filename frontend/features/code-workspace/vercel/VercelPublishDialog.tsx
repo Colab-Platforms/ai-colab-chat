@@ -49,9 +49,9 @@ import {
 /** What the dialog was opened for. */
 export type PublishIntent =
   | { kind: "publish" }
-  /** "Deployment settings…" — straight to the config step with the saved settings. */
+  /** "Deployment settings…" straight to the config step with the saved settings. */
   | { kind: "settings" }
-  /** "Redeploy" — same settings, straight to the log console. */
+  /** "Redeploy" same settings, straight to the log console. */
   | { kind: "redeploy" }
   /** A refresh mid-build, a second tab, or "View logs". */
   | { kind: "attach"; deploymentId: string };
@@ -165,7 +165,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [envRows, setEnvRows] = useState<EnvRow[]>([]);
   const [nameError, setNameError] = useState<{ message: string; suggestion: string | null } | null>(null);
-  /** Which source the draft was last filled for — switching source re-fills it. */
+  /** Which source the draft was last filled for switching source re-fills it. */
   const prefilledFor = useRef<Source | null>(null);
 
   /* ---------------- repo ---------------- */
@@ -197,7 +197,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
   const deploying = step === "deploying" && !TERMINAL_STATES.includes(run.state) && !run.error;
 
   /* ================================================================ *
-   * Log buffering — a build can print hundreds of lines a second;
+   * Log buffering a build can print hundreds of lines a second;
    * batch them into one render per frame.
    * ================================================================ */
 
@@ -234,7 +234,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
         case "deploy_created":
           setRun((r) => ({ ...r, deploymentId: event.deploymentId, url: event.url, dashboardUrl: event.dashboardUrl ?? r.dashboardUrl }));
           onChanged();
-          // A workspace publish snapshots unsaved edits as a version — catch the v-chip up.
+          // A workspace publish snapshots unsaved edits as a version catch the v-chip up.
           if (!event.attached) void codeWorkspace.refreshProjectInfo();
           break;
         case "state":
@@ -293,7 +293,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
             return;
           case "DEPLOY_IN_PROGRESS":
             if (info.details.deploymentId) {
-              toast.info("A deployment is already running — showing it");
+              toast.info("A deployment is already running showing it");
               const id = info.details.deploymentId;
               void runStream((signal) => attachLogs(projectId, id, onEvent, signal), null);
               return;
@@ -324,7 +324,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
       setRun((r) =>
         TERMINAL_STATES.includes(r.state) || r.error
           ? r
-          : { ...r, error: "Lost the connection to the build. It keeps going on Vercel — the header shows when it finishes." },
+          : { ...r, error: "Lost the connection to the build. It keeps going on Vercel the header shows when it finishes." },
       );
       onChanged();
     },
@@ -406,7 +406,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
 
   useEffect(() => {
     return subscribePopupResult((result) => {
-      if (!awaitingRef.current) return; // not waiting on a Vercel window — stale or foreign
+      if (!awaitingRef.current) return; // not waiting on a Vercel window stale or foreign
       awaitingRef.current = false;
       setConnecting(false);
       try {
@@ -444,7 +444,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
     // treated as an unsolicited popup and blocked. Navigate it once the URL is known.
     const popup = window.open("", "vercel-connect", POPUP_FEATURES);
     if (!popup) {
-      setError("Your browser blocked the Vercel window — allow pop-ups for this site and try again.");
+      setError("Your browser blocked the Vercel window allow pop-ups for this site and try again.");
       return;
     }
     popupRef.current = popup;
@@ -651,7 +651,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
   }
 
   /* ================================================================ *
-   * Step: git-setup — Vercel's and GitHub's pages have no callback, so
+   * Step: git-setup Vercel's and GitHub's pages have no callback, so
    * closing the window re-enables the retry; the retry stays manual.
    * ================================================================ */
 
@@ -659,7 +659,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
     if (!url) return;
     const popup = window.open(url, "vercel-git-setup", POPUP_FEATURES);
     if (!popup) {
-      setError("Your browser blocked the window — allow pop-ups for this site and try again.");
+      setError("Your browser blocked the window allow pop-ups for this site and try again.");
       return;
     }
     setupPopupRef.current = popup;
@@ -715,13 +715,13 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
             <Triangle className="h-4 w-4 fill-current" /> {title}
           </DialogTitle>
           <DialogDescription>
-            {step === "connect" && "Put this project on a real URL. It deploys to your own Vercel account — you keep full control."}
+            {step === "connect" && "Put this project on a real URL. It deploys to your own Vercel account you keep full control."}
             {step === "choose" &&
               (status.connection?.accountName ? `Deploying to ${status.connection.accountName}${status.connection.isTeam ? " (team)" : ""}.` : "How should Vercel get this project?")}
             {step === "repo" && "Vercel builds from this repository and redeploys on every push."}
             {step === "configure" && "We detected these settings. Change anything you need."}
             {step === "git-setup" && "Vercel needs access to your GitHub account before it can build from a repository."}
-            {step === "deploying" && "Vercel is building your project. You can close this — it keeps going."}
+            {step === "deploying" && "Vercel is building your project. You can close this it keeps going."}
             {step === "done" && "Deployed to production on Vercel."}
           </DialogDescription>
         </DialogHeader>
@@ -746,7 +746,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
               {connecting ? "Waiting for Vercel…" : "Connect Vercel"}
             </Button>
             {connecting && (
-              <p className="text-center text-[11px] text-muted-foreground">Approve access in the Vercel window — this dialog continues on its own.</p>
+              <p className="text-center text-[11px] text-muted-foreground">Approve access in the Vercel window this dialog continues on its own.</p>
             )}
           </div>
         )}
@@ -806,7 +806,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
               )}
               {repos?.length === 0 && !reposLoading && (
                 <p className="p-3 text-xs text-muted-foreground">
-                  {query ? "No repositories match." : "No repositories are shared with the GitHub app yet — connect one from the GitHub button in the header."}
+                  {query ? "No repositories match." : "No repositories are shared with the GitHub app yet connect one from the GitHub button in the header."}
                 </p>
               )}
               {repos?.map((r) => {
@@ -858,7 +858,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
                 <div className="min-w-0 flex-1 space-y-1.5">
                   <p>
                     <span className="font-medium">{githubLink.owner}/{githubLink.repo}</span> is behind this project
-                    {versionsBehind > 0 ? ` by ${versionsBehind} version${versionsBehind === 1 ? "" : "s"}` : " (unsaved edits)"} — Vercel builds the repo, not the editor.
+                    {versionsBehind > 0 ? ` by ${versionsBehind} version${versionsBehind === 1 ? "" : "s"}` : " (unsaved edits)"} Vercel builds the repo, not the editor.
                   </p>
                   <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" disabled={pushing} onClick={() => void pushNow()}>
                     {pushing ? <Loader2 className="h-3 w-3 animate-spin" /> : <CloudUpload className="h-3 w-3" />} Push now
@@ -1013,7 +1013,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
                 <p className="text-[11px] text-muted-foreground">Rows without a value are skipped.</p>
               )}
               {status.link && envRows.length === 0 && (
-                <p className="text-[11px] text-muted-foreground">Variables you set before stay on Vercel — add a row only to add or change one.</p>
+                <p className="text-[11px] text-muted-foreground">Variables you set before stay on Vercel add a row only to add or change one.</p>
               )}
             </div>
 
@@ -1063,7 +1063,7 @@ export function VercelPublishDialog({ open, onOpenChange, intent, status, projec
             <DialogFooter className="gap-2 sm:gap-2">
               <Button variant="ghost" className="gap-1.5" onClick={() => setStep("configure")}><ArrowLeft className="h-3.5 w-3.5" /> Back</Button>
               <Button className="gap-1.5" disabled={setupPopupOpen || !lastBody.current} onClick={() => deploy(lastBody.current)}>
-                <Check className="h-3.5 w-3.5" /> I&apos;ve done this — Deploy again
+                <Check className="h-3.5 w-3.5" /> I&apos;ve done this Deploy again
               </Button>
             </DialogFooter>
           </div>

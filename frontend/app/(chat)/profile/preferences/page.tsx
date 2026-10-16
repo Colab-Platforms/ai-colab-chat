@@ -30,7 +30,7 @@ export default function PreferencesPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
 
-  // Multi-model layout lives in localStorage — the chat view reads the same key.
+  // Multi-model layout lives in localStorage the chat view reads the same key.
   const [multiView, setMultiView] = useState<"columns" | "focus">("columns");
   useEffect(() => {
     try {

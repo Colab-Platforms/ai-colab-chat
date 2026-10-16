@@ -14,7 +14,7 @@ const run = async (source: string) => {
 };
 
 const task = () => {
-  // Daily at 00:10 IST — before the 00:30 manual-expiry cron, so a plan's last
+  // Daily at 00:10 IST before the 00:30 manual-expiry cron, so a plan's last
   // due month is still granted before the plan is expired.
   cron.schedule("10 0 * * *", () => run("daily"), { timezone: "Asia/Kolkata" });
 

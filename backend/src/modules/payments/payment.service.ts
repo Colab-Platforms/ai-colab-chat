@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import { assertNotOrgSeat } from "@/modules/org/org.policy.service.js";
 import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
@@ -8,11 +9,13 @@ import PaymentCashfreeService from "./payment.cashfree.service.js";
 import BillingService from "@/modules/billing/billing.service.js";
 import InvoiceService from "@/modules/billing/invoice.service.js";
 import { grantStateFor, nextGrantDate } from "@/modules/subscription/yearly-grant.service.js";
+import OrgBillingService from "@/modules/org/org.billing.service.js";
 
 class PaymentService {
   private cashfreeService = new PaymentCashfreeService();
   private billingService = new BillingService();
   private invoiceService = new InvoiceService();
+  private orgBilling = new OrgBillingService();
 
   private normalizePhone(phoneNumber: string | null | undefined): string {
     const digits = String(phoneNumber ?? "").replace(/\D/g, "");
@@ -33,6 +36,7 @@ class PaymentService {
   }
 
   async createSubscriptionOneTimePayment(userId: number, data: { planId: number; billingCycle: "MONTHLY" | "QUARTERLY" | "YEARLY" }) {
+    await assertNotOrgSeat(userId);
     const now = new Date();
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -40,7 +44,7 @@ class PaymentService {
     }
 
     const plan = await prisma.plan.findFirst({
-      where: { id: data.planId, isActive: true, isDeleted: false },
+      where: { id: data.planId, isActive: true, isDeleted: false, isEnterprise: false },
     });
     if (!plan) {
       throw new ApiError("Plan not found", STATUS_CODES.NOT_FOUND);
@@ -57,7 +61,7 @@ class PaymentService {
       throw new ApiError("Plan is not payable via one-time payment", STATUS_CODES.CONFLICT);
     }
 
-    // Plan prices are stored tax-exclusive — this is the actual "Subscribe"/
+    // Plan prices are stored tax-exclusive this is the actual "Subscribe"/
     // "Upgrade" charging path (the recurring Subscriptions API flow in
     // subscription.cashfree.service.ts is only reached for the free plan and
     // AutoPay re-enable), so GST goes on top here, same rate top-ups already
@@ -157,12 +161,13 @@ class PaymentService {
   }
 
   /**
-   * Pay-as-you-go video-credit top-up — a standalone Cashfree order with no
+   * Pay-as-you-go video-credit top-up a standalone Cashfree order with no
    * subscriptionId, distinguished from a plan purchase by the "credittopup_"
    * order-id prefix and Payment.purpose. Reuses the same one-time-order
    * plumbing as createSubscriptionOneTimePayment.
    */
   async createCreditTopUp(userId: number, amountInr: number) {
+    await assertNotOrgSeat(userId);
     if (!Number.isFinite(amountInr) || amountInr <= 0) {
       throw new ApiError("Top-up amount must be a positive number", STATUS_CODES.BAD_REQUEST);
     }
@@ -326,6 +331,12 @@ class PaymentService {
       return result;
     }
 
+    if (String(orderId).startsWith("orgbill_")) {
+      const result = await this.orgBilling.handleCashfreeWebhook(String(orderId), normalizedPaymentId, success, failed);
+      await this.billingService.markWebhookEvent(webhookEvent?.id, "PROCESSED");
+      return result;
+    }
+
     if (!String(orderId).startsWith("subpay_")) {
       return { ignored: true, reason: "Not a subscription one-time order" };
     }
@@ -349,7 +360,7 @@ class PaymentService {
       const tokenLimit = subscription.plan.tokenLimit;
 
       // Reuse the PENDING Payment row created at checkout (createSubscriptionOneTimePayment)
-      // rather than recomputing from plan.monthlyPrice here — that would silently drop the
+      // rather than recomputing from plan.monthlyPrice here that would silently drop the
       // GST already added on top and record/invoice the pre-tax base price as if it were
       // the full charge, which doesn't match what Cashfree actually collected.
       const pendingPayment = await prisma.payment.findFirst({
@@ -441,7 +452,7 @@ class PaymentService {
 
         // Every one-time-payment order creates a fresh PENDING subscription (there's no
         // auto-renew on this flow), so reaching here always means an explicit plan
-        // purchase/switch by the user — carry forward unused tokens instead of wiping them.
+        // purchase/switch by the user carry forward unused tokens instead of wiping them.
         const isPlanSwitch = currentSub.status !== "ACTIVE";
 
         if (!isPlanSwitch && existingWallet && existingWallet.tokensRemaining > 0) {

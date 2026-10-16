@@ -296,7 +296,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       const res = await assistantService.list({
         isActive: "true",
         page: pageNum.toString(),
-        // The sidebar lists every active assistant — no "load more".
+        // The sidebar lists every active assistant no "load more".
         pageSize: "100",
       });
       const result = res.data.data;
@@ -394,7 +394,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
       localStorage.getItem("signup_free_plan_prompt_seen") === "1";
     if (!pendingSignup || seenSignup) return;
 
-    // Check if used already has a paid subscription — if so, silently clear the
+    // Check if used already has a paid subscription if so, silently clear the
     // flag without showing the free-plan modal (e.g. user paid during signup).
     subscriptionService
       .getCurrent()
@@ -406,7 +406,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
           Number(current.plan?.monthlyPrice ?? 0) > 0;
 
         if (isPaid) {
-          // Already on a paid plan — dismiss silently.
+          // Already on a paid plan dismiss silently.
           localStorage.removeItem("signup_free_plan_prompt_pending");
           localStorage.setItem("signup_free_plan_prompt_seen", "1");
           window.dispatchEvent(new Event("ai-colab:plan-popup-handled"));
@@ -605,7 +605,7 @@ export function ChatLayoutView({ children }: { children: React.ReactNode }) {
     router.replace("/");
   }, [logout, router]);
 
-  /** Folders + chat list — assistants are refreshed only via dedicated events. */
+  /** Folders + chat list assistants are refreshed only via dedicated events. */
   const handleSidebarRefresh = useCallback(() => {
     fetchFolders();
     window.dispatchEvent(

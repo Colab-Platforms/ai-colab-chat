@@ -277,6 +277,50 @@ export const demoRequestService = {
   delete: (id: number) => api.delete(`/demo-requests/${id}`),
 };
 
+export const orgAdminService = {
+  list: (params?: Record<string, string>) => api.get("/admin/orgs", { params }),
+  get: (id: number) => api.get(`/admin/orgs/${id}`),
+  create: (data: Record<string, unknown>) => api.post("/admin/orgs", data),
+  setStatus: (id: number, status: "ACTIVE" | "SUSPENDED") =>
+    api.patch(`/admin/orgs/${id}/status`, { status }),
+  activate: (id: number) => api.post(`/admin/orgs/${id}/activate`),
+  bills: (id: number) => api.get(`/admin/orgs/${id}/bills`),
+  close: (id: number) => api.post(`/admin/orgs/${id}/close`, { confirmOrgId: id }),
+  markBillPaid: (id: number, billId: number, reference: string) =>
+    api.post(`/admin/orgs/${id}/bills/${billId}/mark-paid`, { reference }),
+};
+
+export const orgService = {
+  me: () => api.get("/org/me"),
+  listMembers: (params?: Record<string, string>) => api.get("/org/members", { params }),
+  updateMember: (id: number, data: Record<string, unknown>) => api.patch(`/org/members/${id}`, data),
+  removeMember: (id: number) => api.delete(`/org/members/${id}`),
+  topUpMember: (id: number, tokens: number) => api.post(`/org/members/${id}/topup`, { tokens }),
+  memberUsage: (id: number, days = 30) => api.get(`/org/members/${id}/usage`, { params: { days } }),
+  listInvites: () => api.get("/org/invites"),
+  invite: (invites: { email: string; orgRoleId: number; memberRole: "ADMIN" | "MEMBER"; takesSeat?: boolean }[]) =>
+    api.post("/org/invites", { invites }),
+  revokeInvite: (id: number) => api.delete(`/org/invites/${id}`),
+  listRoles: () => api.get("/org/roles"),
+  createRole: (data: Record<string, unknown>) => api.post("/org/roles", data),
+  updateRole: (id: number, data: Record<string, unknown>) => api.patch(`/org/roles/${id}`, data),
+  deleteRole: (id: number) => api.delete(`/org/roles/${id}`),
+  overview: () => api.get("/org/overview"),
+  usage: (days: number) => api.get("/org/usage", { params: { days } }),
+  exportUsage: (days: number) => api.get("/org/usage/export", { params: { days }, responseType: "blob" }),
+  audit: (params?: Record<string, string>) => api.get("/org/audit", { params }),
+  settings: () => api.get("/org/settings"),
+  updateSettings: (data: Record<string, unknown>) => api.patch("/org/settings", data),
+  transferOwnership: (memberId: number) => api.post("/org/transfer-ownership", { memberId }),
+  billing: () => api.get("/org/billing"),
+  seatPreview: (seats: number) => api.get("/org/billing/seat-preview", { params: { seats } }),
+  changeSeats: (seats: number) => api.post("/org/billing/seats", { seats }),
+  payBill: (id: number) => api.post(`/org/billing/bills/${id}/pay`),
+  previewInvite: (token: string) => api.get(`/org/invites/${token}`),
+  acceptInvite: (token: string, data: { firstName: string; lastName: string; password: string }) =>
+    api.post(`/org/invites/${token}/accept`, data),
+};
+
 export const voiceService = {
   createSession: (voiceId?: string, chatId?: number, attachmentIds?: number[]) =>
     api.post("/voice/session", { voiceId, chatId, attachmentIds }),

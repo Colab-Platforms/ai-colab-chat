@@ -29,11 +29,11 @@ export const PREVIEWABLE_FRAMEWORKS: ReadonlySet<CodeFramework> = new Set([
 ]);
 
 /**
- * NEW  — scaffold a fresh project.
- * EDIT — change the chat's current project.
- * ASK  — a question about the current project; answered in chat with the
+ * NEW  scaffold a fresh project.
+ * EDIT change the chat's current project.
+ * ASK  a question about the current project; answered in chat with the
  *        files attached as read-only context, no files are written.
- * NONE — an ordinary chat turn.
+ * NONE an ordinary chat turn.
  */
 export type CodeIntentKind = "NEW" | "EDIT" | "ASK" | "NONE";
 
@@ -49,7 +49,7 @@ export interface CodeFileSnapshot {
   content: string;
 }
 
-/** Hard limits — a runaway model must not be able to fill the database. */
+/** Hard limits a runaway model must not be able to fill the database. */
 export const MAX_FILES_PER_PROJECT = 80;
 export const MAX_FILE_CHARS = 200_000;
 export const MAX_PATH_CHARS = 200;

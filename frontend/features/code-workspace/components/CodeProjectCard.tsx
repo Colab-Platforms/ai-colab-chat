@@ -18,7 +18,7 @@ const FRAMEWORK_LABEL: Record<string, string> = {
   other: "Project",
 };
 
-/** The card under a code turn's answer — reopens the panel, downloads the ZIP. */
+/** The card under a code turn's answer reopens the panel, downloads the ZIP. */
 export function CodeProjectCard({ turn }: { turn: CodeTurnInfo }) {
   const [zipping, setZipping] = useState(false);
   const panelShowsThis = useCodeWorkspace((s) => s.isOpen && s.project?.id === turn.projectId);

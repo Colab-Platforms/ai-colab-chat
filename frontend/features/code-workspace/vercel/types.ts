@@ -1,4 +1,4 @@
-// Mirrors backend/src/modules/vercel/vercel.types.ts (DTOs only — the Vercel token never reaches the browser).
+// Mirrors backend/src/modules/vercel/vercel.types.ts (DTOs only the Vercel token never reaches the browser).
 
 export type VercelSource = "FILES" | "GIT";
 export type DeployState = "QUEUED" | "INITIALIZING" | "BUILDING" | "READY" | "ERROR" | "CANCELED";
@@ -56,7 +56,7 @@ export interface VercelDeploymentDto {
 
 /** GET /api/vercel/status */
 export interface VercelStatusDto {
-  /** False when the server has no Vercel credentials — the button is hidden entirely. */
+  /** False when the server has no Vercel credentials the button is hidden entirely. */
   configured: boolean;
   connected: boolean;
   connection: VercelConnectionDto | null;
@@ -179,7 +179,7 @@ function str(value: unknown): string | null {
 }
 
 /**
- * The parts of an axios error (or a stream error shaped like one — see
+ * The parts of an axios error (or a stream error shaped like one see
  * deployStream.ts) the Vercel UI cares about. URLs are allowlisted: we only
  * ever open Vercel's or GitHub's own pages that the backend handed us.
  */

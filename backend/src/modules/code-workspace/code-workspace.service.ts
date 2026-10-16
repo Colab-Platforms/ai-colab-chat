@@ -35,7 +35,7 @@ function requirePath(raw: unknown): string {
  * Used by the chat stream (code-workspace.chat.ts)
  * ------------------------------------------------------------------ */
 
-/** The project the chat is working on — the most recently touched one. */
+/** The project the chat is working on the most recently touched one. */
 export async function findActiveProject(chatId: number, userId: number) {
   return prisma.codeProject.findFirst({
     where: { chatId, userId, isDeleted: false },
@@ -67,7 +67,7 @@ export async function setProjectStatus(projectId: number, status: "GENERATING" |
   await prisma.codeProject.update({ where: { id: projectId }, data: { status } });
 }
 
-/** AI write — no ownership check (the chat turn already verified the chat). */
+/** AI write no ownership check (the chat turn already verified the chat). */
 export async function writeFile(projectId: number, path: string, content: string) {
   await prisma.codeFile.upsert({
     where: { projectId_path: { projectId, path } },
@@ -102,7 +102,7 @@ export async function readFiles(projectId: number): Promise<CodeFileSnapshot[]> 
 
 /**
  * Records the project's current files as the next version. Also refreshes
- * `previewable` from the files that actually exist — a "react" project the
+ * `previewable` from the files that actually exist a "react" project the
  * model wrote without a package.json/index.html cannot run in Sandpack.
  */
 export async function snapshotVersion(
@@ -150,7 +150,7 @@ export async function snapshotUserEditsIfDirty(projectId: number) {
 }
 
 /* ------------------------------------------------------------------ *
- * REST (code-workspace.controller.ts) — every call checks ownership
+ * REST (code-workspace.controller.ts) every call checks ownership
  * ------------------------------------------------------------------ */
 
 async function requireProject(userId: number, projectId: number) {
@@ -164,7 +164,7 @@ async function requireProject(userId: number, projectId: number) {
 
 function assertNotGenerating(status: string) {
   if (status === "GENERATING") {
-    throw new ApiError("The AI is still writing this project — try again when it finishes", STATUS_CODES.CONFLICT);
+    throw new ApiError("The AI is still writing this project try again when it finishes", STATUS_CODES.CONFLICT);
   }
 }
 

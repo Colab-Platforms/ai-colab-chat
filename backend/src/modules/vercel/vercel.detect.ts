@@ -2,8 +2,8 @@ import type { CodeFileSnapshot } from "@/modules/code-workspace/code-workspace.t
 import type { DetectedConfig, VercelFramework } from "./vercel.types.js";
 
 /**
- * Works out Vercel build settings from a project's files. Pure — no network,
- * no Prisma — so /detect and the deploy itself both run it, and
+ * Works out Vercel build settings from a project's files. Pure no network,
+ * no Prisma so /detect and the deploy itself both run it, and
  * vercel.detect.check.ts can test it.
  *
  * Every command defaults to null ("let Vercel decide"), which is right almost
@@ -12,7 +12,7 @@ import type { DetectedConfig, VercelFramework } from "./vercel.types.js";
  * can show the user something real, and for the override case.
  *
  * Sibling heuristic: frontend/features/code-workspace/lib/sandpack.ts reads the
- * same package.json for the *preview*. It is deliberately not shared — that
+ * same package.json for the *preview*. It is deliberately not shared that
  * code rewrites package.json for Nodebox (pinning vite@4.1.4), where a deploy
  * must keep the project's real versions. Keep the two in mind together.
  */
@@ -35,7 +35,7 @@ function parsePackageJson(content: string | undefined): PackageJson | null {
   }
 }
 
-/** First match wins — meta-frameworks before the bundlers they're built on. */
+/** First match wins meta-frameworks before the bundlers they're built on. */
 const FRAMEWORK_RULES: { test: (has: (dep: string) => boolean, deps: string[]) => boolean; framework: VercelFramework; label: string; output: string | null }[] = [
   { test: (has) => has("next"), framework: "nextjs", label: "Next.js", output: null },
   { test: (has) => has("@remix-run/dev"), framework: "remix", label: "Remix", output: null },
@@ -53,7 +53,7 @@ const FRAMEWORK_RULES: { test: (has: (dep: string) => boolean, deps: string[]) =
   { test: (has) => has("preact"), framework: "preact", label: "Preact", output: "dist" },
 ];
 
-/** Built-ins every bundler provides — never worth an env row. */
+/** Built-ins every bundler provides never worth an env row. */
 const BUILTIN_ENV = new Set(["NODE_ENV", "MODE", "BASE_URL", "DEV", "PROD", "SSR", "PORT", "PUBLIC_URL"]);
 const MAX_SUGGESTED_ENV = 20;
 
@@ -82,8 +82,8 @@ function nodeVersionFrom(engines: string | undefined): string | null {
 const ENTRY_FILES = ["package.json", "index.html", "vercel.json"];
 
 /**
- * Where the app lives: the repo root, or — for a project pulled from a
- * monorepo-shaped repo — the single top-level folder holding the entry files.
+ * Where the app lives: the repo root, or for a project pulled from a
+ * monorepo-shaped repo the single top-level folder holding the entry files.
  */
 function findRoot(paths: Set<string>): string | null {
   if (ENTRY_FILES.some((f) => paths.has(f))) return null;
@@ -134,7 +134,7 @@ export function detectVercelConfig(files: CodeFileSnapshot[], projectFramework: 
 
   // Something Vercel can serve: a recognised web build, a plain HTML site, or a
   // project that brought its own vercel.json. This is what keeps an Express
-  // server (framework "node", no index.html, no build) from a doomed build —
+  // server (framework "node", no index.html, no build) from a doomed build  
   // without blocking a Node project that does ship a vercel.json.
   const deployable = (!!buildScript && !!rule) || indexHtml || vercelJson;
   if (!deployable) {
@@ -179,7 +179,7 @@ export function detectVercelConfig(files: CodeFileSnapshot[], projectFramework: 
     blockedReason: null,
     reason: buildScript
       ? `No framework detected${where}; Vercel will run the build script and serve its output.`
-      : `Static site${where} — index.html is served as-is, no build step.`,
+      : `Static site${where} index.html is served as-is, no build step.`,
     suggestedEnvKeys,
   };
 }
@@ -202,7 +202,7 @@ export function slugifyProjectName(title: string): string {
   return slug || "my-project";
 }
 
-/** Same rules, as a check — mirrored by the Joi schema. */
+/** Same rules, as a check mirrored by the Joi schema. */
 export function isValidProjectName(name: string): boolean {
   return /^[a-z0-9][a-z0-9._-]{0,99}$/.test(name) && !name.includes("---");
 }

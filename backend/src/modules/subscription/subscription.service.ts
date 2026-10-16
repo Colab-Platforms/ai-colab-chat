@@ -1,4 +1,5 @@
 import prisma from "@root/prisma.js";
+import { assertNotOrgSeat } from "@/modules/org/org.policy.service.js";
 import dayjs from "dayjs";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
@@ -12,7 +13,7 @@ class SubscriptionService {
     private static readonly PENDING_AUTH_WINDOW_MINUTES = Number(process.env.SUBSCRIPTION_PENDING_AUTH_WINDOW_MINUTES ?? 15);
 
     /**
-     * Plan prices are stored tax-exclusive — this is the live rate GST gets
+     * Plan prices are stored tax-exclusive this is the live rate GST gets
      * added at the point of actually charging Cashfree (same CreditPricingConfig
      * row credit top-ups already read). Falls back to 18% only if the config
      * row is somehow missing.
@@ -63,6 +64,7 @@ class SubscriptionService {
     }
 
     async create(userId: number, data: CreateSubscriptionBody) {
+        await assertNotOrgSeat(userId);
         const now = new Date();
         const user = await prisma.user.findUnique({
             where: { id: userId },
@@ -73,7 +75,7 @@ class SubscriptionService {
         }
 
         const plan = await prisma.plan.findFirst({
-            where: { id: data.planId, isActive: true, isDeleted: false },
+            where: { id: data.planId, isActive: true, isDeleted: false, isEnterprise: false },
         });
 
         if (!plan) {
@@ -211,7 +213,7 @@ class SubscriptionService {
                     meta: { reason: "FREE_PLAN_ACTIVATION", planId: plan.id, planName: plan.name },
                 });
 
-                // Bundled video credits reset (overwrite) to this plan's grant —
+                // Bundled video credits reset (overwrite) to this plan's grant  
                 // unlike tokens above, they never carry forward across a switch.
                 await creditBundledCredits(tx, {
                     userId,
@@ -391,6 +393,7 @@ class SubscriptionService {
     }
 
     async enableAutoPay(userId: number, data: CreateSubscriptionBody) {
+        await assertNotOrgSeat(userId);
         const user = await prisma.user.findUnique({
             where: { id: userId },
         });
@@ -399,7 +402,7 @@ class SubscriptionService {
         }
 
         const plan = await prisma.plan.findFirst({
-            where: { id: data.planId, isActive: true, isDeleted: false },
+            where: { id: data.planId, isActive: true, isDeleted: false, isEnterprise: false },
         });
         if (!plan) {
             throw new ApiError("Plan not found", STATUS_CODES.NOT_FOUND);

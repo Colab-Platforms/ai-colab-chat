@@ -116,7 +116,7 @@ export default function ChatPage() {
         if (!cancelled && res.data?.data?.items) setVideos(res.data.data.items);
       })
       .catch(() => {
-        /* no videos yet, or a transient failure — either way, start empty */
+        /* no videos yet, or a transient failure either way, start empty */
       });
     return () => {
       cancelled = true;
@@ -575,7 +575,7 @@ export default function ChatPage() {
                 );
               } else if (parsed.type === "document_started") {
                 // Generation outlives this SSE connection, so we only attach a
-                // PENDING placeholder here — DocumentCard polls it to completion
+                // PENDING placeholder here DocumentCard polls it to completion
                 // on its own, leaving the user free to keep chatting.
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -758,7 +758,7 @@ export default function ChatPage() {
     try {
       const controller = createStreamAbortController();
       if (isUnpersisted) {
-        // Nothing was ever saved for this turn — resend fresh, reusing the
+        // Nothing was ever saved for this turn resend fresh, reusing the
         // same local bubble ids so the UI doesn't jump.
         await streamSingleModel(
           newModelId,
@@ -859,7 +859,7 @@ export default function ChatPage() {
       setIsStreaming(false);
       return;
     }
-    // "CODE" (code-workspace pill) is sent for this turn only — it is not a
+    // "CODE" (code-workspace pill) is sent for this turn only it is not a
     // capability and must not be saved on the chat.
     const capability = chatType === "CODE" ? "STANDARD" : chatType;
     if (capability) {
@@ -1003,7 +1003,7 @@ export default function ChatPage() {
         syncChatAfterStop();
       } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
         // Nothing was persisted server-side yet (the balance check runs
-        // before the turn's messages are created) — keep the local bubble
+        // before the turn's messages are created) keep the local bubble
         // so the user can still choose to switch to a free model or upgrade.
         setMessages((prev) =>
           prev.map((msg) =>
@@ -1661,7 +1661,7 @@ export default function ChatPage() {
         onGenerateVideoClick={() => setVideoDialogOpen(true)}
         onEnhancePrompt={handleEnhancePrompt}
         // Also "sending" while the server is still generating a reply this page
-        // did not start (came back after leaving) — so the Stop button shows.
+        // did not start (came back after leaving) so the Stop button shows.
         isSending={isSending || awaitingServerResult}
         onStopStreaming={stopStreaming}
         initialPrompt={initialPrompt}

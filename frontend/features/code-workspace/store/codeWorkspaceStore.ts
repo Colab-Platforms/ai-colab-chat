@@ -16,7 +16,7 @@ import type {
  * Streaming performance is the whole design here: a project arrives as
  * thousands of tiny deltas. File *content* is therefore kept outside React
  * state in `contents`, and deltas are pushed straight to the Monaco editor
- * through `subscribeDeltas` — no re-render per token. React state (`state`)
+ * through `subscribeDeltas` no re-render per token. React state (`state`)
  * only changes on structural events: a file starts/ends, the panel opens,
  * the view toggles, a save finishes.
  */
@@ -35,7 +35,7 @@ export interface CodeWorkspaceState {
   saveState: "idle" | "saving" | "saved" | "error";
   /** Bumped when content changes by anything other than stream deltas or typing (load, restore). */
   contentRevision: number;
-  /** Bumped on every content change — drives the (debounced) preview refresh. */
+  /** Bumped on every content change drives the (debounced) preview refresh. */
   editRevision: number;
 }
 
@@ -63,7 +63,7 @@ const contents = new Map<string, string>();
 const listeners = new Set<() => void>();
 const deltaListeners = new Set<DeltaListener>();
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
-/** Paths the current AI turn has written — a late project fetch must not clobber them. */
+/** Paths the current AI turn has written a late project fetch must not clobber them. */
 let turnTouched = new Set<string>();
 let loadSeq = 0;
 
@@ -87,7 +87,7 @@ function rememberOpen(project: CodeProjectInfo | null) {
     if (project) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ projectId: project.id, chatId: project.chatId }));
     else sessionStorage.removeItem(SESSION_KEY);
   } catch {
-    // storage disabled — the panel just won't survive a reload
+    // storage disabled the panel just won't survive a reload
   }
 }
 
@@ -142,7 +142,7 @@ async function loadProject(projectId: number): Promise<boolean> {
     const dto = await codeWorkspaceApi.getProject(projectId);
     if (seq !== loadSeq) return false;
     if (state.isGenerating && state.project?.id === projectId) {
-      // An AI edit is streaming into this project right now — fill in only
+      // An AI edit is streaming into this project right now fill in only
       // the files it has not rewritten yet.
       const files = { ...state.files };
       for (const f of dto.files) {
@@ -380,7 +380,7 @@ export const codeWorkspace = {
   },
 
   /**
-   * Re-reads only the project's metadata — e.g. currentVersion after the server
+   * Re-reads only the project's metadata e.g. currentVersion after the server
    * snapshotted the user's edits for a Vercel publish. File contents are left
    * alone, so it is safe while the user is still typing.
    */
@@ -391,7 +391,7 @@ export const codeWorkspace = {
       const dto = await codeWorkspaceApi.getProject(project.id);
       if (state.project?.id === dto.id && !state.isGenerating) set({ project: toInfo(dto) });
     } catch {
-      // Decoration only — the version chip catches up on the next load.
+      // Decoration only the version chip catches up on the next load.
     }
   },
 

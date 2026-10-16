@@ -8,7 +8,7 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { subscriptionService } from "@/lib/services";
+import { subscriptionService, orgService } from "@/lib/services";
 import { useAuth } from "@/context/auth-context";
 
 interface PlanCapabilities {
@@ -18,28 +18,42 @@ interface PlanCapabilities {
   imageGenEnabled: boolean;
   videoGenEnabled: boolean;
   monthlyVideoCredits: number;
+  // Enterprise seats: capabilities come from the org role instead of a plan.
+  codeWorkspaceEnabled: boolean;
+  voiceEnabled: boolean;
+  org: { name: string; roleName: string; active: boolean } | null;
+  orgModelPolicy: { mode: "ALL" | "ALLOWLIST" | "BLOCKLIST"; modelIds: number[] } | null;
+  /** True when this model can't be picked (plan free-only limit, or the org role's model policy). */
+  isModelLocked: (model: { id: number; isFreeModel?: boolean }) => boolean;
   loading: boolean;
   refresh: () => void;
 }
 
-// Free-plan-shaped defaults — used while loading and if the request fails,
+type CapState = Omit<PlanCapabilities, "refresh" | "isModelLocked">;
+
+// Free-plan-shaped defaults used while loading and if the request fails,
 // so a lock icon flickering to "unlocked" never happens: worst case a paid
 // user briefly sees things as locked, never the other way around.
-const DEFAULTS: Omit<PlanCapabilities, "refresh"> = {
+const DEFAULTS: CapState = {
   planName: null,
   restrictToFreeModels: true,
   documentGenEnabled: true,
   imageGenEnabled: false,
   videoGenEnabled: false,
   monthlyVideoCredits: 0,
+  codeWorkspaceEnabled: true,
+  voiceEnabled: true,
+  org: null,
+  orgModelPolicy: null,
   loading: true,
 };
 
 const PlanCapabilitiesContext = createContext<PlanCapabilities | undefined>(undefined);
 
 export function PlanCapabilitiesProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
-  const [state, setState] = useState<Omit<PlanCapabilities, "refresh">>(DEFAULTS);
+  const { token, user } = useAuth();
+  const isOrgSeat = user?.orgMembership?.status === "ACTIVE" && user.orgMembership.takesSeat !== false;
+  const [state, setState] = useState<CapState>(DEFAULTS);
 
   const fetchCapabilities = useCallback(async () => {
     if (!token) {
@@ -47,6 +61,30 @@ export function PlanCapabilitiesProvider({ children }: { children: ReactNode }) 
       return;
     }
     try {
+      if (isOrgSeat) {
+        const org = (await orgService.me())?.data?.data;
+        const c = org?.capabilities;
+        if (org && c) {
+          setState({
+            planName: org.organization?.name ?? null,
+            restrictToFreeModels: false,
+            documentGenEnabled: c.documentGenEnabled !== false,
+            imageGenEnabled: Boolean(c.imageGenEnabled),
+            videoGenEnabled: Boolean(c.videoGenEnabled),
+            monthlyVideoCredits: Number(c.monthlyVideoCredits ?? 0),
+            codeWorkspaceEnabled: Boolean(c.codeWorkspaceEnabled),
+            voiceEnabled: Boolean(c.voiceEnabled),
+            org: {
+              name: org.organization?.name ?? "",
+              roleName: org.role?.name ?? "",
+              active: Boolean(org.subscriptionActive),
+            },
+            orgModelPolicy: c.modelPolicy ?? null,
+            loading: false,
+          });
+          return;
+        }
+      }
       const res = await subscriptionService.getCurrent();
       const plan = res?.data?.data?.subscription?.plan;
       if (!plan) {
@@ -60,19 +98,36 @@ export function PlanCapabilitiesProvider({ children }: { children: ReactNode }) 
         imageGenEnabled: Boolean(plan.imageGenEnabled),
         videoGenEnabled: Boolean(plan.videoGenEnabled),
         monthlyVideoCredits: Number(plan.monthlyVideoCredits ?? 0),
+        codeWorkspaceEnabled: true,
+        voiceEnabled: true,
+        org: null,
+        orgModelPolicy: null,
         loading: false,
       });
     } catch {
       setState({ ...DEFAULTS, loading: false });
     }
-  }, [token]);
+  }, [token, isOrgSeat]);
+
+  const isModelLocked = useCallback(
+    (model: { id: number; isFreeModel?: boolean }) => {
+      const policy = state.orgModelPolicy;
+      if (policy) {
+        if (policy.mode === "ALLOWLIST") return !policy.modelIds.includes(model.id);
+        if (policy.mode === "BLOCKLIST") return policy.modelIds.includes(model.id);
+        return false;
+      }
+      return state.restrictToFreeModels && !model.isFreeModel;
+    },
+    [state.orgModelPolicy, state.restrictToFreeModels],
+  );
 
   useEffect(() => {
     void fetchCapabilities();
   }, [fetchCapabilities]);
 
   return (
-    <PlanCapabilitiesContext.Provider value={{ ...state, refresh: fetchCapabilities }}>
+    <PlanCapabilitiesContext.Provider value={{ ...state, isModelLocked, refresh: fetchCapabilities }}>
       {children}
     </PlanCapabilitiesContext.Provider>
   );

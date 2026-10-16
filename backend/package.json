@@ -17,6 +17,7 @@
     "db:create-plan": "tsx prisma/scripts/createPlan.ts",
     "yearly:grant": "tsx src/scripts/runYearlyGrantNow.ts",
     "suggestions:generate": "tsx src/scripts/runPromptSuggestionsNow.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "type-check": "tsc --noEmit"
   },
   "keywords": [],

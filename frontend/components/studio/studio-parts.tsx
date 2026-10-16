@@ -219,7 +219,7 @@ export function UsageMeter() {
         if (!cancelled) setWallet(res.data?.data ?? null);
       })
       .catch(() => {
-        /* no wallet yet — render nothing */
+        /* no wallet yet render nothing */
       });
     return () => {
       cancelled = true;

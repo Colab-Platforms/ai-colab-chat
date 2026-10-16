@@ -58,7 +58,7 @@ export default function WalletPage() {
       .get()
       .then((res) => setCreditWallet(res.data.data))
       // A 404 here just means no CreditWallet row exists yet (e.g. the
-      // account subscribed before video credits existed, or is on Free) —
+      // account subscribed before video credits existed, or is on Free)  
       // not an error to hide the section for. It's created on first top-up
       // or the next plan renewal.
       .catch(() => setCreditWallet(null))
@@ -426,7 +426,7 @@ export default function WalletPage() {
         <div className="mt-4">
           {!creditWallet && (
             <p className="mb-2 px-1 text-xs text-muted-foreground">
-              No credits yet — they&apos;re added automatically on your plan&apos;s next renewal, or as soon as you top up below.
+              No credits yet they&apos;re added automatically on your plan&apos;s next renewal, or as soon as you top up below.
             </p>
           )}
           <CreditTopUpCard onCheckoutStart={handleTopUpCheckoutStart} />

@@ -18,15 +18,15 @@ import {
  * independent of whoever is watching it.
  *
  * Two upstream sources, on purpose:
- *  - GET /v3/deployments/{id}/events?follow=1 — newline-delimited JSON log
+ *  - GET /v3/deployments/{id}/events?follow=1 newline-delimited JSON log
  *    lines. It covers the *build* and may stay open after it, so it is NOT a
  *    reliable "done" signal.
- *  - GET /v13/deployments/{id} every few seconds — readyState. This is the
+ *  - GET /v13/deployments/{id} every few seconds readyState. This is the
  *    authority on when a deploy has finished.
  *
  * When the browser goes away mid-build, the log reader stops but a detached
  * poller keeps going until Vercel reports a terminal state, so the DB (and the
- * header dot) learns the outcome either way — the same spirit as
+ * header dot) learns the outcome either way the same spirit as
  * pushAfterAiTurn() being deliberately un-awaited.
  */
 
@@ -109,7 +109,7 @@ async function fetchAllLogs(ctx: VercelCtx, deploymentId: string): Promise<strin
 }
 
 /* ------------------------------------------------------------------ *
- * Finishing a deploy — shared by the stream and the detached poller.
+ * Finishing a deploy shared by the stream and the detached poller.
  * ------------------------------------------------------------------ */
 
 interface Finished {
@@ -127,7 +127,7 @@ async function recordTerminal(rowId: number, dep: VercelDeploymentRaw, logTail?:
   const state = deploymentState(dep);
   const aliasUrl = state === "READY" ? pickAliasUrl(dep) : null;
   const errorMessage =
-    state === "ERROR" ? dep.errorMessage || "The build failed — see the logs for details" : state === "CANCELED" ? "Deployment was canceled" : null;
+    state === "ERROR" ? dep.errorMessage || "The build failed see the logs for details" : state === "CANCELED" ? "Deployment was canceled" : null;
   const finished: Finished = { state, url: withHttps(dep.url), aliasUrl, errorMessage };
 
   const row = await prisma.vercelDeployment.findUnique({ where: { id: rowId } });
@@ -146,7 +146,7 @@ async function recordTerminal(rowId: number, dep: VercelDeploymentRaw, logTail?:
   });
   if (updated.count === 0) return finished; // someone else already recorded it
 
-  // Only the link's *latest* deploy may move its status — an older deploy
+  // Only the link's *latest* deploy may move its status an older deploy
   // finishing late must not overwrite a newer one.
   await prisma.vercelProjectLink.updateMany({
     where: { id: row.linkId, lastDeploymentId: row.vercelDeploymentId },
@@ -231,7 +231,7 @@ export async function finishDeploymentDetached(rowId: number, ctx: VercelCtx): P
         dep = await getDeployment(ctx, row.vercelDeploymentId);
       } catch (error: any) {
         if (error?.statusCode === 404) {
-          // Deleted on vercel.com — nothing will ever finish it.
+          // Deleted on vercel.com nothing will ever finish it.
           await recordTerminal(rowId, { id: row.vercelDeploymentId, url: row.url, readyState: "CANCELED" });
           return;
         }
@@ -249,15 +249,15 @@ export async function finishDeploymentDetached(rowId: number, ctx: VercelCtx): P
     }
     // Vercel has had twice the hard timeout and still hasn't settled: stop
     // following it rather than leaving the header spinning forever.
-    await abandon(rowId, "Lost track of this deployment — check it on Vercel.");
+    await abandon(rowId, "Lost track of this deployment check it on Vercel.");
   } catch (error: any) {
     // Back off, and after a few failures in a row stop pretending we can track
-    // it — a token Vercel refuses would otherwise never resolve the row.
+    // it a token Vercel refuses would otherwise never resolve the row.
     const count = (failures.get(rowId)?.count ?? 0) + 1;
     failures.set(rowId, { count, until: Date.now() + DETACHED_POLL_MS * 2 ** Math.min(count, 5) });
     console.warn(`[vercel] detached finisher for deployment row ${rowId} failed (${count})`, error?.message ?? error);
     if (count >= MAX_DETACHED_FAILURES) {
-      await abandon(rowId, error?.message || "Lost track of this deployment — check it on Vercel.");
+      await abandon(rowId, error?.message || "Lost track of this deployment check it on Vercel.");
     }
   } finally {
     watched.delete(rowId);
@@ -308,13 +308,13 @@ async function follow({ res, rowId, vercelDeploymentId, ctx, dashboardUrl }: Fol
     if (truncated) return;
     if (++streamedLines > MAX_LOG_LINES_STREAMED) {
       truncated = true;
-      writeSse(res, { type: "log", at: Date.now(), level: "info", text: `… log truncated — the full log is on Vercel: ${dashboardUrl}` });
+      writeSse(res, { type: "log", at: Date.now(), level: "info", text: `… log truncated the full log is on Vercel: ${dashboardUrl}` });
       return;
     }
     writeSse(res, { type: "log", ...line });
   };
 
-  // 1. Log reader — best effort. Its failure never fails the deploy.
+  // 1. Log reader best effort. Its failure never fails the deploy.
   const readLogs = (async () => {
     try {
       const response = await vercelStream(
@@ -334,13 +334,13 @@ async function follow({ res, rowId, vercelDeploymentId, ctx, dashboardUrl }: Fol
             const line = toLogLine(JSON.parse(part) as VercelLogEvent);
             if (line) onLine(line);
           } catch {
-            // Not JSON — ignore rather than break the stream.
+            // Not JSON ignore rather than break the stream.
           }
         }
       }
     } catch (error: any) {
       if (upstream.signal.aborted) return;
-      writeSse(res, { type: "log", at: Date.now(), level: "info", text: "(Live logs are unavailable — still tracking the deployment status.)" });
+      writeSse(res, { type: "log", at: Date.now(), level: "info", text: "(Live logs are unavailable still tracking the deployment status.)" });
       console.warn("[vercel] log stream failed", error?.message ?? error);
     }
   })();
@@ -355,13 +355,13 @@ async function follow({ res, rowId, vercelDeploymentId, ctx, dashboardUrl }: Fol
   });
 
   try {
-    // 2. State poller — the authority on "done".
+    // 2. State poller the authority on "done".
     while (!finished && !clientGone) {
       if (Date.now() - startedAt > DEPLOY_HARD_TIMEOUT_MS) {
         writeSse(res, {
           type: "error",
           code: "DEPLOY_TIMEOUT",
-          message: "This deployment is taking unusually long. It will keep going on Vercel — check the dashboard.",
+          message: "This deployment is taking unusually long. It will keep going on Vercel check the dashboard.",
           details: { dashboardUrl },
         });
         break;
@@ -421,7 +421,7 @@ async function follow({ res, rowId, vercelDeploymentId, ctx, dashboardUrl }: Fol
   }
 }
 
-/** POST /deploy — the deployment was just created by startDeploy(). */
+/** POST /deploy the deployment was just created by startDeploy(). */
 export async function runDeployStream(opts: {
   res: Response;
   started: {
@@ -453,7 +453,7 @@ export async function runDeployStream(opts: {
 }
 
 /**
- * POST /deploy/:id/logs — re-attach after a refresh, a second tab, or "View logs".
+ * POST /deploy/:id/logs re-attach after a refresh, a second tab, or "View logs".
  *
  * In flight: follow Vercel's stream from the start (it replays history), so
  * nothing is duplicated or lost. Finished: replay the stored tail, fetching it

@@ -45,7 +45,7 @@ export const LOG_TAIL_CHARS = 32_000;
 /** After this many lines the stream stops forwarding logs (state is still tracked). */
 export const MAX_LOG_LINES_STREAMED = 5_000;
 export const DEPLOY_HARD_TIMEOUT_MS = 15 * 60_000;
-/** How often the stream asks Vercel for readyState — the authority on "done". */
+/** How often the stream asks Vercel for readyState the authority on "done". */
 export const STATE_POLL_MS = 3_000;
 /** The same, for a deploy whose browser went away. */
 export const DETACHED_POLL_MS = 5_000;
@@ -69,7 +69,7 @@ export interface VercelConfig {
   frontendCallbackUrl: string;
 }
 
-/** Signed into the OAuth `state` param — the callback has no Bearer header. */
+/** Signed into the OAuth `state` param the callback has no Bearer header. */
 export interface VercelOauthState {
   nonce: string;
   userId: number;
@@ -95,7 +95,7 @@ export type VercelErrorCode =
   | "DEPLOY_TIMEOUT";
 
 /* ------------------------------------------------------------------ *
- * DTOs — tokens never appear in any of these.
+ * DTOs tokens never appear in any of these.
  * ------------------------------------------------------------------ */
 
 export interface VercelConnectionDto {
@@ -130,7 +130,7 @@ export interface VercelLinkDto {
   lastDeployedVersion: number | null;
   lastDeployedAt: string | null;
   lastError: string | null;
-  /** The project's current version — ahead of lastDeployedVersion means unpublished work. */
+  /** The project's current version ahead of lastDeployedVersion means unpublished work. */
   currentVersion: number;
   /** True when the editor has edits not yet in any version. */
   dirty: boolean;
@@ -151,14 +151,14 @@ export interface VercelDeploymentDto {
   finishedAt: string | null;
 }
 
-/** GET /api/vercel/status — the single source of truth the header button reads. */
+/** GET /api/vercel/status the single source of truth the header button reads. */
 export interface VercelStatusDto {
-  /** False when the server has no Vercel credentials — the button is hidden entirely. */
+  /** False when the server has no Vercel credentials the button is hidden entirely. */
   configured: boolean;
   connected: boolean;
   connection: VercelConnectionDto | null;
   link: VercelLinkDto | null;
-  /** Non-null while a deploy is mid-flight — drives the spinner and the re-attach. */
+  /** Non-null while a deploy is mid-flight drives the spinner and the re-attach. */
   activeDeployment: VercelDeploymentDto | null;
   /** Whether this user's GitHub integration is connected (gates "Deploy with GitHub"). */
   githubConnected: boolean;
@@ -176,7 +176,7 @@ export interface DetectedConfig {
   blockedReason: string | null;
   /** One sentence shown under the fields: why these values. */
   reason: string;
-  /** Env keys referenced in the source — prefills the env editor with empty values. */
+  /** Env keys referenced in the source prefills the env editor with empty values. */
   suggestedEnvKeys: string[];
 }
 
@@ -184,7 +184,7 @@ export interface DetectedConfig {
 export interface VercelDetectDto extends DetectedConfig {
   suggestedName: string;
   nameAvailable: boolean;
-  /** Set when the suggested name is taken — the next free one. */
+  /** Set when the suggested name is taken the next free one. */
   nameSuggestion: string | null;
 }
 

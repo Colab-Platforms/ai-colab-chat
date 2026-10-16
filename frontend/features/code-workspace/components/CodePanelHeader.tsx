@@ -106,7 +106,7 @@ export function CodePanelHeader({
   forceVite,
 }: {
   onClose: () => void;
-  /** Fully recreates the Sandpack bundler — the only recovery from a failed preview handshake. */
+  /** Fully recreates the Sandpack bundler the only recovery from a failed preview handshake. */
   onReloadPreview: () => void;
   /** The panel's "Run with Vite" choice, carried over to the new tab. */
   forceVite: boolean;

@@ -12,6 +12,7 @@ declare global {
         interface Request {
             user?: User;
             planContext?: PlanContext;
+            org?: { orgId: number; memberId: number; memberRole: "OWNER" | "ADMIN" | "MEMBER" };
         }
     }
 }

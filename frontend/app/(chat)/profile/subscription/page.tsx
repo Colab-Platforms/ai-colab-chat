@@ -96,7 +96,7 @@ export default function SubscriptionPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => {
-    // Live rate, not hardcoded — same CreditPricingConfig.gstPercent the
+    // Live rate, not hardcoded same CreditPricingConfig.gstPercent the
     // backend actually charges with, so this popup never quietly drifts
     // from what Cashfree really bills.
     creditWalletService
@@ -286,7 +286,7 @@ export default function SubscriptionPage() {
     if (isFreePlan && freePlanTaken) return;
 
     // Open the price/feature confirmation popup rather than charging
-    // immediately — a deep link from the marketing page shouldn't skip the
+    // immediately a deep link from the marketing page shouldn't skip the
     // "here's what you're about to pay, including GST" step.
     autoStartedPlanIdsRef.current.add(parsedPlanId);
     setPlanToConfirm(selectedPlan);
@@ -406,13 +406,13 @@ export default function SubscriptionPage() {
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   })();
 
-  // Discount differs per plan, so the toggle badge advertises the best one ("up to").
-  const maxYearlySavePercent = plans.reduce((max: number, p: any) => {
+  // Marketing copy is a flat "up to 20%" everywhere; actual per-plan savings vary,
+  // so no per-plan percentage is shown (the strike-through price shows the real saving).
+  const hasYearlySavings = plans.some((p: any) => {
     const monthly = Number(p.monthlyPrice ?? 0);
     const yearly = Number(p.yearlyPrice ?? 0);
-    if (monthly <= 0 || yearly <= 0 || monthly * 12 <= yearly) return max;
-    return Math.max(max, Math.round((1 - yearly / (monthly * 12)) * 100));
-  }, 0);
+    return monthly > 0 && yearly > 0 && monthly * 12 > yearly;
+  });
 
   return (
     <div>
@@ -554,6 +554,7 @@ export default function SubscriptionPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-semibold">{subscription.plan?.name}</h2>
+                
                 
                 <span
                   className={`rounded-md px-2 py-0.5 text-xs font-medium ${
@@ -707,9 +708,9 @@ export default function SubscriptionPage() {
                 }`}
               >
                 {c === "MONTHLY" ? "Monthly" : "Yearly"}
-                {c === "YEARLY" && maxYearlySavePercent > 0 && (
+                {c === "YEARLY" && hasYearlySavings && (
                   <span className="ml-2 rounded-full bg-ok/15 px-2 py-0.5 text-[10px] font-semibold text-ok">
-                    Save up to {maxYearlySavePercent}%
+                    Save up to 20%
                   </span>
                 )}
               </button>
@@ -732,7 +733,6 @@ export default function SubscriptionPage() {
             const price = showYearly ? yearly : monthly;
             // Strike-through is what 12 monthly payments would cost.
             const fullYearPrice = monthly * 12;
-            const savePercent = fullYearPrice > yearly ? Math.round((1 - yearly / fullYearPrice) * 100) : 0;
             const isYearlyCurrent = isCurrentPlan && subscription?.billingCycle === "YEARLY";
             const canRenewYearly = showYearly && isYearlyCurrent;
 
@@ -759,7 +759,6 @@ export default function SubscriptionPage() {
                 {showYearly && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     ₹{Math.round(yearly / 12).toLocaleString("en-IN")}/month effective
-                    {savePercent > 0 ? ` · save ${savePercent}%` : ""}
                   </p>
                 )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-// Imported by path, not via the feature index — see index.ts.
+// Imported by path, not via the feature index see index.ts.
 import { StandalonePreview } from "@/features/code-workspace/components/StandalonePreview";
 
 // Full-screen project preview opened from the code panel's "Open in a new tab".

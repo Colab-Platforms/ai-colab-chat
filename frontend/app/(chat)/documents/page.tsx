@@ -329,7 +329,7 @@ export default function DocumentsPage() {
             )}
           </>
         ) : mine.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No documents yet — describe one above to get started.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">No documents yet describe one above to get started.</p>
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {mine.map((d) => {

@@ -121,7 +121,7 @@ export async function mergeGuestChatsIntoAccount() {
   try {
     await api.post("/guest/merge", { guestToken });
   } catch {
-    // Best effort — the account works either way.
+    // Best effort the account works either way.
   } finally {
     clearGuestToken();
   }

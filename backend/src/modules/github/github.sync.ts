@@ -25,7 +25,7 @@ import {
  * One CodeProjectVersion == one commit. The commit tree is built WITHOUT a
  * base_tree, so it is exactly the project's current files: a file the AI
  * deleted disappears from GitHub too. That makes CodeFile the source of truth
- * — and is also why remote-ahead detection below is essential, or an edit made
+ * and is also why remote-ahead detection below is essential, or an edit made
  * on github.com would be silently wiped by the next push.
  */
 
@@ -43,7 +43,7 @@ interface LinkContext {
 /* ------------------------------------------------------------------ *
  * Serialisation: one sync per project at a time, per process.
  * Every push reads the DB fresh, so a queued push just picks up the latest
- * state — running two concurrently would only race on the branch ref.
+ * state running two concurrently would only race on the branch ref.
  * ------------------------------------------------------------------ */
 
 const queues = new Map<number, Promise<unknown>>();
@@ -222,7 +222,7 @@ async function performPush(link: LinkContext, opts: PushOptions): Promise<Github
   });
   if (!project) throw new ApiError("Project not found", STATUS_CODES.NOT_FOUND);
   if (project.status === "GENERATING") {
-    throw new ApiError("The AI is still writing this project — push when it finishes", STATUS_CODES.CONFLICT);
+    throw new ApiError("The AI is still writing this project push when it finishes", STATUS_CODES.CONFLICT);
   }
 
   const files = await readFiles(link.projectId);
@@ -335,7 +335,7 @@ async function withSyncState<T>(link: LinkContext, task: () => Promise<T>): Prom
 }
 
 /**
- * Manual push (button) — errors propagate to the caller so the UI can show them.
+ * Manual push (button) errors propagate to the caller so the UI can show them.
  */
 export async function pushProject(projectId: number, opts: PushOptions = {}): Promise<GithubPushResultDto> {
   const link = await loadLink(projectId);
@@ -378,7 +378,7 @@ async function performPull(link: LinkContext): Promise<GithubPullResultDto> {
   const project = await prisma.codeProject.findUnique({ where: { id: link.projectId }, select: { status: true } });
   if (!project) throw new ApiError("Project not found", STATUS_CODES.NOT_FOUND);
   if (project.status === "GENERATING") {
-    throw new ApiError("The AI is still writing this project — pull when it finishes", STATUS_CODES.CONFLICT);
+    throw new ApiError("The AI is still writing this project pull when it finishes", STATUS_CODES.CONFLICT);
   }
 
   const token = await getInstallationToken(link.connection.installationId);
@@ -482,7 +482,7 @@ export async function pullProject(projectId: number): Promise<GithubPullResultDt
   return serialise(projectId, () => withSyncState(link, () => performPull(link)));
 }
 
-/** Whether the remote branch has any commits — used before the first push to a non-empty repo. */
+/** Whether the remote branch has any commits used before the first push to a non-empty repo. */
 export async function remoteHasCommits(installationId: string, owner: string, repo: string, branch: string): Promise<boolean> {
   const token = await getInstallationToken(installationId);
   const head = await readRemoteHead(token, owner, repo, branch);

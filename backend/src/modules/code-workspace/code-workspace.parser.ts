@@ -19,7 +19,7 @@ import {
  *
  * Deltas arrive in arbitrary chunks, so a tag can be split across two of
  * them ("<fi" + "le path=…"). The parser holds back only the smallest tail
- * that could still turn into a tag and streams everything else immediately —
+ * that could still turn into a tag and streams everything else immediately  
  * that is what makes the editor fill up line by line instead of in bursts.
  *
  * Tolerated model mistakes (each seen in practice):
@@ -43,7 +43,7 @@ const CLOSE_FILE = "</file>";
 const TAG_NAMES = ["plan", "/plan", "summary", "/summary", "file", "/file", "delete", "/delete"];
 
 const FILE_OPEN_AT_LINE_START = /(^|\n)<file\s+path\s*=\s*["'][^"'\n]*["']\s*>/g;
-/** A trailing line of only backticks (optionally followed by blank lines) — a closing fence in the making. */
+/** A trailing line of only backticks (optionally followed by blank lines) a closing fence in the making. */
 const TRAILING_FENCE = /(^|\n)`{1,3}[ \t]*(?:\r?\n[ \t]*)*$/;
 const OPENING_FENCE_LINE = /^```[\w.+#-]*$/;
 
@@ -155,7 +155,7 @@ export class CodeStreamParser {
     return this.plan.trim();
   }
 
-  /** Everything the chat bubble should show — no code. */
+  /** Everything the chat bubble should show no code. */
   get visibleText(): string {
     return this.visible.replace(/\n{3,}/g, "\n\n").trim();
   }
@@ -342,7 +342,7 @@ export class CodeStreamParser {
         return true;
       }
       if (lineEnd && lineEnd[1] === "") {
-        // "</file>" then only spaces up to the end of what we have — could
+        // "</file>" then only spaces up to the end of what we have could
         // still be the real close once the next chunk shows a newline.
         holdFrom = closeIdx;
         break;

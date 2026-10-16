@@ -4,7 +4,7 @@ import STATUS_CODES from "./statusCodes.js";
 
 /**
  * AES-256-GCM for third-party tokens we must be able to read back (GitHub
- * access/refresh tokens). Passwords and OTPs stay on bcrypt (utils/auth.ts) —
+ * access/refresh tokens). Passwords and OTPs stay on bcrypt (utils/auth.ts)  
  * those are only ever compared, never recovered.
  *
  * The key is read lazily, never at module load: the server must boot fine
@@ -26,11 +26,11 @@ function getKey(): Buffer {
     throw new ApiError("TOKEN_ENCRYPTION_KEY is not configured on the server", STATUS_CODES.SERVER_ERROR);
   }
 
-  // Accept hex (openssl rand -hex 32) or base64 — whichever the operator pasted.
+  // Accept hex (openssl rand -hex 32) or base64 whichever the operator pasted.
   let key = /^[0-9a-fA-F]{64}$/.test(raw) ? Buffer.from(raw, "hex") : Buffer.from(raw, "base64");
   if (key.length !== KEY_BYTES) {
     throw new ApiError(
-      `TOKEN_ENCRYPTION_KEY must decode to ${KEY_BYTES} bytes (got ${key.length}) — use: openssl rand -hex 32`,
+      `TOKEN_ENCRYPTION_KEY must decode to ${KEY_BYTES} bytes (got ${key.length}) use: openssl rand -hex 32`,
       STATUS_CODES.SERVER_ERROR,
     );
   }
@@ -39,7 +39,7 @@ function getKey(): Buffer {
   return key;
 }
 
-/** True when a key is configured and usable — lets callers degrade instead of throwing. */
+/** True when a key is configured and usable lets callers degrade instead of throwing. */
 export function isEncryptionConfigured(): boolean {
   try {
     getKey();
@@ -69,8 +69,8 @@ export function decrypt(blob: string): string {
     return Buffer.concat([decipher.update(Buffer.from(dataB64, "base64")), decipher.final()]).toString("utf8");
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    // Wrong key or tampered ciphertext — never leak the underlying crypto message.
-    throw new ApiError("Stored credential could not be decrypted — reconnect the integration", STATUS_CODES.UNAUTHORIZED);
+    // Wrong key or tampered ciphertext never leak the underlying crypto message.
+    throw new ApiError("Stored credential could not be decrypted reconnect the integration", STATUS_CODES.UNAUTHORIZED);
   }
 }
 

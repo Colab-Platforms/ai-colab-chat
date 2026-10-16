@@ -39,7 +39,7 @@ export function useGithubStatus() {
     }
   }, [projectId]);
 
-  /** Poll for a while — call after an action that kicks off background work. */
+  /** Poll for a while call after an action that kicks off background work. */
   const pollSoon = useCallback(() => {
     pollUntil.current = Date.now() + POST_TURN_POLL_MS;
   }, []);
@@ -59,7 +59,7 @@ export function useGithubStatus() {
     void refresh();
   }, [refresh, isGenerating, currentVersion, saveState === "saved"]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A finished AI turn triggers a background push — poll briefly to catch it.
+  // A finished AI turn triggers a background push poll briefly to catch it.
   const wasGenerating = useRef(false);
   useEffect(() => {
     if (wasGenerating.current && !isGenerating) pollSoon();

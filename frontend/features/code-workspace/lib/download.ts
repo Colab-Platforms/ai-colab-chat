@@ -24,7 +24,7 @@ export function downloadFile(path: string, content: string) {
   saveBlob(new Blob([content], { type: "text/plain;charset=utf-8" }), path.split("/").pop() || "file.txt");
 }
 
-/** Zips the files client-side — everything is already in memory (or one fetch away). */
+/** Zips the files client-side everything is already in memory (or one fetch away). */
 export async function downloadProjectZip(title: string, files: { path: string; content: string }[]) {
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();

@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
 import {
   LayoutDashboard, Users, Bot, Building, CreditCard as PlansIcon,
-  BarChart3, LifeBuoy, ArrowLeft, Menu, X, Sparkles, Inbox,
+  BarChart3, LifeBuoy, ArrowLeft, Menu, X, Sparkles, Inbox, Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ const adminNav = [
   { label: "Assistants", href: "/admin/assistants", icon: Bot },
   { label: "Templates", href: "/admin/templates", icon: Sparkles },
   { label: "Demo requests", href: "/admin/demo-requests", icon: Inbox },
+  { label: "Organizations", href: "/admin/orgs", icon: Briefcase },
   { label: "Providers", href: "/admin/providers", icon: Building },
   { label: "Usage", href: "/admin/usage", icon: BarChart3 },
   { label: "Support", href: "/admin/support", icon: LifeBuoy },

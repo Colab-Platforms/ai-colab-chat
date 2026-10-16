@@ -31,7 +31,7 @@ function missingEnv(): string[] {
   return REQUIRED_ENV.filter((key) => !process.env[key]?.trim());
 }
 
-/** Cheap, never throws — drives `configured` in the status endpoint. */
+/** Cheap, never throws drives `configured` in the status endpoint. */
 export function isGithubConfigured(): boolean {
   return missingEnv().length === 0 && isEncryptionConfigured();
 }
@@ -72,7 +72,7 @@ function normalizePrivateKey(raw: string): string {
     }
   }
   throw new ApiError(
-    "GITHUB_APP_PRIVATE_KEY could not be read as a private key — paste the .pem base64-encoded (base64 -w0 your-app.pem)",
+    "GITHUB_APP_PRIVATE_KEY could not be read as a private key paste the .pem base64-encoded (base64 -w0 your-app.pem)",
     STATUS_CODES.SERVER_ERROR,
   );
 }
@@ -112,7 +112,7 @@ export function createAppJwt(): string {
  * Installation tokens
  * ------------------------------------------------------------------ */
 
-// Per-process cache. Multiple instances each keep their own — harmless, since
+// Per-process cache. Multiple instances each keep their own harmless, since
 // minting is idempotent and GitHub allows concurrent valid tokens.
 const installationTokens = new Map<string, { token: string; expiresAt: number }>();
 
@@ -134,7 +134,7 @@ export async function getInstallationToken(installationId: string): Promise<stri
     installationTokens.delete(installationId);
     if (response.status === 404) {
       throw new ApiError(
-        "This GitHub installation no longer exists — reconnect your GitHub account",
+        "This GitHub installation no longer exists reconnect your GitHub account",
         STATUS_CODES.UNAUTHORIZED,
       );
     }
@@ -252,11 +252,11 @@ export interface ConnectionTokenRow {
 
 /**
  * A valid user token, refreshing it in place when it has expired. Throws when
- * the user must reconnect — callers surface that as a "reconnect" prompt.
+ * the user must reconnect callers surface that as a "reconnect" prompt.
  */
 export async function getUserToken(connection: ConnectionTokenRow): Promise<string> {
   if (!connection.userTokenEnc) {
-    throw new ApiError("Your GitHub authorization is missing — reconnect your account", STATUS_CODES.UNAUTHORIZED);
+    throw new ApiError("Your GitHub authorization is missing reconnect your account", STATUS_CODES.UNAUTHORIZED);
   }
 
   const expiresAt = connection.userTokenExpiresAt?.getTime() ?? null;
@@ -267,7 +267,7 @@ export async function getUserToken(connection: ConnectionTokenRow): Promise<stri
     !connection.refreshTokenEnc ||
     (connection.refreshTokenExpiresAt !== null && connection.refreshTokenExpiresAt.getTime() <= Date.now());
   if (refreshUnusable) {
-    throw new ApiError("Your GitHub authorization expired — reconnect your account", STATUS_CODES.UNAUTHORIZED);
+    throw new ApiError("Your GitHub authorization expired reconnect your account", STATUS_CODES.UNAUTHORIZED);
   }
 
   const { clientId, clientSecret } = getGithubConfig();

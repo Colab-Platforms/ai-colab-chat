@@ -1,4 +1,5 @@
 import prisma from "@root/prisma.js";
+import { isEnterpriseEnabled } from "@/utils/enterprise.js";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc.js";
 import timezone from "dayjs/plugin/timezone.js";
@@ -41,7 +42,18 @@ class UserService {
       throw new ApiError("User not found", STATUS_CODES.NOT_FOUND);
     }
 
-    return formatUser(user);
+    // Lets the client know it's an org seat without a separate request; regular
+    // users (and everyone while the feature is off) get null with no extra query.
+    let orgMembership: { orgId: number; orgName: string; memberRole: string; status: string; takesSeat: boolean } | null = null;
+    if (isEnterpriseEnabled()) {
+      const m = await prisma.orgMember.findFirst({
+        where: { userId, status: { in: ["ACTIVE", "SUSPENDED"] } },
+        select: { orgId: true, memberRole: true, status: true, takesSeat: true, organization: { select: { name: true } } },
+      });
+      if (m) orgMembership = { orgId: m.orgId, orgName: m.organization.name, memberRole: m.memberRole, status: m.status, takesSeat: m.takesSeat };
+    }
+
+    return { ...formatUser(user), orgMembership };
   }
 
   async updateProfile(userId: number, data: UpdateProfileBody) {
@@ -211,7 +223,7 @@ class UserService {
       Array.isArray(data.roles) &&
       callerRole === "SUPERADMIN"
     ) {
-      // Filter out SUPERADMIN from the input — it can never be assigned
+      // Filter out SUPERADMIN from the input it can never be assigned
       const requestedRoles: string[] = data.roles.filter(
         (r: string) => r !== "SUPERADMIN" && r !== "SUPER_ADMIN",
       );

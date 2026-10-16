@@ -42,7 +42,7 @@ class InvoiceService {
         : null;
 
       // baseAmount/taxPercent/taxAmount are null for payments predating this
-      // split (or for flows that don't add GST on top, e.g. credit top-ups) —
+      // split (or for flows that don't add GST on top, e.g. credit top-ups)  
       // the template falls back to a single-line total in that case rather
       // than showing a fabricated $0 tax row.
       const baseAmount = invoice.payment.baseAmount;
@@ -100,7 +100,7 @@ class InvoiceService {
       });
     }
 
-    // Confirmation goes out even if the PDF failed (without the attachment) —
+    // Confirmation goes out even if the PDF failed (without the attachment)  
     // the user still paid. Email trouble must never affect the webhook.
     try {
       const subscription = invoice.payment.subscription;

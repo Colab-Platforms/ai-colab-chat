@@ -1,7 +1,7 @@
 import type { CodeFileSnapshot, CodeIntent } from "./code-workspace.types.js";
 
 /**
- * System prompt for code-mode turns. Stable across turns on purpose — it is
+ * System prompt for code-mode turns. Stable across turns on purpose it is
  * sent with cache_control (see buildSystemMessage), so it must not embed
  * anything per-turn. Per-turn material goes in buildCodeTurnNote().
  *
@@ -43,7 +43,7 @@ For web apps and UI requests, default to React unless the user asks for somethin
 - Use Tailwind classes for styling. Import local files with relative paths ("./components/Hero.jsx").
 - No binary assets (images, fonts). Use https://picsum.photos, https://images.unsplash.com URLs, inline SVG, or lucide-react icons instead.
 - Vue: same idea with src/main.js + src/App.vue. Plain HTML/CSS/JS sites: index.html, styles.css, script.js.
-- Backends (Node/Express, Python, etc.) are fine when asked for — write them completely; they just cannot be previewed in the browser.
+- Backends (Node/Express, Python, etc.) are fine when asked for write them completely; they just cannot be previewed in the browser.
 
 ## Quality bar
 
@@ -53,7 +53,7 @@ const EDIT_RULES = `This turn EDITS the existing project shown below.
 - Output ONLY files you create or change, each as a complete file. Do not re-send unchanged files.
 - Use <delete path="…" /> for files that should be removed.
 - Keep the existing stack, structure and style unless the user asks otherwise.
-- The files below are the CURRENT state, including any manual edits the user made in the editor — build on them, do not revert them.`;
+- The files below are the CURRENT state, including any manual edits the user made in the editor build on them, do not revert them.`;
 
 const ASK_RULES = `The user is asking about the project shown below. Answer normally in chat (markdown, short code snippets are fine). Do NOT use <plan>, <file>, <delete> or <summary> tags this turn and do not rewrite files.`;
 
@@ -100,7 +100,7 @@ function renderProject(title: string, framework: string, files: CodeFileSnapshot
   const tree = files.map((f) => `- ${f.path}`).join("\n");
   const body = included.map((f) => `<file path="${f.path}">\n${f.content}\n</file>`).join("\n");
   const omittedNote = omitted.length
-    ? `\n\n(Not attached to save space — ask the user or keep them unchanged unless you must rewrite them: ${omitted.join(", ")})`
+    ? `\n\n(Not attached to save space ask the user or keep them unchanged unless you must rewrite them: ${omitted.join(", ")})`
     : "";
   return `<current_project title="${title}" framework="${framework}">\nFile tree:\n${tree}\n\n${body}\n</current_project>${omittedNote}`;
 }
@@ -125,4 +125,4 @@ export function buildCodeTurnNote(params: {
 }
 
 /** Sent as the user turn when an answer was cut off by max_tokens. */
-export const CODE_CONTINUE_PROMPT = `Your previous answer was cut off by the length limit. Continue EXACTLY where it stopped — the very next character. Do not repeat anything already written, do not re-open the file that was being written, and do not add any preamble. Keep following the same output format until the <summary>.`;
+export const CODE_CONTINUE_PROMPT = `Your previous answer was cut off by the length limit. Continue EXACTLY where it stopped the very next character. Do not repeat anything already written, do not re-open the file that was being written, and do not add any preamble. Keep following the same output format until the <summary>.`;

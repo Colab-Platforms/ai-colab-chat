@@ -26,7 +26,7 @@ function GithubCallback() {
     postPopupResult(ok ? { type: "github:connected", login } : { type: "github:error", message });
 
     // Brief pause so the user sees the result, then try to close. window.close()
-    // only works for windows a script opened — if it is ignored the page is still
+    // only works for windows a script opened if it is ignored the page is still
     // here a moment later, and we tell the user to close it themselves.
     const closeTimer = setTimeout(() => window.close(), ok ? 700 : 2500);
     const fallbackTimer = setTimeout(() => setCouldNotClose(true), ok ? 1600 : 3400);
@@ -51,7 +51,7 @@ function GithubCallback() {
         {couldNotClose ? (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              {ok ? "All done — you can close this window and go back to the editor." : "You can close this window and try again."}
+              {ok ? "All done you can close this window and go back to the editor." : "You can close this window and try again."}
             </p>
             <button
               type="button"

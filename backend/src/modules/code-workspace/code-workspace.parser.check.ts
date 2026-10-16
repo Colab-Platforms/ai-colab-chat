@@ -68,7 +68,7 @@ function check(name: string, input: string, expected: Result) {
   for (let seed = 1; seed <= 400; seed++) {
     assert.deepEqual(run(randomChunks(input, seed)), expected, `${name}: differs for seed ${seed}`);
   }
-  // One char at a time — the harshest split.
+  // One char at a time the harshest split.
   assert.deepEqual(run([...input]), expected, `${name}: differs for 1-char chunks`);
   console.log(`✓ ${name}`);
 }
@@ -77,7 +77,7 @@ function check(name: string, input: string, expected: Result) {
 
 check(
   "standard response",
-  `Sure — here is the project.
+  `Sure here is the project.
 <plan>
 - React + Tailwind
 - 2 files
@@ -98,7 +98,7 @@ Your app is ready. Edit \`src/App.jsx\` to start.
 </summary>`,
   {
     plan: "- React + Tailwind\n- 2 files",
-    visible: "Sure — here is the project.\n\nYour app is ready. Edit `src/App.jsx` to start.",
+    visible: "Sure here is the project.\n\nYour app is ready. Edit `src/App.jsx` to start.",
     files: {
       "src/App.jsx": {
         content: "import React from 'react';\n\nexport default function App() {\n  return <div className=\"p-4\">Hi</div>;\n}\n",
@@ -200,7 +200,7 @@ export function App() {
 );
 
 check(
-  "no tags at all — everything is chat text",
+  "no tags at all everything is chat text",
   "Closures capture variables from the enclosing scope.\n\nExample: `const f = () => x;`",
   {
     plan: "",

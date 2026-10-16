@@ -20,7 +20,7 @@ export interface OpenRouterJsonCompletionOptions {
 
 /**
  * Non-streaming JSON-object completion for internal/background calls
- * (e.g. context distillation) — the streaming helper below is for
+ * (e.g. context distillation) the streaming helper below is for
  * user-facing chat only and isn't a fit for a single-shot batch job.
  */
 export const createOpenRouterJsonCompletion = async (
@@ -96,7 +96,7 @@ export const createOpenRouterStream = async (
       stream: true,
       stream_options: { include_usage: true },
       // OpenRouter-specific (not part of the OpenAI SDK's types, hence the
-      // `as any` cast on the whole call) — adds `usage.cost` (real $ charged
+      // `as any` cast on the whole call) adds `usage.cost` (real $ charged
       // by OpenRouter for this request) to the final usage chunk, on top of
       // the standard token counts stream_options.include_usage already gives.
       usage: { include: true },

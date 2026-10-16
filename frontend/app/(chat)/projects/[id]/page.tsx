@@ -63,7 +63,7 @@ export default function ProjectDetailPage() {
       setBrief(existing?.memory || "");
       setBriefContextId(existing?.id ?? null);
     } catch {
-      /* no brief shown — not fatal */
+      /* no brief shown not fatal */
     }
   }, [folderId]);
 

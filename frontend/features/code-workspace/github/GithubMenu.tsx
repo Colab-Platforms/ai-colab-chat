@@ -66,7 +66,7 @@ const LABEL: Record<Health, string> = {
 
 /**
  * Header button for the GitHub integration. Renders nothing at all until the
- * server reports GitHub as configured — so a deployment without the App's
+ * server reports GitHub as configured so a deployment without the App's
  * credentials shows no half-working button, and the rest of the panel is untouched.
  */
 export function GithubMenu() {
@@ -183,7 +183,7 @@ export function GithubMenu() {
       variant="ghost"
       size="sm"
       className="relative h-8 w-8 shrink-0 p-0"
-      title={link ? `${LABEL[health!]} — ${link.owner}/${link.repo}` : "Connect to GitHub"}
+      title={link ? `${LABEL[health!]} ${link.owner}/${link.repo}` : "Connect to GitHub"}
       onClick={link ? undefined : () => setDialogOpen(true)}
     >
       {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Github className="h-3.5 w-3.5" />}
@@ -276,8 +276,8 @@ export function GithubMenu() {
                 <span className="block font-medium">Auto-commit AI changes</span>
                 <span className="block text-[11px] font-normal text-muted-foreground">
                   {link.autoPush
-                    ? "On — every AI edit is committed for you. Your own edits use the buttons above."
-                    : "Off — nothing is committed until you commit or push."}
+                    ? "On every AI edit is committed for you. Your own edits use the buttons above."
+                    : "Off nothing is committed until you commit or push."}
                 </span>
               </span>
               <Switch checked={link.autoPush} className="pointer-events-none mt-0.5 shrink-0" tabIndex={-1} aria-label="Auto-commit AI changes" />

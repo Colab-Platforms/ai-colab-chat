@@ -6,7 +6,7 @@ import * as controller from "./vercel.controller.js";
 // popup there without our Bearer token (identity rides in the signed OAuth state).
 //
 // The three stream routes are POSTs read with fetch() + getReader(), not
-// EventSource GETs — EventSource can't send the Authorization header.
+// EventSource GETs EventSource can't send the Authorization header.
 const router = Router();
 const authed = auth("USER", "ADMIN", "SUPERADMIN");
 
