@@ -50,6 +50,24 @@ const MINDMAP_THEME_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "midnight", label: "Midnight" },
 ];
 
+// Resizable width. The chat column must keep a usable width, so the panel's
+// maximum is measured from its container at drag time, not from the window
+// (the window also holds the sidebar).
+const PANEL_MIN_WIDTH = 360;
+const CHAT_MIN_WIDTH = 380;
+const PANEL_DEFAULT_WIDTH = 800;
+const PANEL_WIDTH_KEY = "documentPanelWidth";
+const KEYBOARD_STEP = 24;
+
+const readSavedWidth = (): number => {
+  try {
+    const saved = Number(localStorage.getItem(PANEL_WIDTH_KEY));
+    return Number.isFinite(saved) && saved >= PANEL_MIN_WIDTH ? saved : PANEL_DEFAULT_WIDTH;
+  } catch {
+    return PANEL_DEFAULT_WIDTH;
+  }
+};
+
 const POLL_INTERVAL_MS = 2000;
 const FILE_REFRESH_DELAY_MS = 6000;
 
@@ -77,6 +95,35 @@ export function DocumentPanel() {
   const [titleDraft, setTitleDraft] = useState("");
   const titleDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(readSavedWidth);
+  const [resizing, setResizing] = useState(false);
+  const resizeStart = useRef<{ x: number; width: number } | null>(null);
+
+  /** Keeps `next` between the panel minimum and what leaves the chat its minimum. */
+  const clampWidth = useCallback((next: number) => {
+    const container = panelRef.current?.parentElement;
+    const max = container
+      ? Math.max(PANEL_MIN_WIDTH, container.clientWidth - CHAT_MIN_WIDTH)
+      : Number.POSITIVE_INFINITY;
+    return Math.round(Math.min(Math.max(next, PANEL_MIN_WIDTH), max));
+  }, []);
+
+  const saveWidth = useCallback((value: number) => {
+    try {
+      localStorage.setItem(PANEL_WIDTH_KEY, String(value));
+    } catch {
+      /* private mode: the width just won't be remembered */
+    }
+  }, []);
+
+  // A saved width can be too wide for a smaller window; shrink with it.
+  useEffect(() => {
+    const onResize = () => setWidth((current) => clampWidth(current));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [clampWidth]);
 
   const isRendering =
     activeDocument?.status === "PENDING" || activeDocument?.status === "PROCESSING";
@@ -122,6 +169,38 @@ export function DocumentPanel() {
 
   if (!isOpen || !activeDocument) return null;
 
+  const onResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    resizeStart.current = { x: event.clientX, width };
+    setResizing(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onResizeMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = resizeStart.current;
+    if (!start) return;
+    // The handle is on the panel's LEFT edge: dragging left makes it wider.
+    setWidth(clampWidth(start.width + (start.x - event.clientX)));
+  };
+
+  const onResizeEnd = () => {
+    if (!resizeStart.current) return;
+    resizeStart.current = null;
+    setResizing(false);
+    saveWidth(width);
+  };
+
+  const onResizeKey = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    let next: number | null = null;
+    if (event.key === "ArrowLeft") next = width + KEYBOARD_STEP;
+    else if (event.key === "ArrowRight") next = width - KEYBOARD_STEP;
+    else if (event.key === "Home") next = PANEL_DEFAULT_WIDTH;
+    if (next === null) return;
+    event.preventDefault();
+    const clamped = clampWidth(next);
+    setWidth(clamped);
+    saveWidth(clamped);
+  };
+
   // The download link points at the rendered file, which is refreshed in the
   // background after a manual edit. Re-read the document a little later so the
   // header's Open/Download buttons stop serving the pre-edit file.
@@ -164,7 +243,42 @@ export function DocumentPanel() {
   const extension = activeDocument.format.toLowerCase();
 
   return (
-    <div className="hidden md:flex w-[800px] shrink-0 flex-col border-l border-border/50 bg-background">
+    <div
+      ref={panelRef}
+      className={`relative hidden md:flex shrink-0 flex-col border-l border-border/50 bg-background ${
+        resizing ? "select-none" : ""
+      }`}
+      style={{ width }}
+    >
+      {/* Drag to resize; double-click or Home resets. A wider invisible hit area sits over the 1px border. */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize panel"
+        aria-valuemin={PANEL_MIN_WIDTH}
+        aria-valuenow={width}
+        tabIndex={0}
+        title="Drag to resize · double-click to reset"
+        onPointerDown={onResizeStart}
+        onPointerMove={onResizeMove}
+        onPointerUp={onResizeEnd}
+        onPointerCancel={onResizeEnd}
+        onDoubleClick={() => {
+          const reset = clampWidth(PANEL_DEFAULT_WIDTH);
+          setWidth(reset);
+          saveWidth(reset);
+        }}
+        onKeyDown={onResizeKey}
+        className="group absolute -left-1.5 top-0 z-30 flex h-full w-3 cursor-col-resize touch-none items-stretch justify-center outline-none"
+      >
+        <span
+          className={`w-0.5 rounded-full transition-colors ${
+            resizing
+              ? "bg-primary"
+              : "bg-transparent group-hover:bg-primary/60 group-focus-visible:bg-primary/60"
+          }`}
+        />
+      </div>
       <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3">
         <Input
           value={titleDraft}
