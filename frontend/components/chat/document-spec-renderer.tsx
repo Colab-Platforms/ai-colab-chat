@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment } from "react";
+import { MindmapCanvas } from "./mindmap/mindmap-canvas";
+import type { MindmapSpec, MindmapThemeTokens } from "./mindmap/mindmap-types";
 
 /**
  * Mirrors the shapes in `backend/src/modules/document/document.types.ts` and
@@ -8,7 +10,7 @@ import { Fragment } from "react";
  * package frontend and backend are separate deploys here but the field
  * names must stay identical to what `GET /documents/:id/spec` returns.
  */
-export type SpecKind = "document" | "presentation" | "workbook";
+export type SpecKind = "document" | "presentation" | "workbook" | "mindmap";
 
 export type CalloutVariant = "info" | "warning" | "success" | "danger";
 
@@ -73,7 +75,11 @@ export interface WorkbookSpec {
   sheets: SheetSpec[];
 }
 
-export type AnySpec = DocumentSpec | PresentationSpec | WorkbookSpec;
+export type AnySpec =
+  | DocumentSpec
+  | PresentationSpec
+  | WorkbookSpec
+  | MindmapSpec;
 
 export interface ThemeTokens {
   accent: string;
@@ -653,10 +659,16 @@ export function DocumentSpecRenderer({
 }: {
   specKind: SpecKind;
   spec: AnySpec;
-  themeTokens: ThemeTokens | PptxTemplateTokens;
+  themeTokens: ThemeTokens | PptxTemplateTokens | MindmapThemeTokens;
 }) {
   return (
     <Fragment>
+      {specKind === "mindmap" && (
+        <MindmapCanvas
+          spec={spec as MindmapSpec}
+          tokens={themeTokens as MindmapThemeTokens}
+        />
+      )}
       {specKind === "presentation" && (
         <PresentationPreview
           spec={spec as PresentationSpec}

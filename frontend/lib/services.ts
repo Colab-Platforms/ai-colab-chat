@@ -227,6 +227,9 @@ export const documentService = {
   templates: () => api.get("/documents/templates"),
   updateStyle: (id: number, data: { title?: string; theme?: string }) =>
     api.patch(`/documents/${id}`, data),
+  /** Replaces a document's stored content (manual mind-map edits). */
+  updateSpec: (id: number, spec: unknown) =>
+    api.put(`/documents/${id}/spec`, { spec }),
 };
 
 export const videoService = {

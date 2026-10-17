@@ -5,9 +5,13 @@ import {
   validateSpecForKind,
 } from "./document.validators.js";
 import {
+  isMindmapSpec,
   isPresentationSpec,
   isWorkbookSpec,
   MAX_BLOCKS,
+  MAX_MINDMAP_CHILDREN,
+  MAX_MINDMAP_DEPTH,
+  MAX_MINDMAP_NODE_CHARS,
   MAX_BLOCKS_PER_SLIDE,
   MAX_NOTES_CHARS,
   MAX_SHEET_COLUMNS,
@@ -173,17 +177,98 @@ Choosing what goes in the spreadsheet:
 - Prefer several focused sheets over one wide sheet when the material covers distinct subjects.
 - Set "total" only on columns where a sum, average or count is genuinely meaningful. Never total an identifier, a year, or a percentage.`;
 
+const MINDMAP_SYSTEM_PROMPT = `You are a mind map composition engine. You convert a user's request into a structured mind map specification that a rendering engine draws as a branching diagram.
+
+Return ONLY a JSON object matching this schema:
+
+{
+  "title": string,                      // required, the map's topic, max 200 chars
+  "root": Node                          // required
+}
+
+Node is:
+{
+  "text": string,                       // required, a SHORT phrase, max ${MAX_MINDMAP_NODE_CHARS} chars
+  "note": string,                       // optional, one or two sentences of detail shown on hover
+  "children": Node[]                    // optional, omit or [] on a leaf
+}
+
+Hard rules:
+- Output raw JSON only. No markdown fences, no commentary.
+- NEVER emit HTML, CSS, colours, positions, ids or any styling. The renderer owns all layout and colour.
+- Do not use markdown syntax inside text (no **bold**, no bullets, no numbering).
+- The root's "text" is the central topic, a few words.
+
+Composition rules these are what separate a mind map from a bulleted outline:
+- A node holds a phrase, not a sentence. Aim for 2-6 words, never more than 10. Put the explanation in "note", not in "text".
+- The root has 4-8 branches. Each branch is a distinct, parallel category (do not let two branches overlap).
+- Go ${MAX_MINDMAP_DEPTH - 1} levels deep below the root where the topic supports it, but never pad: a branch with two genuine children beats one with six filler ones. No node may have more than ${MAX_MINDMAP_CHILDREN} children.
+- Sibling nodes are the same kind of thing (all steps, or all causes, or all categories) and are ordered meaningfully.
+- Cover the topic broadly first, then add depth. A balanced map is more useful than one deep branch and several empty ones.
+- If the user supplies source material, build the map from it and do not invent facts that contradict it.
+- Write in the same language as the user's request.`;
+
+const nounFor = (kind: SpecKind): string =>
+  kind === "presentation"
+    ? "presentation"
+    : kind === "workbook"
+      ? "spreadsheet"
+      : kind === "mindmap"
+        ? "mind map"
+        : "document";
+
+/**
+ * Keys that are not the model's to author and only waste tokens when echoed
+ * back: mind-map node ids (re-assigned by the validator) and PPTX stock photos
+ * (re-attached after generation).
+ */
+const REVISION_OMITTED_KEYS = new Set(["id", "photoUrl", "coverPhotoUrl"]);
+
+export interface SpecRevision {
+  /** The stored spec of the document being revised. */
+  spec: unknown;
+  /** What the user asked to change, verbatim. */
+  instruction: string;
+}
+
+/**
+ * The user turn for a revision: the current spec plus the requested change.
+ *
+ * The model is asked for the COMPLETE updated spec, not a patch, because every
+ * validator and renderer consumes a whole spec and a diff format would be a
+ * second thing to get wrong. The cost is that the current spec travels in the
+ * prompt, which is why oversized ones are refused instead of truncated (a
+ * truncated spec would silently delete the user's content).
+ */
+const buildRevisionContent = (kind: SpecKind, revision: SpecRevision): string => {
+  const noun = nounFor(kind);
+  const json = JSON.stringify(revision.spec, (key, value) =>
+    REVISION_OMITTED_KEYS.has(key) ? undefined : value,
+  );
+  if (json.length > MAX_SOURCE_TEXT_CHARS) {
+    throw new Error(
+      `This ${noun} is too large to revise in one step. Ask for a new one instead.`,
+    );
+  }
+
+  return [
+    `Below is the current ${noun} as JSON, in exactly the schema you normally return.`,
+    ``,
+    json,
+    ``,
+    `The user asked for this change:`,
+    revision.instruction,
+    ``,
+    `Return the COMPLETE updated ${noun} as one JSON object in the same schema. Keep everything the change does not affect, unchanged. Apply the change fully: if the user asked for more content, add substantial new material at the same level of detail as what already exists. Never return only the new or changed parts.`,
+  ].join("\n");
+};
+
 const buildUserContent = (
   kind: SpecKind,
   prompt: string,
   sourceText?: string | null,
 ): string => {
-  const noun =
-    kind === "presentation"
-      ? "presentation"
-      : kind === "workbook"
-        ? "spreadsheet"
-        : "document";
+  const noun = nounFor(kind);
   const trimmedSource = sourceText?.trim();
   if (!trimmedSource) {
     return `Create a ${noun} for this request:\n\n${prompt}`;
@@ -197,6 +282,13 @@ const buildUserContent = (
     trimmedSource.slice(0, MAX_SOURCE_TEXT_CHARS),
   ].join("\n");
 };
+
+const countMindmapNodes = (node: { children: unknown[] }): number =>
+  1 +
+  (node.children as Array<{ children: unknown[] }>).reduce(
+    (sum, child) => sum + countMindmapNodes(child),
+    0,
+  );
 
 const parseJsonLoosely = (raw: string): unknown => {
   try {
@@ -230,8 +322,15 @@ export const generateSpec = async (
   kind: SpecKind,
   prompt: string,
   sourceText?: string | null,
+  revision?: SpecRevision | null,
 ): Promise<GeneratedSpecResult> => {
-  let userContent = buildUserContent(kind, prompt, sourceText);
+  // Fixed for the whole call: a retry re-sends the SAME request plus the
+  // validator's error, so a revision must keep revising rather than fall back
+  // to generating from the bare instruction.
+  const baseContent = revision
+    ? buildRevisionContent(kind, revision)
+    : buildUserContent(kind, prompt, sourceText);
+  let userContent = baseContent;
   let promptTokens = 0;
   let completionTokens = 0;
   let lastError = "";
@@ -241,7 +340,9 @@ export const generateSpec = async (
       ? PRESENTATION_SYSTEM_PROMPT
       : kind === "workbook"
         ? WORKBOOK_SYSTEM_PROMPT
-        : DOCUMENT_SYSTEM_PROMPT;
+        : kind === "mindmap"
+          ? MINDMAP_SYSTEM_PROMPT
+          : DOCUMENT_SYSTEM_PROMPT;
   const model = getSpecModel();
 
   for (let attempt = 1; attempt <= MAX_SPEC_ATTEMPTS; attempt += 1) {
@@ -334,11 +435,12 @@ export const generateSpec = async (
 
       if (!error) {
         const spec = value as AnySpec;
-        const blocks = isWorkbookSpec(spec)
-          ? []
-          : isPresentationSpec(spec)
-            ? spec.slides.flatMap((slide) => slide.blocks)
-            : spec.blocks;
+        const blocks =
+          isWorkbookSpec(spec) || isMindmapSpec(spec)
+            ? []
+            : isPresentationSpec(spec)
+              ? spec.slides.flatMap((slide) => slide.blocks)
+              : spec.blocks;
         const blockCounts = blocks.reduce<Record<string, number>>((acc, b) => {
           acc[b.type] = (acc[b.type] ?? 0) + 1;
           return acc;
@@ -351,7 +453,12 @@ export const generateSpec = async (
             kind,
             salvagedEntries: salvaged,
             title: spec.title,
-            ...(isWorkbookSpec(spec)
+            ...(isMindmapSpec(spec)
+              ? {
+                  branches: spec.root.children.map((c) => c.text),
+                  totalNodes: countMindmapNodes(spec.root),
+                }
+              : isWorkbookSpec(spec)
               ? {
                   totalSheets: spec.sheets.length,
                   sheets: spec.sheets.map((sheet) => ({
@@ -388,7 +495,7 @@ export const generateSpec = async (
     }
 
     userContent = [
-      buildUserContent(kind, prompt, sourceText),
+      baseContent,
       ``,
       `Your previous response was rejected by the schema validator with this error:`,
       lastError,

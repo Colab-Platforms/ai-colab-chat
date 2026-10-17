@@ -2,11 +2,17 @@ import { Request, Response } from "express";
 import { sendResponse } from "@/utils/responseUtils.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import DocumentService from "./document.service.js";
-import { DOCUMENT_THEMES, PPTX_TEMPLATES } from "./document.types.js";
+import {
+  DOCUMENT_THEMES,
+  MINDMAP_THEMES,
+  PPTX_TEMPLATES,
+} from "./document.types.js";
 import { getThemeTokens } from "./document.theme.js";
 import { getPptxTemplateTokens } from "./document.pptxTemplates.js";
+import { getMindmapThemeTokens } from "./document.mindmapThemes.js";
 import {
   validateCreateDocumentSchema,
+  validateUpdateDocumentSpecSchema,
   validateUpdateDocumentStyleSchema,
 } from "./document.validators.js";
 
@@ -65,6 +71,13 @@ const PPTX_COPY: Record<string, string> = {
   mono: "Near-black with a lime accent. Bold, minimal and punchy.",
 };
 
+const MINDMAP_COPY: Record<string, string> = {
+  vibrant: "A different bold colour for every branch on white. Easy to scan at a glance.",
+  ocean: "Cool blues and teals on a pale background. Calm and focused.",
+  autumn: "Warm rust and gold on cream with a serif face. Friendly and editorial.",
+  midnight: "A dark canvas with glowing branch colours. Easy on the eyes and striking on screen.",
+};
+
 /**
  * The predefined visual templates, straight from the renderers' own tokens, so
  * the Documents studio previews exactly the colours and fonts that generation
@@ -121,6 +134,29 @@ export const listTemplates = async (
     };
   });
 
+  const mindmapTemplates = MINDMAP_THEMES.map((key) => {
+    const t = getMindmapThemeTokens(key);
+    return {
+      key,
+      label: t.label,
+      description: MINDMAP_COPY[key] ?? "",
+      tokens: {
+        // `accent`/`accent2` feed the colour dots on the template preview
+        // dialog, which is shared with the other formats.
+        accent: t.branchColors[0],
+        accent2: t.branchColors[1],
+        bg: t.bg,
+        rootBg: t.rootBg,
+        rootText: t.rootText,
+        text: t.text,
+        muted: t.muted,
+        branchColors: t.branchColors,
+        fontFamily: t.fontFamily,
+        headingWeight: t.headingWeight,
+      },
+    };
+  });
+
   sendResponse(
     res,
     true,
@@ -130,6 +166,7 @@ export const listTemplates = async (
         DOCX: documentThemes,
         PPTX: deckTemplates,
         XLSX: documentThemes,
+        MINDMAP: mindmapTemplates,
       },
     },
     "Templates fetched successfully",
@@ -242,6 +279,34 @@ export const updateDocumentStyle = async (
     );
   } catch (error: any) {
     console.error("Update document style error", error);
+    sendResponse(
+      res,
+      false,
+      null,
+      error.message,
+      error.statusCode ?? STATUS_CODES.SERVER_ERROR,
+    );
+  }
+};
+
+export const updateDocumentSpec = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { error, value } = validateUpdateDocumentSpecSchema(req.body);
+    if (error) {
+      sendResponse(res, false, error, error.message, STATUS_CODES.BAD_REQUEST);
+      return;
+    }
+    const result = await documentService.updateSpec(
+      req.user!.id,
+      parseInt(req.params.id as string),
+      value,
+    );
+    sendResponse(res, true, result, "Document saved", STATUS_CODES.OK);
+  } catch (error: any) {
+    console.error("Update document spec error", error);
     sendResponse(
       res,
       false,

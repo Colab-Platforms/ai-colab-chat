@@ -38,7 +38,19 @@ const INTENT_TIMEOUT_MS = Number(
 );
 const LAST_ANSWER_CHARS = 600;
 
-export type DocumentIntentMode = "REPLACE" | "AUGMENT" | "NONE";
+export type DocumentIntentMode = "REPLACE" | "AUGMENT" | "UPDATE" | "NONE";
+
+/**
+ * The document this chat most recently produced, if any. Its presence is what
+ * makes an otherwise format-less follow-up ("add some more use cases")
+ * interpretable as an edit to it.
+ */
+export interface ActiveDocument {
+  id: number;
+  format: DocumentFormat;
+  title: string;
+  theme: string;
+}
 
 export interface DocumentIntent {
   intent: DocumentIntentMode;
@@ -69,14 +81,14 @@ const NONE: DocumentIntent = {
 // ("convert this to word") fails *silently*, producing no document and no
 // explanation, which is far worse than an occasional wasted classifier call.
 const FORMAT_NOUN =
-  /\b(pdf|document|doc|docx|word|report|write[- ]?up|summary sheet|excel|spreadsheet|xlsx|sheet|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck)\b/i;
+  /\b(pdf|document|doc|docx|word|report|write[- ]?up|summary sheet|excel|spreadsheet|xlsx|sheet|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck|mind[- ]?map|mindmap|concept map)\b/i;
 
 const PRODUCTION_VERB =
   /\b(generate|create|make|build|produce|export|prepare|draft|compile|give me|send me|download|save (?:it |this |that )?as|convert (?:it |this |that )?(?:in)?to|turn (?:it|this|that) into|put (?:it|this|that) in(?:to)?|banao|bana do|bana do)\b/i;
 
 /** "as a pdf", "in word format", "into a deck" verb-free but unambiguous. */
 const REFERENTIAL_FORM =
-  /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:pdf|document|report|word|docx|excel|spreadsheet|xlsx|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck)\b|\b(?:pdf|word|docx|excel|xlsx|csv|ppt|pptx)\s+format\b/i;
+  /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:pdf|document|report|word|docx|excel|spreadsheet|xlsx|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck|mind[- ]?map|mindmap|concept map)\b|\b(?:pdf|word|docx|excel|xlsx|csv|ppt|pptx)\s+format\b/i;
 
 /**
  * "same data", "above content", "that information" an unambiguous back
@@ -105,9 +117,23 @@ const scanWindow = (message: string): string => {
   return `${message.slice(0, HEAD_SCAN_CHARS)}\n${message.slice(-TAIL_SCAN_CHARS)}`;
 };
 
-export const passesDocumentGate = (message: string): boolean => {
+/**
+ * Words that signal "change the thing we just made". Only consulted when the
+ * chat already has a document, and like the rest of the gate it is high-recall
+ * on purpose: it just decides whether the classifier is worth paying for, and
+ * the classifier is what actually separates "add more use cases" (an edit)
+ * from "what else is AI used for?" (a question).
+ */
+const EDIT_FOLLOWUP =
+  /\b(add|adding|more|extra|additional|another|also|include|including|insert|append|update|upgrade|improve|enhance|refine|expand|extend|elaborate|detail|detailed|deeper|remove|delete|drop|replace|change|edit|modify|rewrite|rephrase|fix|rename|reorder|shorten|shorter|longer|simplify|redo|regenerate|instead|make (?:it|this|that)|jodo|badhao|hatao)\b/i;
+
+export const passesDocumentGate = (
+  message: string,
+  hasActiveDocument = false,
+): boolean => {
   if (!message) return false;
   const window = scanWindow(message);
+  if (hasActiveDocument && EDIT_FOLLOWUP.test(window)) return true;
   if (!FORMAT_NOUN.test(window)) return false;
   return PRODUCTION_VERB.test(window) || REFERENTIAL_FORM.test(window);
 };
@@ -134,6 +160,7 @@ Choosing "format" report what the user ASKED FOR, never what you think is best:
 - "PPTX" "ppt", "powerpoint", "pptx", "presentation", "slide deck", "slides".
 - "XLSX" "excel", "spreadsheet", "xlsx", "sheet".
 - "CSV"  "csv", "comma separated", "comma-separated values". Do NOT use XLSX for these they are different files.
+- "MINDMAP"  "mind map", "mindmap", "concept map", "brainstorm map", "flow diagram of topics". A branching diagram of a topic, not a document.
 When no format is named at all, answer "PDF".
 
 Choosing "requiresCurrentData" set true when accurately answering the request needs facts that are current, recent, or change over time, which you cannot verify with certainty: this month's or this year's statistics, best-sellers or rankings "right now", live prices, sports scores, ongoing events, recent news. Set false for facts that are stable regardless of when they are answered (how something works, historical events, established concepts). This is judged independently of intent and format.
@@ -154,8 +181,23 @@ Critical distinctions:
 - "useLastAnswer" is true when the message refers to earlier content ("that", "this", "the above", "your answer") rather than naming a fresh topic.
 - Be conservative. When genuinely unsure, answer NONE with low confidence.`;
 
+/**
+ * Appended to the system prompt only when the chat already has a document, so
+ * the extra intent cannot be chosen in a chat where there is nothing to edit.
+ */
+const UPDATE_PROMPT_ADDENDUM = `
+
+This chat already contains a generated document (named on the "Existing document" line below). That adds a fourth intent:
+- "UPDATE": the message asks to CHANGE, EXTEND, SHORTEN, RESTRUCTURE or FIX that existing document, without asking for a new file or a different format.
+    "add some more use cases", "make the second section shorter", "remove the pricing part", "update it with 2025 data", "add a branch for security"
+  For UPDATE, echo the existing document's own format in "format".
+Rules for UPDATE:
+- If the user names a DIFFERENT format ("now make this a PDF", "turn it into slides"), that is REPLACE or AUGMENT, not UPDATE.
+- A general question that merely relates to the topic ("what else is AI used for?", "explain the first point") is NONE, not UPDATE. UPDATE requires that the user wants the document itself to change.
+- When genuinely unsure between UPDATE and NONE, answer NONE.`;
+
 const intentSchema = Joi.object({
-  intent: Joi.string().valid("REPLACE", "AUGMENT", "NONE").required(),
+  intent: Joi.string().valid("REPLACE", "AUGMENT", "UPDATE", "NONE").required(),
   // Defaulted rather than required: an older/weaker model that omits the field
   // should still produce a working PDF instead of failing the whole turn.
   format: Joi.string()
@@ -182,8 +224,9 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
 export const detectDocumentIntent = async (
   message: string,
   lastAssistantAnswer?: string | null,
+  activeDocument?: ActiveDocument | null,
 ): Promise<DocumentIntent> => {
-  const gated = passesDocumentGate(message);
+  const gated = passesDocumentGate(message, Boolean(activeDocument));
   dlog(
     "intent:gate",
     `${gated ? "PASS" : "STOP"} "${message.slice(0, 120)}"${gated ? " → calling classifier" : " (no model call, free)"}`,
@@ -203,7 +246,13 @@ export const detectDocumentIntent = async (
     lastAssistantAnswer
       ? `\nPrevious assistant answer (for resolving "that"/"this"):\n${lastAssistantAnswer.slice(0, LAST_ANSWER_CHARS)}`
       : `\n(No previous assistant answer in this conversation.)`,
+    activeDocument
+      ? `\nExisting document: ${DOCUMENT_FORMAT_META[activeDocument.format].label} titled "${activeDocument.title}"`
+      : "",
   ].join("\n");
+  const systemPrompt = activeDocument
+    ? SYSTEM_PROMPT + UPDATE_PROMPT_ADDENDUM
+    : SYSTEM_PROMPT;
 
   const model = getIntentModel();
   const started = Date.now();
@@ -213,14 +262,14 @@ export const detectDocumentIntent = async (
       model,
       temperature: 0,
       max_tokens: 200,
-      systemPrompt: `${SYSTEM_PROMPT.slice(0, 200)}… [${SYSTEM_PROMPT.length} chars]`,
+      systemPrompt: `${systemPrompt.slice(0, 200)}… [${systemPrompt.length} chars]`,
       userContent,
     });
 
     const completion = await withTimeout(
       createOpenRouterJsonCompletion({
         model,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt,
         userContent,
         max_tokens: 200,
         temperature: 0,
@@ -257,6 +306,21 @@ export const detectDocumentIntent = async (
     }
 
     const intent = value as DocumentIntent;
+
+    if (intent.intent === "UPDATE") {
+      // An UPDATE is only meaningful against a real document, and it always
+      // targets that document's own format; whatever format the classifier
+      // echoed is discarded so a slip there cannot change the file type.
+      if (!activeDocument) {
+        dlog("intent:result", "NONE classifier said UPDATE but the chat has no document");
+        return NONE;
+      }
+      intent.format = activeDocument.format;
+      intent.title = activeDocument.title;
+      intent.useLastAnswer = false;
+      dlogBlock("intent:result", "decided UPDATE", intent);
+      return intent;
+    }
 
     if (!intent.useLastAnswer && REFERS_TO_EXISTING_DATA.test(message)) {
       dlog(
@@ -304,6 +368,19 @@ export const buildDocumentSystemNote = (
 ): string => {
   const named = intent.title ? `titled "${intent.title}" ` : "";
   const effectiveLabel = DOCUMENT_FORMAT_META[opts.effectiveFormat].label;
+
+  // An edit to the document already in this chat. The pipeline revises the
+  // stored document itself, so the reply must not re-list the content (that
+  // would bill the user twice and, worse, read as if the chat text WERE the
+  // update, which is the exact confusion this intent exists to fix).
+  if (intent.intent === "UPDATE") {
+    return [
+      `The user's existing ${effectiveLabel} ${named}is being UPDATED with this request. The revised version will appear as a new download card directly beneath your reply. This is a real capability of this platform, not a hypothetical one.`,
+      `Never tell the user you cannot edit or regenerate it, and never ask them to paste it again the pipeline already has the full current document.`,
+      `Do NOT write out the new or changed content in your reply, and do not restate the existing document the pipeline applies the change to the stored document itself.`,
+      `Reply with one or two short sentences saying what you changed or added (for example "I've added more use cases and updated the ${effectiveLabel.toLowerCase()}."), and nothing else.`,
+    ].join("\n");
+  }
   const lines = [
     `A downloadable ${effectiveLabel} ${named}is being generated from this turn and will appear as a download card directly beneath your reply. This is a real capability of this platform, not a hypothetical one.`,
     "Never tell the user you cannot create files, and never ask them to paste their content again or upload it elsewhere the document pipeline already has the full, untruncated message.",

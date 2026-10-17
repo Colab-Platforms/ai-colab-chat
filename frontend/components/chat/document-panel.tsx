@@ -12,6 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { documentService } from "@/lib/services";
+import type { MindmapSpec, MindmapThemeTokens } from "./mindmap/mindmap-types";
+import { MindmapEditorSurface } from "./mindmap/mindmap-editor-surface";
+import { flushMindmapEdits } from "./mindmap/mindmap-autosave-registry";
 import { useDocumentPanel } from "@/context/document-panel-context";
 import {
   DocumentSpecRenderer,
@@ -38,14 +41,26 @@ const PPTX_TEMPLATES: Array<{ value: string; label: string }> = [
   { value: "mono", label: "Mono" },
 ];
 
+// Mind-map-only palettes. Keys must match MINDMAP_THEMES in
+// backend/src/modules/document/document.types.ts.
+const MINDMAP_THEME_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: "vibrant", label: "Vibrant" },
+  { value: "ocean", label: "Ocean" },
+  { value: "autumn", label: "Autumn" },
+  { value: "midnight", label: "Midnight" },
+];
+
 const POLL_INTERVAL_MS = 2000;
+const FILE_REFRESH_DELAY_MS = 6000;
 
 interface SpecPayload {
+  /** Which document this spec was fetched for; see the guard where it is rendered. */
+  forDocumentId: number;
   format: string;
   specKind: SpecKind;
   spec: AnySpec;
   theme: string;
-  themeTokens: ThemeTokens | PptxTemplateTokens;
+  themeTokens: ThemeTokens | PptxTemplateTokens | MindmapThemeTokens;
 }
 
 /**
@@ -61,6 +76,7 @@ export function DocumentPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const titleDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isRendering =
     activeDocument?.status === "PENDING" || activeDocument?.status === "PROCESSING";
@@ -69,7 +85,7 @@ export function DocumentPanel() {
     try {
       const res = await documentService.getSpec(id);
       if (res.data?.data) {
-        setPayload(res.data.data);
+        setPayload({ ...res.data.data, forDocumentId: id });
         setLoadError(null);
       }
     } catch (err: any) {
@@ -106,7 +122,25 @@ export function DocumentPanel() {
 
   if (!isOpen || !activeDocument) return null;
 
-  const applyStyleChange = (patch: { title?: string; theme?: string }) => {
+  // The download link points at the rendered file, which is refreshed in the
+  // background after a manual edit. Re-read the document a little later so the
+  // header's Open/Download buttons stop serving the pre-edit file.
+  const refreshFileLink = (id: number) => {
+    if (fileRefreshTimer.current) clearTimeout(fileRefreshTimer.current);
+    fileRefreshTimer.current = setTimeout(async () => {
+      try {
+        const res = await documentService.getById(id);
+        if (res.data?.data) updateActiveDocument(res.data.data);
+      } catch {
+        /* the link just stays on the previous file */
+      }
+    }, FILE_REFRESH_DELAY_MS);
+  };
+
+  const applyStyleChange = async (patch: { title?: string; theme?: string }) => {
+    // A theme/title change re-renders from the STORED map, so unsaved edits
+    // must reach the server first or the re-render would drop them.
+    await flushMindmapEdits();
     documentService
       .updateStyle(activeDocument.id, patch)
       .then((res) => {
@@ -143,7 +177,12 @@ export function DocumentPanel() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(payload.specKind === "presentation" ? PPTX_TEMPLATES : THEMES).map((t) => (
+              {(payload.specKind === "presentation"
+                ? PPTX_TEMPLATES
+                : payload.specKind === "mindmap"
+                  ? MINDMAP_THEME_OPTIONS
+                  : THEMES
+              ).map((t) => (
                 <SelectItem key={t.value} value={t.value}>
                   {t.label}
                 </SelectItem>
@@ -191,7 +230,11 @@ export function DocumentPanel() {
         </Button>
       </div>
 
-      <div className="relative flex-1 overflow-y-auto bg-white">
+      <div
+        className={`relative flex-1 bg-white ${
+          payload?.specKind === "mindmap" ? "overflow-hidden" : "overflow-y-auto"
+        }`}
+      >
         {isRendering && (
           <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-background/70 text-sm text-muted-foreground backdrop-blur-[1px]">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -207,8 +250,28 @@ export function DocumentPanel() {
 
         {loadError && <div className="p-6 text-sm text-destructive">{loadError}</div>}
 
-        {payload && !loadError && (
-   
+        {payload &&
+          !loadError &&
+          payload.specKind === "mindmap" &&
+          // The payload can briefly belong to the PREVIOUS document while the
+          // new one loads. An editor seeded from it would let the user edit,
+          // and save, the wrong map onto this document.
+          payload.forDocumentId === activeDocument.id && (
+            // Full-bleed and editable: the canvas owns its own pan/zoom, so it
+            // must not sit inside the padded, scrolling page wrapper the other
+            // formats use. Keyed by document so pan/zoom/undo survive a theme
+            // change but reset when a different map opens.
+            <MindmapEditorSurface
+              key={activeDocument.id}
+              documentId={activeDocument.id}
+              initialSpec={payload.spec as MindmapSpec}
+              tokens={payload.themeTokens as MindmapThemeTokens}
+              disabled={isRendering}
+              onSaved={() => refreshFileLink(activeDocument.id)}
+            />
+          )}
+
+        {payload && !loadError && payload.specKind !== "mindmap" && (
           <div
             className="h-full w-full bg-white p-8 text-black"
             style={{ ["--doc-preview-bg" as any]: "#ffffff" }}

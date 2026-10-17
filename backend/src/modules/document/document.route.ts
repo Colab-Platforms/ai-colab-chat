@@ -17,6 +17,9 @@ router.post(
   documentController.createDocument,
 );
 router.patch("/:id", auth("USER", "ADMIN", "SUPERADMIN"), documentController.updateDocumentStyle);
+// Replaces the stored content (manual edits). Distinct from PATCH "/:id",
+// which only restyles and re-renders.
+router.put("/:id/spec", auth("USER", "ADMIN", "SUPERADMIN"), documentController.updateDocumentSpec);
 router.post("/:id/retry", auth("USER", "ADMIN", "SUPERADMIN"), documentController.retryDocument);
 router.delete("/:id", auth("USER", "ADMIN", "SUPERADMIN"), documentController.deleteDocument);
 

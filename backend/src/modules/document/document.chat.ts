@@ -2,6 +2,7 @@ import prisma from "@root/prisma.js";
 import {
   buildDocumentSystemNote,
   detectDocumentIntent,
+  type ActiveDocument,
   type DocumentIntent,
 } from "./document.intent.js";
 import { runPendingDocumentJobs } from "./document.generation.service.js";
@@ -12,7 +13,9 @@ import {
   DOCUMENT_THEMES,
   MAX_SOURCE_TEXT_CHARS,
   MAX_TITLE_CHARS,
+  MINDMAP_THEMES,
   PPTX_TEMPLATES,
+  defaultThemeFor,
   type DocumentFormat,
 } from "./document.types.js";
 
@@ -35,11 +38,40 @@ export function parseRequestedDocumentOptions(
   // `theme` names a PPTX template for decks and a document theme for the
   // rest an unknown or mismatched value is dropped, never passed on.
   const allowed: readonly string[] =
-    upper === "PPTX" ? PPTX_TEMPLATES : DOCUMENT_THEMES;
+    upper === "PPTX"
+      ? PPTX_TEMPLATES
+      : upper === "MINDMAP"
+        ? MINDMAP_THEMES
+        : DOCUMENT_THEMES;
   return {
     format: upper,
     theme: typeof theme === "string" && allowed.includes(theme) ? theme : undefined,
   };
+}
+
+/**
+ * The latest finished document in this chat, i.e. what a follow-up like "add
+ * more use cases" would be editing.
+ *
+ * Only COMPLETED rows count: one still generating has no spec to revise, so a
+ * follow-up sent mid-generation falls back to a normal chat turn rather than
+ * queueing a revision of nothing. When several documents exist the newest wins,
+ * which also makes consecutive edits cumulative (each builds on the last).
+ */
+async function findActiveDocument(chatId: number): Promise<ActiveDocument | null> {
+  const row = await prisma.generatedDocument.findFirst({
+    where: { chatId, isDeleted: false, status: "COMPLETED" },
+    orderBy: { id: "desc" },
+    select: { id: true, format: true, title: true, theme: true },
+  });
+  return row
+    ? {
+        id: row.id,
+        format: row.format as DocumentFormat,
+        title: row.title,
+        theme: row.theme,
+      }
+    : null;
 }
 
 // Above this, a user message is carrying pasted material rather than just an
@@ -81,9 +113,15 @@ export async function prepareDocumentTurn(params: {
   systemNote: string;
 } | null> {
   try {
+    // An explicit format pick means "make a new one", so it never edits.
+    const activeDocument = params.requested
+      ? null
+      : await findActiveDocument(params.chatId);
+
     let intent = await detectDocumentIntent(
       params.userPrompt,
       params.lastAssistantAnswer,
+      activeDocument,
     );
     if (params.requested) {
       // An explicit pick always yields a document, even when the wording of the
@@ -104,8 +142,11 @@ export async function prepareDocumentTurn(params: {
 
     // Length is the same signal the enqueue uses, so the note and the source
     // selection always agree about where the document's content comes from.
+    // An UPDATE's material is the existing document, which always exists.
     const sourceAlreadyExists =
-      intent.useLastAnswer || usesPastedSource(params.userPrompt);
+      intent.intent === "UPDATE" ||
+      intent.useLastAnswer ||
+      usesPastedSource(params.userPrompt);
 
     const { format: effectiveFormat, substituted } = resolveRenderableFormat(
       intent.format,
@@ -216,6 +257,53 @@ export async function maybeGenerateDocumentFromChat(params: {
       }
     }
 
+    // A revision of the chat's current document: same format and theme, the
+    // worker revises its stored spec instead of generating from scratch. Done
+    // before the source-selection logic below, which is for NEW documents.
+    if (intent.intent === "UPDATE") {
+      const base = await findActiveDocument(chatId);
+      if (!base) {
+        dlog("chat:hook", "UPDATE intent but no completed document to revise skipping");
+        return null;
+      }
+
+      const revision = await prisma.generatedDocument.create({
+        data: {
+          userId,
+          chatId,
+          messageId,
+          modelResponseId: modelResponseId ?? null,
+          baseDocumentId: base.id,
+          format: base.format,
+          status: "PENDING",
+          title: base.title,
+          prompt: userPrompt.slice(0, 4000),
+          sourceText: null,
+          theme: base.theme,
+        },
+        select: { id: true, title: true, format: true },
+      });
+
+      dlogBlock("chat:enqueue", `revision ${revision.id} queued (of document ${base.id})`, {
+        documentId: revision.id,
+        baseDocumentId: base.id,
+        format: base.format,
+        theme: base.theme,
+        chatId,
+        messageId,
+        modelResponseId: modelResponseId ?? null,
+        promptChars: userPrompt.length,
+      });
+
+      void runPendingDocumentJobs();
+
+      return {
+        documentId: revision.id,
+        title: revision.title,
+        format: revision.format as DocumentFormat,
+      };
+    }
+
     const effectiveFormat =
       params.effectiveFormat ?? resolveRenderableFormat(intent.format).format;
 
@@ -297,7 +385,7 @@ export async function maybeGenerateDocumentFromChat(params: {
         title,
         prompt: userPrompt.slice(0, 4000),
         sourceText: sourceText || null,
-        theme: params.theme ?? "professional",
+        theme: params.theme ?? defaultThemeFor(effectiveFormat),
       },
       select: { id: true, title: true, format: true },
     });
@@ -312,7 +400,7 @@ export async function maybeGenerateDocumentFromChat(params: {
       chatId,
       messageId,
       modelResponseId: modelResponseId ?? null,
-      theme: params.theme ?? "professional",
+      theme: params.theme ?? defaultThemeFor(effectiveFormat),
       promptChars: userPrompt.length,
       sourceTextChars: sourceText.length,
     });

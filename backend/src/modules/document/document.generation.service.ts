@@ -4,7 +4,7 @@ import { debitTokens } from "@/utils/walletUtils.js";
 import { dlog, dlogBlock, dlogError, dtime } from "./document.logger.js";
 import { enrichPresentationImages } from "./document.pptxImages.js";
 import { getRenderer } from "./document.renderers.js";
-import { generateSpec } from "./document.spec.service.js";
+import { generateSpec, type SpecRevision } from "./document.spec.service.js";
 import {
   DOCUMENT_FORMAT_META,
   FORMAT_SPEC_KIND,
@@ -14,6 +14,7 @@ import {
   type DocumentFormat,
   type DocumentSpec,
   type DocumentTheme,
+  type MindmapSpec,
   type PresentationSpec,
   type WorkbookSpec,
 } from "./document.types.js";
@@ -130,8 +131,30 @@ export const processDocument = async (id: number): Promise<void> => {
     let completionTokens = document.completionTokens;
 
     if (!spec) {
-      const generated = await dtime("worker", `job=${id} spec generation`, () =>
-        generateSpec(specKind, document.prompt, document.sourceText),
+      // A chat follow-up ("add more use cases") revises the earlier document
+      // rather than starting over. If that document's spec is gone, fall back
+      // to generating from the request alone, which is worse but not broken.
+      let revision: SpecRevision | null = null;
+      if (document.baseDocumentId) {
+        const base = await prisma.generatedDocument.findUnique({
+          where: { id: document.baseDocumentId },
+          select: { spec: true },
+        });
+        if (base?.spec) {
+          revision = { spec: base.spec, instruction: document.prompt };
+        } else {
+          dlog(
+            "worker",
+            `job=${id} base document ${document.baseDocumentId} has no spec generating from the request alone`,
+          );
+        }
+      }
+
+      const generated = await dtime(
+        "worker",
+        `job=${id} spec ${revision ? `revision of document ${document.baseDocumentId}` : "generation"}`,
+        () =>
+          generateSpec(specKind, document.prompt, document.sourceText, revision),
       );
       spec = generated.spec;
       promptTokens = generated.promptTokens;
@@ -206,6 +229,8 @@ export const processDocument = async (id: number): Promise<void> => {
           return renderer.render(spec as PresentationSpec, theme as AnyTheme);
         case "workbook":
           return renderer.render(spec as WorkbookSpec, theme as DocumentTheme);
+        case "mindmap":
+          return renderer.render(spec as MindmapSpec, theme);
         default:
           return renderer.render(spec as DocumentSpec, theme as DocumentTheme);
       }
@@ -249,6 +274,92 @@ export const processDocument = async (id: number): Promise<void> => {
     });
   } catch (error) {
     await failDocument(id, error);
+  }
+};
+
+/**
+ * Re-renders a finished document's FILE from its stored spec, without touching
+ * `status`.
+ *
+ * Used by manual edits: the user's change is already saved on the row and shown
+ * on the canvas, so flipping the row back to PENDING (as a theme change does)
+ * would put the "Updating…" overlay over the map they are in the middle of
+ * editing and block their next save. Only the downloadable file lags behind.
+ */
+const renderStoredFile = async (id: number): Promise<void> => {
+  const document = await prisma.generatedDocument.findUnique({
+    where: { id },
+    select: { format: true, spec: true, theme: true, title: true, isDeleted: true },
+  });
+  if (!document || document.isDeleted || !document.spec) return;
+
+  const format = document.format as DocumentFormat;
+  const renderer = getRenderer(format);
+  if (!renderer) return;
+
+  const spec = document.spec as unknown as AnySpec;
+  if (specKindOf(spec) !== renderer.kind) return;
+
+  const theme = document.theme;
+  const buffer =
+    renderer.kind === "presentation"
+      ? await renderer.render(spec as PresentationSpec, theme as AnyTheme)
+      : renderer.kind === "workbook"
+        ? await renderer.render(spec as WorkbookSpec, theme as DocumentTheme)
+        : renderer.kind === "mindmap"
+          ? await renderer.render(spec as MindmapSpec, theme)
+          : await renderer.render(spec as DocumentSpec, theme as DocumentTheme);
+
+  const meta = DOCUMENT_FORMAT_META[format];
+  const publicId = buildPublicId(document.title, id);
+  const uploaded = await uploadToCloudinary(buffer, {
+    folder: "generated-documents",
+    resourceType: "raw",
+    format: meta.extension,
+    publicId,
+  });
+
+  await prisma.generatedDocument.update({
+    where: { id },
+    data: {
+      fileName: `${publicId}.${meta.extension}`,
+      fileUrl: uploaded.url,
+      cloudinaryPublicId: uploaded.publicId,
+      fileSize: buffer.length,
+    },
+  });
+};
+
+// id -> "another save arrived while this one was rendering".
+const refreshing = new Map<number, boolean>();
+
+/**
+ * Fire-and-forget file refresh, coalesced per document.
+ *
+ * Edits arrive in bursts, and two overlapping uploads of the same public id can
+ * finish out of order, leaving an OLDER file as the final one. So a second
+ * request while one is running only sets a flag, and the running job loops once
+ * more, always rendering whatever the row holds by then.
+ */
+export const refreshDocumentFile = async (id: number): Promise<void> => {
+  if (refreshing.has(id)) {
+    refreshing.set(id, true);
+    return;
+  }
+
+  try {
+    do {
+      refreshing.set(id, false);
+      await dtime("worker", `job=${id} file refresh after edit`, () =>
+        renderStoredFile(id),
+      );
+    } while (refreshing.get(id));
+  } catch (error) {
+    // The edit itself is already saved; a stale download file is recoverable
+    // by the next save, so this must never surface as a failed edit.
+    dlogError("worker", `job=${id} file refresh failed`, error);
+  } finally {
+    refreshing.delete(id);
   }
 };
 

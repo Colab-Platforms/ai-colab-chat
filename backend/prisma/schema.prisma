@@ -316,6 +316,7 @@ enum GeneratedDocumentFormat {
   PPTX
   XLSX
   CSV
+  MINDMAP
 }
 
 enum GeneratedDocumentStatus {
@@ -330,9 +331,11 @@ model GeneratedDocument {
   userId             Int
   chatId             Int?
   messageId          Int?
-  // In compare mode one assistant Message owns several ModelResponse rows, so
-  // messageId alone cannot say which model's answer this document came from.
+
+
+
   modelResponseId    Int?
+  baseDocumentId     Int?
   format             GeneratedDocumentFormat @default(PDF)
   status             GeneratedDocumentStatus @default(PENDING)
   title              String

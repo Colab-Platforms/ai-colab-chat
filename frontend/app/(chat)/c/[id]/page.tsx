@@ -21,6 +21,7 @@ import {
 } from "@/features/code-workspace";
 import * as LucideIcons from "lucide-react";
 import { Bot, Sparkles, MessageSquare } from "lucide-react";
+import { flushMindmapEdits } from "@/components/chat/mindmap/mindmap-autosave-registry";
 
 const SUGGESTED_PROMPTS = [
   { text: "Brainstorm ideas for...", value: "Brainstorm ideas for ", icon: Sparkles, className: "w-3.5 h-3.5 inline mr-2" },
@@ -847,6 +848,9 @@ export default function ChatPage() {
 
   const sendMessage = async (content: string, attachmentIds?: number[], modelIds?: number[], chatType?: string, attachmentObjects?: any[]) => {
     if (isSending) return;
+    // A follow-up like "add more use cases" revises the STORED mind map on the
+    // server, so edits still waiting on the autosave debounce must land first.
+    await flushMindmapEdits();
     stopRequestedRef.current = false;
     clearStreamAbortControllers();
     setIsSending(true);

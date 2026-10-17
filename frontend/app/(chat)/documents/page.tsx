@@ -28,6 +28,7 @@ import {
   DeckContentSlide,
   DeckTitleSlide,
   DocPagePreview,
+  MindmapPreview,
   SheetPreview,
   TemplateThumb,
   type TemplateInfo,
@@ -64,6 +65,7 @@ function TemplatePreviewBody({ format, template }: { format: DocFormat; template
     );
   }
   if (format === "XLSX") return <SheetPreview tokens={t} fontSize={10} />;
+  if (format === "MINDMAP") return <MindmapPreview tokens={t} fontSize={14} />;
   return <DocPagePreview tokens={t} fontSize={12} />;
 }
 
@@ -178,7 +180,7 @@ export default function DocumentsPage() {
 
   return (
     <StudioFrame>
-      <StudioHero title="Documents" subtitle="Reports, decks, sheets and more. Start from a prompt or a template." />
+      <StudioHero title="Documents" subtitle="Reports, decks, sheets, mind maps and more. Start from a prompt or a template." />
 
       <div>
         <StudioComposer

@@ -13,7 +13,13 @@ import { documentService } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { useDocumentPanel } from "@/context/document-panel-context";
 
-export type DocumentFormat = "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
+export type DocumentFormat =
+  | "PDF"
+  | "DOCX"
+  | "PPTX"
+  | "XLSX"
+  | "CSV"
+  | "MINDMAP";
 
 export interface GeneratedDocument {
   id: number;
@@ -47,6 +53,7 @@ const FORMAT_META: Record<
   // but a plain-text file is a genuinely different thing to open than a
   // styled workbook, and the icon should say so before the label does.
   CSV: { label: "CSV", extension: "csv", short: "CSV", tint: "#546E7A" },
+  MINDMAP: { label: "Mind map", extension: "svg", short: "MAP", tint: "#7C3AED" },
 };
 
 const metaFor = (format: string) =>
@@ -114,12 +121,20 @@ export function FileFormatIcon({
 const POLL_INTERVAL_MS = 2000;
 const MAX_POLL_MS = 5 * 60 * 1000;
 
-const stagesFor = (label: string) => [
-  "Understanding your request",
-  "Structuring the document",
-  "Laying out pages",
-  `Finalising the ${label}`,
-];
+const stagesFor = (label: string, format: string) =>
+  format.toUpperCase() === "MINDMAP"
+    ? [
+        "Understanding your request",
+        "Finding the main branches",
+        "Filling in the details",
+        `Finalising the ${label.toLowerCase()}`,
+      ]
+    : [
+        "Understanding your request",
+        "Structuring the document",
+        "Laying out pages",
+        `Finalising the ${label}`,
+      ];
 
 const formatBytes = (bytes?: number | null): string => {
   if (!bytes) return "";
@@ -142,7 +157,7 @@ export function DocumentCard({
 
   const isWorking = doc.status === "PENDING" || doc.status === "PROCESSING";
   const meta = metaFor(doc.format);
-  const STAGES = stagesFor(meta.label);
+  const STAGES = stagesFor(meta.label, doc.format);
 
   // Auto-opens the preview panel the moment a document that was generating
   // (or re-rendering after a style edit) becomes ready not on mount of an

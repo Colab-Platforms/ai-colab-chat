@@ -3,12 +3,14 @@ import { renderSpecToDocx } from "./document.docx.js";
 import { renderSpecToPptx } from "./document.pptx.js";
 import { renderSpecToXlsx } from "./document.xlsx.js";
 import { renderSpecToCsv } from "./document.csv.js";
+import { renderSpecToMindmap } from "./document.mindmap.js";
 import {
   DOCUMENT_FORMATS,
   type AnyTheme,
   type DocumentFormat,
   type DocumentSpec,
   type DocumentTheme,
+  type MindmapSpec,
   type PresentationSpec,
   type WorkbookSpec,
 } from "./document.types.js";
@@ -39,6 +41,10 @@ export type RendererEntry =
   | {
       kind: "workbook";
       render: (spec: WorkbookSpec, theme: DocumentTheme) => Promise<Buffer>;
+    }
+  | {
+      kind: "mindmap";
+      render: (spec: MindmapSpec, theme: string) => Promise<Buffer>;
     };
 
 /**
@@ -55,6 +61,7 @@ const RENDERERS: Partial<Record<DocumentFormat, RendererEntry>> = {
   PPTX: { kind: "presentation", render: renderSpecToPptx },
   XLSX: { kind: "workbook", render: renderSpecToXlsx },
   CSV: { kind: "workbook", render: renderSpecToCsv },
+  MINDMAP: { kind: "mindmap", render: renderSpecToMindmap },
 };
 
 export const isFormatSupported = (format: DocumentFormat): boolean =>

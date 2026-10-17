@@ -2,7 +2,11 @@ import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import { deleteFromCloudinary } from "@/utils/cloudinary.js";
-import { runPendingDocumentJobs } from "./document.generation.service.js";
+import {
+  refreshDocumentFile,
+  runPendingDocumentJobs,
+} from "./document.generation.service.js";
+import { validateMindmapEdit } from "./document.validators.js";
 import { getUserPlanContext, assertCanGenerateDocument } from "@/modules/plan-access/planAccess.service.js";
 import {
   getSupportedFormats,
@@ -10,7 +14,9 @@ import {
 } from "./document.renderers.js";
 import { getThemeTokens } from "./document.theme.js";
 import { getPptxTemplateTokens } from "./document.pptxTemplates.js";
+import { getMindmapThemeTokens } from "./document.mindmapThemes.js";
 import {
+  defaultThemeFor,
   FORMAT_SPEC_KIND,
   MAX_TITLE_CHARS,
   type AnySpec,
@@ -81,7 +87,7 @@ class DocumentService {
         ),
         prompt: input.prompt.trim(),
         sourceText: input.sourceText?.trim() || null,
-        theme: input.theme ?? (format === "PPTX" ? "corporate" : "professional"),
+        theme: input.theme ?? defaultThemeFor(format),
       },
     });
 
@@ -175,7 +181,9 @@ class DocumentService {
       themeTokens:
         format === "PPTX"
           ? getPptxTemplateTokens(document.theme)
-          : getThemeTokens(document.theme as DocumentTheme),
+          : format === "MINDMAP"
+            ? getMindmapThemeTokens(document.theme)
+            : getThemeTokens(document.theme as DocumentTheme),
     };
   }
 
@@ -226,6 +234,67 @@ class DocumentService {
     });
 
     void runPendingDocumentJobs();
+
+    return updated;
+  }
+
+  /**
+   * Saves a manual edit of a document's content, in place.
+   *
+   * Only mind maps for now: their spec is a plain tree the editor can change
+   * safely. The other formats' structural editing is a separate phase.
+   *
+   * The client sends the whole tree. The title is taken from the row, not the
+   * client: the title is edited through `updateStyle`, which rewrites both the
+   * column and the spec, so a client still holding the old title in its copy of
+   * the spec must not be able to revert it here.
+   *
+   * Unlike `updateStyle` this does NOT flip the row to PENDING. The canvas
+   * already shows the edit, so the downloadable file is refreshed quietly in
+   * the background rather than putting an "Updating…" overlay over the map.
+   */
+  async updateSpec(userId: number, id: number, input: { spec: unknown }) {
+    const document = await prisma.generatedDocument.findFirst({
+      where: { id, userId, isDeleted: false },
+      select: { id: true, format: true, status: true, title: true },
+    });
+
+    if (!document) {
+      throw new ApiError("Document not found", STATUS_CODES.NOT_FOUND);
+    }
+    if ((document.format as DocumentFormat) !== "MINDMAP") {
+      throw new ApiError(
+        "Editing the content of this kind of document isn't supported yet.",
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+    // A theme/title re-render is mid-flight. 409 (not 400) because this is
+    // transient: the client keeps its edit and retries shortly.
+    if (document.status === "PENDING" || document.status === "PROCESSING") {
+      throw new ApiError(
+        "This document is still updating. Your edit will be saved in a moment.",
+        STATUS_CODES.CONFLICT,
+      );
+    }
+
+    const { error, value } = validateMindmapEdit({
+      ...(input.spec as Record<string, unknown>),
+      title: document.title,
+    });
+    if (error) {
+      throw new ApiError(
+        `Couldn't save the mind map: ${error.message}`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const updated = await prisma.generatedDocument.update({
+      where: { id },
+      data: { spec: value as any },
+      select: { id: true, updatedAt: true },
+    });
+
+    void refreshDocumentFile(id);
 
     return updated;
   }

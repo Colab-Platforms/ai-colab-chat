@@ -40,11 +40,32 @@ export const PPTX_TEMPLATES: PptxTemplate[] = [
   "mono",
 ];
 
+/**
+ * Mind-map-only palettes. Like `PptxTemplate`, these share the `theme` column
+ * and are disambiguated by the document's format. Names are deliberately
+ * distinct from the PPTX template keys so a stray value can never be mistaken
+ * for the other set.
+ */
+export type MindmapTheme = "vibrant" | "ocean" | "autumn" | "midnight";
+
+export const MINDMAP_THEMES: MindmapTheme[] = [
+  "vibrant",
+  "ocean",
+  "autumn",
+  "midnight",
+];
+
 /** Whatever a `theme` field/column may hold, across every document format. */
-export type AnyTheme = DocumentTheme | PptxTemplate;
+export type AnyTheme = DocumentTheme | PptxTemplate | MindmapTheme;
 
 /** Mirrors `GeneratedDocumentFormat` in schema.prisma. */
-export type DocumentFormat = "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
+export type DocumentFormat =
+  | "PDF"
+  | "DOCX"
+  | "PPTX"
+  | "XLSX"
+  | "CSV"
+  | "MINDMAP";
 
 export const DOCUMENT_FORMATS: DocumentFormat[] = [
   "PDF",
@@ -52,6 +73,7 @@ export const DOCUMENT_FORMATS: DocumentFormat[] = [
   "PPTX",
   "XLSX",
   "CSV",
+  "MINDMAP",
 ];
 
 export interface DocumentFormatMeta {
@@ -98,6 +120,14 @@ export const DOCUMENT_FORMAT_META: Record<DocumentFormat, DocumentFormatMeta> = 
     label: "CSV file",
     extension: "csv",
     mimeType: "text/csv",
+  },
+  // The interactive map is drawn client-side from the stored spec; the file
+  // is a standalone SVG of the same layout, so the card has something to
+  // open and download like every other format.
+  MINDMAP: {
+    label: "Mind map",
+    extension: "svg",
+    mimeType: "image/svg+xml",
   },
 };
 
@@ -253,7 +283,43 @@ export interface WorkbookSpec {
   sheets: SheetSpec[];
 }
 
-export type AnySpec = DocumentSpec | PresentationSpec | WorkbookSpec;
+/* ------------------------------------------------------------------ *
+ * Mind maps
+ *
+ * A tree of short phrases. The model decides only WHAT the branches are; the
+ * layout (which side a branch sits on, spacing, curves) and every colour are
+ * the renderer's, exactly as for the other formats. Branch colours are keyed
+ * off the top-level branch index, so the spec carries none.
+ *
+ * `id`s are assigned by the validator, never by the model: they are stable
+ * path ids ("1", "1.2") that the client uses for collapse state and, later,
+ * for editing individual nodes.
+ * ------------------------------------------------------------------ */
+
+export interface MindmapNode {
+  id: string;
+  text: string;
+  /** A longer explanation shown on hover; never drawn on the map itself. */
+  note?: string;
+  children: MindmapNode[];
+}
+
+export interface MindmapSpec {
+  title: string;
+  root: MindmapNode;
+}
+
+export const MAX_MINDMAP_DEPTH = 5;
+export const MAX_MINDMAP_NODES = 250;
+export const MAX_MINDMAP_CHILDREN = 12;
+export const MAX_MINDMAP_NODE_CHARS = 120;
+export const MAX_MINDMAP_NOTE_CHARS = 600;
+
+export type AnySpec =
+  | DocumentSpec
+  | PresentationSpec
+  | WorkbookSpec
+  | MindmapSpec;
 
 /**
  * Excel's own limits, not ours: a sheet name over 31 characters or containing
@@ -273,7 +339,7 @@ export const MAX_SHEET_COLUMNS = 30;
  * the validator and the renderer signature, so it is the real fork in the
  * pipeline. XLSX will need a third kind; PDF and DOCX share the first.
  */
-export type SpecKind = "document" | "presentation" | "workbook";
+export type SpecKind = "document" | "presentation" | "workbook" | "mindmap";
 
 export const FORMAT_SPEC_KIND: Record<DocumentFormat, SpecKind> = {
   PDF: "document",
@@ -283,7 +349,16 @@ export const FORMAT_SPEC_KIND: Record<DocumentFormat, SpecKind> = {
   // CSV shares the workbook spec a CSV is just one flat sheet of it,
   // rendered by a format-specific renderer rather than a different spec.
   CSV: "workbook",
+  MINDMAP: "mindmap",
 };
+
+/** The theme a new document of this format starts with. */
+export const defaultThemeFor = (format: DocumentFormat): string =>
+  format === "PPTX"
+    ? "corporate"
+    : format === "MINDMAP"
+      ? "vibrant"
+      : "professional";
 
 export const isPresentationSpec = (spec: AnySpec): spec is PresentationSpec =>
   Array.isArray((spec as PresentationSpec).slides);
@@ -291,12 +366,19 @@ export const isPresentationSpec = (spec: AnySpec): spec is PresentationSpec =>
 export const isWorkbookSpec = (spec: AnySpec): spec is WorkbookSpec =>
   Array.isArray((spec as WorkbookSpec).sheets);
 
+export const isMindmapSpec = (spec: AnySpec): spec is MindmapSpec => {
+  const root = (spec as MindmapSpec).root;
+  return Boolean(root) && typeof root === "object" && !Array.isArray(root);
+};
+
 export const specKindOf = (spec: AnySpec): SpecKind =>
   isPresentationSpec(spec)
     ? "presentation"
     : isWorkbookSpec(spec)
       ? "workbook"
-      : "document";
+      : isMindmapSpec(spec)
+        ? "mindmap"
+        : "document";
 
 export const MAX_SLIDES = 60;
 export const MAX_BLOCKS_PER_SLIDE = 8;
