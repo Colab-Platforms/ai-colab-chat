@@ -1,0 +1,82 @@
+/* Scoped styles for the redesigned landing page (everything except the hero).
+   Tokens live on .cl-root so they never leak into the rest of the app. */
+.cl-root {
+  --bg: #f8f7fa; --surface: #ffffff; --sunken: #f2f1f5; --border: #e6e4ec; --border-strong: #d3d0dc;
+  --text: #18161d; --muted: #5d5968; --faint: #8a8694;
+  --accent: #6a45d9; --accent-hover: #5a37c6; --accent-soft: #efeafd; --accent-ink: #4a2aae;
+  --ok: oklch(0.58 0.13 155);
+  --shadow: 0 1px 2px rgba(24,22,29,.04), 0 8px 28px -10px rgba(40,24,90,.12);
+  --pop: 0 30px 80px -24px rgba(40,20,110,.35), 0 4px 14px rgba(20,10,50,.06);
+  --header: rgba(248,247,250,.82);
+  --inv: #18161d; --inv-fg: #ffffff; --inv-muted: #a8a4b3; --inv-border: #18161d;
+  --vp: #f3f0fb; --vp-line: #e4dff0;
+  --ph: #ffffff; --ph-in: #f6f5f9; --ph-line: #e6e4ec; --ph-text: #18161d; --ph-muted: #5d5968; --ph-faint: #8a8694;
+  --pill-bg: rgba(255,255,255,.85);
+  --glow: #ede6ff; --glow0: rgba(237,230,255,0); --chrome: #e3e1e8;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: clip;
+  transition: background .3s, color .3s;
+}
+.dark .cl-root {
+  --bg: #131217; --surface: #1b1a21; --sunken: #16151b; --border: #2a2832; --border-strong: #3a3744;
+  --text: #edebf2; --muted: #a8a4b3; --faint: #8e8a99;
+  --accent: #9677ff; --accent-hover: #a68bff; --accent-soft: #261f3f; --accent-ink: #cbbbff;
+  --ok: oklch(0.72 0.13 155);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px -10px rgba(0,0,0,.6);
+  --pop: 0 30px 80px -24px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.02);
+  --header: rgba(19,18,23,.8);
+  --inv: #201d2b; --inv-fg: #edebf2; --inv-muted: #a8a4b3; --inv-border: #3a3744;
+  --vp: #0e0d12; --vp-line: #24222c;
+  --ph: #1b1a21; --ph-in: #131217; --ph-line: #2e2b38; --ph-text: #edebf2; --ph-muted: #a8a4b3; --ph-faint: #8e8a99;
+  --pill-bg: rgba(19,17,24,.78);
+  --glow: #2a2147; --glow0: rgba(42,33,71,0); --chrome: #3a3744;
+}
+
+.cl-root .cl-s { font-family: 'Geist', var(--font-geist-sans), system-ui, sans-serif; }
+.cl-root .cl-s, .cl-root .cl-s * { box-sizing: border-box; }
+.cl-root .cl-s a { text-decoration: none; }
+.cl-root .cl-s button { font-family: inherit; }
+
+.cl-root .ms {
+  font-family: 'Material Symbols Rounded'; font-weight: normal; font-style: normal; line-height: 1;
+  letter-spacing: normal; text-transform: none; white-space: nowrap; direction: ltr; display: inline-block;
+  font-feature-settings: 'liga'; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* hover helpers (inline styles can't do :hover) */
+.cl-root .cl-navlink:hover { background: var(--sunken) !important; color: var(--text) !important; }
+.cl-root .cl-iconbtn:hover { border-color: var(--border-strong) !important; }
+.cl-root .cl-textlink:hover { color: var(--accent) !important; }
+.cl-root .cl-solid:hover { background: var(--accent) !important; color: #fff !important; }
+.cl-root .cl-primary:hover { background: var(--accent-hover) !important; color: #fff !important; }
+.cl-root .cl-white:hover { background: #efeafd !important; color: #18161d !important; }
+.cl-root .cl-ghost-inv:hover { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.6) !important; }
+.cl-root .cl-fade:hover { opacity: .88; }
+.cl-root .cl-flink:hover { color: #fff !important; }
+.cl-root .cl-card {
+  transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .35s;
+}
+.cl-root .cl-card:hover {
+  transform: translateY(-6px);
+  border-color: color-mix(in oklch, var(--accent) 50%, var(--border)) !important;
+  box-shadow: 0 30px 60px -30px color-mix(in oklch, var(--accent) 55%, transparent);
+}
+.cl-root .cl-noscroll { scrollbar-width: none; }
+.cl-root .cl-noscroll::-webkit-scrollbar { display: none; }
+
+@keyframes cl-marq { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes cl-spin { to { transform: rotate(360deg); } }
+@keyframes cl-spinr { to { transform: rotate(-360deg); } }
+@keyframes cl-flow { from { stroke-dashoffset: 434; } to { stroke-dashoffset: 0; } }
+@keyframes cl-type { 0% { max-width: 0; } 55%, 85% { max-width: 160px; } 100% { max-width: 0; } }
+@keyframes cl-fill { 0% { transform: scaleX(.08); } 45%, 80% { transform: scaleX(1); } 100% { transform: scaleX(.08); } }
+@keyframes cl-sheen { 0%, 35% { transform: translateX(-120%); } 75%, 100% { transform: translateX(220%); } }
+@keyframes cl-bob { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.18); opacity: .75; } }
+@keyframes cl-blink { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cl-root *, .cl-root *::before, .cl-root *::after { animation: none !important; transition: none !important; }
+}

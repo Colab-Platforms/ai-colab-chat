@@ -5,11 +5,13 @@ import { ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { EASE } from "@/components/landing/components/motionVariants";
 import HeroGrid from "./HeroGrid";
-import Image from "next/image";
+import HeroMock from "./HeroMock";
+import { useTheme } from "@/context/theme-context";
 
 export function Hero() {
+  const { theme } = useTheme();
   return (
-    <section className="flex flex-col text-foreground transition-all duration-300">
+    <section className="flex flex-col text-foreground transition-all duration-300 pb-[clamp(64px,9vw,140px)]">
       <div className="container max-w-7xl mx-auto flex flex-1 flex-col px-5 sm:px-10 z-50">
         <div className="flex flex-col items-center justify-center gap-5 pt-48 z-50">
           {/* Headline */}
@@ -51,8 +53,7 @@ export function Hero() {
 
         <HeroGrid />
 
-      <Image width={1920} height={1000} alt="hero-pc-dark" src="/new-landing/hero-pc-dark.png" className="border-2 border-gray-200 dark:border-[#4d4d4d] rounded-2xl shadow-lg w-full flex mx-auto hidden dark:block" />
-      <Image width={1920} height={1000} alt="hero-pc-light" src="/Landing/hero-pc-light.png" className="border-2 border-gray-200 dark:border-[#4d4d4d] rounded-2xl shadow-lg w-full flex mx-auto dark:hidden" />
+        <HeroMock dark={theme === "dark"} />
       </div>
 
 
