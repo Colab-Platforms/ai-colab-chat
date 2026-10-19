@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AudioLines, Captions, Crop, ImagePlus, Loader2, Pause, Play, Timer, Video, X, Zap } from "lucide-react";
-import { attachmentService, chatService, creditWalletService, studioTemplateService, videoService } from "@/lib/services";
+import { chatService, creditWalletService, studioTemplateService, videoService } from "@/lib/services";
 import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { toast } from "@/lib/toast";
 import {
@@ -12,6 +12,7 @@ import {
   constraintsFor,
   IMAGE_TO_VIDEO_MODELS,
   MAX_REFERENCE_AUDIO_SECONDS,
+  maxImagesFor,
   type VideoModelOption,
 } from "@/components/chat/video-generate-dialog";
 import {
@@ -26,14 +27,14 @@ import {
   TemplatesComingSoon,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
+import {
+  ImageSequenceStrip,
+  MAX_STUDIO_IMAGES,
+  MultiImageDialog,
+  type StudioImage,
+} from "@/components/studio/multi-image-dialog";
 import { VIDEO_TEMPLATES } from "@/components/studio/studio-templates";
 import { TemplateUseDialog, type TemplatePhoto } from "@/components/studio/template-use-dialog";
-
-interface StartFrame {
-  fileUrl: string;
-  previewUrl: string;
-  uploading: boolean;
-}
 
 interface ReferenceAudio {
   fileUrl: string;
@@ -75,7 +76,8 @@ export default function VideoStudioPage() {
   const [duration, setDuration] = useState(5);
   const [resolution, setResolution] = useState("720p");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [frame, setFrame] = useState<StartFrame | null>(null);
+  const [images, setImages] = useState<StudioImage[]>([]);
+  const [imagesOpen, setImagesOpen] = useState(false);
   const [audio, setAudio] = useState<ReferenceAudio | null>(null);
   const [audioPlaying, setAudioPlaying] = useState(false);
   const audioElRef = useRef<HTMLAudioElement>(null);
@@ -142,6 +144,9 @@ export default function VideoStudioPage() {
   const model = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
   const constraints = constraintsFor(model);
   const supportsImageToVideo = model ? IMAGE_TO_VIDEO_MODELS.has(model.externalId) : false;
+  const maxImages = maxImagesFor(model);
+  const hasImageInput = images.some((i) => i.fileUrl);
+  const imagesUploading = images.some((i) => i.uploading);
   const supportsAudioReference = model ? AUDIO_REFERENCE_MODELS.has(model.externalId) : false;
 
   const clearAudio = useCallback(() => {
@@ -161,31 +166,29 @@ export default function VideoStudioPage() {
     }
     if (!constraints.resolutions.includes(resolution)) setResolution(constraints.resolutions[0]);
     if (!constraints.aspectRatios.includes(aspectRatio)) setAspectRatio(constraints.aspectRatios[0]);
-    if (!supportsImageToVideo) setFrame(null);
+    if (images.length > maxImages) {
+      images.slice(maxImages).forEach((i) => URL.revokeObjectURL(i.previewUrl));
+      setImages(images.slice(0, maxImages));
+      if (maxImages > 0) toast.error(`${model?.name} uses at most ${maxImages} images — extra ones were removed.`);
+    }
     if (!supportsAudioReference) clearAudio();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model?.id]);
 
   const costPerSecond = model
-    ? (frame?.fileUrl ? model.creditCostPerSecondByResolutionImageInput?.[resolution] : undefined) ??
+    ? (hasImageInput ? model.creditCostPerSecondByResolutionImageInput?.[resolution] : undefined) ??
       model.creditCostPerSecondByResolution?.[resolution] ??
       model.creditCostPerSecond
     : null;
   const estimate = costPerSecond != null ? Math.ceil(duration * costPerSecond) : null;
   const insufficient = estimate !== null && credits !== null && estimate > credits;
 
-  const handleFrame = useCallback(async (file: File) => {
-    const previewUrl = URL.createObjectURL(file);
-    setFrame({ fileUrl: "", previewUrl, uploading: true });
-    try {
-      const res = await attachmentService.presend(file);
-      setFrame({ fileUrl: res.data.data.fileUrl, previewUrl, uploading: false });
-    } catch (err: any) {
-      toast.error(`Failed to upload ${file.name}: ${err?.response?.data?.message || err.message}`);
-      URL.revokeObjectURL(previewUrl);
-      setFrame(null);
-    }
-  }, []);
+  const removeImage = (id: string) =>
+    setImages((prev) => {
+      const gone = prev.find((i) => i.id === id);
+      if (gone) URL.revokeObjectURL(gone.previewUrl);
+      return prev.filter((i) => i.id !== id);
+    });
 
   const handleAudio = useCallback(async (file: File) => {
     if (file.size > MAX_REFERENCE_AUDIO_BYTES) {
@@ -235,7 +238,7 @@ export default function VideoStudioPage() {
       modelId &&
       model?.allowedForPlan &&
       videoGenEnabled &&
-      !frame?.uploading &&
+      !imagesUploading &&
       !audio?.uploading &&
       !insufficient,
   );
@@ -246,6 +249,7 @@ export default function VideoStudioPage() {
     aspectRatio: string;
     duration: number;
     firstFrameUrl?: string;
+    imageUrls?: string[];
     referenceAudioUrl?: string;
     title: string;
   }) => {
@@ -265,6 +269,7 @@ export default function VideoStudioPage() {
         resolution,
         aspectRatio: opts.aspectRatio,
         firstFrameUrl: opts.firstFrameUrl,
+        imageUrls: opts.imageUrls,
         referenceAudioUrl: opts.referenceAudioUrl,
         chatId,
       });
@@ -285,7 +290,7 @@ export default function VideoStudioPage() {
       text: prompt.trim(),
       aspectRatio,
       duration,
-      firstFrameUrl: frame?.fileUrl || undefined,
+      imageUrls: images.length > 0 ? images.map((i) => i.fileUrl) : undefined,
       referenceAudioUrl: audio?.fileUrl || undefined,
       title: prompt.trim(),
     });
@@ -345,37 +350,24 @@ export default function VideoStudioPage() {
           onSubmit={handleSubmit}
           canSubmit={canSubmit}
           busy={busy}
+          top={<ImageSequenceStrip images={images} onEdit={() => setImagesOpen(true)} onRemove={removeImage} />}
           left={
             <>
-              {frame ? (
-                <div className="relative h-8 w-8 shrink-0">
-                  <img src={frame.previewUrl} alt="Start frame" className="h-8 w-8 rounded-full object-cover border border-border" />
-                  {frame.uploading && (
-                    <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    title="Remove start image"
-                    onClick={() => {
-                      URL.revokeObjectURL(frame.previewUrl);
-                      setFrame(null);
-                    }}
-                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-surface border border-border flex items-center justify-center cursor-pointer"
-                  >
-                    <X className="w-2.5 h-2.5" />
-                  </button>
-                </div>
-              ) : (
-                <AttachButton
-                  onFile={handleFrame}
-                  accept="image/*"
-                  icon={ImagePlus}
-                  disabled={!supportsImageToVideo}
-                  title={supportsImageToVideo ? "Start from an image" : "This model can't start from an image"}
-                />
-              )}
+              <button
+                type="button"
+                disabled={!supportsImageToVideo}
+                title={
+                  !supportsImageToVideo
+                    ? "This model can't start from an image"
+                    : images.length > 0
+                      ? "Edit images"
+                      : "Add images"
+                }
+                onClick={() => setImagesOpen(true)}
+                className="h-8 w-8 shrink-0 rounded-full border border-border bg-surface text-muted-foreground hover:bg-sidebar-accent hover:text-foreground flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ImagePlus className="w-4 h-4" />
+              </button>
               {audio ? (
                 <div
                   className="inline-flex h-8 max-w-[11rem] shrink-0 items-center gap-1.5 rounded-full border border-border pl-1 pr-2 text-xs"
@@ -478,7 +470,7 @@ export default function VideoStudioPage() {
         {audio && (
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Tip: say how to use the audio, e.g. &ldquo;the character speaks in the voice from the audio&rdquo;.
-            {frame && " With audio attached, your image guides the character but may not be the exact first frame."}
+            {images.length > 0 && " With audio attached, your images guide the character but may not be the exact first frame."}
           </p>
         )}
         <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -546,6 +538,19 @@ export default function VideoStudioPage() {
           </div>
         )}
       </div>
+
+      <MultiImageDialog
+        open={imagesOpen}
+        onOpenChange={setImagesOpen}
+        images={images}
+        onConfirm={setImages}
+        maxImages={maxImages}
+        limitNote={
+          maxImages > 0 && maxImages < MAX_STUDIO_IMAGES
+            ? `${model?.name} only uses a first and last frame, so up to ${maxImages} images. Pick a Seedance model for longer sequences.`
+            : null
+        }
+      />
 
       <TemplateUseDialog
         template={activeTemplate}

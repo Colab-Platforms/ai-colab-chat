@@ -243,6 +243,8 @@ export const videoService = {
     aspectRatio?: string;
     firstFrameUrl?: string;
     lastFrameUrl?: string;
+    /** Ordered frame sequence (frame 1…n); wins over firstFrameUrl/lastFrameUrl. */
+    imageUrls?: string[];
     referenceAudioUrl?: string;
   }) => api.post("/videos", data),
   /** Resolves to `{ url, durationSec }` — the url goes into create()'s referenceAudioUrl. */

@@ -50,6 +50,7 @@ export function StudioComposer({
   busy,
   left,
   right,
+  top,
   maxLength = 4000,
 }: {
   value: string;
@@ -58,6 +59,8 @@ export function StudioComposer({
   onSubmit: () => void;
   canSubmit: boolean;
   busy?: boolean;
+  /** Attachments shown above the textarea (e.g. the image frame strip). */
+  top?: ReactNode;
   /** Controls after the textarea: attach button, option chips. */
   left: ReactNode;
   /** Controls just before the send button (e.g. cost estimate). */
@@ -75,6 +78,7 @@ export function StudioComposer({
 
   return (
     <div className="rounded-2xl border border-border bg-surface shadow-cl px-3 pt-3 pb-3 focus-within:border-line-strong transition-colors">
+      {top}
       <textarea
         ref={ref}
         value={value}

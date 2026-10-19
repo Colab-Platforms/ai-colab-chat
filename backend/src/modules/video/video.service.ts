@@ -9,8 +9,10 @@ import { containsDisallowedContent } from "./video.moderation.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
 import {
   AUDIO_REFERENCE_MODELS,
+  MAX_FRAME_PAIR_IMAGES,
   MAX_REFERENCE_AUDIO_SECONDS,
   MAX_TITLE_CHARS,
+  MULTI_IMAGE_MODELS,
   type CreateVideoInput,
   type ListVideosQuery,
 } from "./video.types.js";
@@ -252,6 +254,22 @@ class VideoService {
       );
     }
 
+    // One ordered sequence regardless of how the client sent it. 1–2 images go
+    // out as exact first/last frames; 3+ go out as ordered reference images
+    // (OpenRouter drops input_references whenever frame_images is present, so
+    // the two can't be combined in one request).
+    const images = input.imageUrls?.length
+      ? input.imageUrls
+      : [input.firstFrameUrl, input.lastFrameUrl].filter((u): u is string => Boolean(u));
+    if (images.length > MAX_FRAME_PAIR_IMAGES && !MULTI_IMAGE_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} ${images.length} images rejected — ${model.externalId} only takes a first/last frame`);
+      throw new ApiError(
+        `${model.name} can only use up to ${MAX_FRAME_PAIR_IMAGES} images (first and last frame). Pick a Seedance model or remove some images.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+    const asReferences = images.length > MAX_FRAME_PAIR_IMAGES;
+
     const duration = input.duration ?? DEFAULT_DURATION;
     const resolution = input.resolution ?? DEFAULT_RESOLUTION;
     const aspectRatio = input.aspectRatio ?? DEFAULT_ASPECT_RATIO;
@@ -290,7 +308,7 @@ class VideoService {
       vlogError("create", "model catalogue check failed (continuing without validation)", error);
     }
 
-    const hasImageInput = Boolean(input.firstFrameUrl || input.lastFrameUrl);
+    const hasImageInput = images.length > 0;
     const costPerSecond = await this.resolveExactCreditsPerSecond(model, resolution, hasImageInput);
     const reservedTokens = Math.ceil(duration * costPerSecond); // credits, despite the field name — see refundReservation in video.generation.service.ts
     const costPerCreditInr = await this.getCostPerCreditInr();
@@ -323,8 +341,9 @@ class VideoService {
           duration,
           resolution,
           aspectRatio,
-          firstFrameUrl: input.firstFrameUrl ?? null,
-          lastFrameUrl: input.lastFrameUrl ?? null,
+          firstFrameUrl: asReferences ? null : (images[0] ?? null),
+          lastFrameUrl: asReferences ? null : (images[1] ?? null),
+          referenceImageUrls: asReferences ? images : [],
           referenceAudioUrl: input.referenceAudioUrl ?? null,
           reservedTokens,
         },

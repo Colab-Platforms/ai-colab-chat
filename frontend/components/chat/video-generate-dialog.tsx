@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ImagePlus, Loader2, Lock, Sparkles, X } from "lucide-react";
+import { ImagePlus, Loader2, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +20,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { attachmentService, videoService, creditWalletService } from "@/lib/services";
+import { videoService, creditWalletService } from "@/lib/services";
+import {
+  ImageSequenceStrip,
+  MAX_STUDIO_IMAGES,
+  MultiImageDialog,
+  type StudioImage,
+} from "@/components/studio/multi-image-dialog";
 import { toast } from "@/lib/toast";
 
 export interface VideoModelOption {
@@ -94,6 +100,23 @@ export const IMAGE_TO_VIDEO_MODELS = new Set([
 ]);
 
 /**
+ * Models that take a 3+ image sequence (sent as ordered reference images).
+ * Mirrors MULTI_IMAGE_MODELS in backend video.types.ts — the others only use
+ * a first/last frame pair.
+ */
+export const MULTI_IMAGE_MODELS = new Set([
+  "bytedance/seedance-2.0",
+  "bytedance/seedance-2.0-mini",
+]);
+export const MAX_FRAME_PAIR_IMAGES = 2;
+
+/** How many images the model can actually use (0 = text-to-video only). */
+export const maxImagesFor = (model: VideoModelOption | undefined) => {
+  if (!model || !IMAGE_TO_VIDEO_MODELS.has(model.externalId)) return 0;
+  return MULTI_IMAGE_MODELS.has(model.externalId) ? MAX_STUDIO_IMAGES : MAX_FRAME_PAIR_IMAGES;
+};
+
+/**
  * Models that honour a reference audio (voice / dialogue / music). Mirrors
  * AUDIO_REFERENCE_MODELS in backend video.types.ts — other models ignore it.
  */
@@ -109,90 +132,8 @@ export interface VideoGenerateParams {
   duration: number;
   resolution: string;
   aspectRatio: string;
-  firstFrameUrl?: string;
-  lastFrameUrl?: string;
-}
-
-interface FrameUpload {
-  fileUrl: string;
-  previewUrl: string;
-  uploading: boolean;
-}
-
-function FrameImagePicker({
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  value: FrameUpload | null;
-  onChange: (next: FrameUpload | null) => void;
-  disabled?: boolean;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const handleFile = useCallback(
-    async (file: File) => {
-      const previewUrl = URL.createObjectURL(file);
-      onChange({ fileUrl: "", previewUrl, uploading: true });
-      try {
-        const res = await attachmentService.presend(file);
-        onChange({ fileUrl: res.data.data.fileUrl, previewUrl, uploading: false });
-      } catch (err: any) {
-        toast.error(`Failed to upload ${file.name}: ${err?.response?.data?.message || err.message}`);
-        URL.revokeObjectURL(previewUrl);
-        onChange(null);
-      }
-    },
-    [onChange],
-  );
-
-  return (
-    <div className="flex-1">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) handleFile(file);
-        }}
-      />
-      {value ? (
-        <div className="relative">
-          <img src={value.previewUrl} alt={label} className="h-20 w-full rounded-md object-cover" />
-          {value.uploading && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-md bg-black/40">
-              <Loader2 className="h-4 w-4 animate-spin text-white" />
-            </div>
-          )}
-          <button
-            type="button"
-            className="absolute -right-1.5 -top-1.5 rounded-full bg-background border border-border/60 p-0.5 shadow"
-            onClick={() => {
-              URL.revokeObjectURL(value.previewUrl);
-              onChange(null);
-            }}
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => inputRef.current?.click()}
-          className="flex h-20 w-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border/60 text-muted-foreground hover:bg-muted/40 disabled:opacity-50"
-        >
-          <ImagePlus className="h-4 w-4" />
-          <span className="text-[11px]">{label}</span>
-        </button>
-      )}
-    </div>
-  );
+  /** Ordered frame sequence (frame 1…n). */
+  imageUrls?: string[];
 }
 
 /**
@@ -217,8 +158,8 @@ export function VideoGenerateDialog({
   const [duration, setDuration] = useState(4);
   const [resolution, setResolution] = useState("720p");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [firstFrame, setFirstFrame] = useState<FrameUpload | null>(null);
-  const [lastFrame, setLastFrame] = useState<FrameUpload | null>(null);
+  const [images, setImages] = useState<StudioImage[]>([]);
+  const [imagesOpen, setImagesOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
 
@@ -252,19 +193,28 @@ export function VideoGenerateDialog({
   const selectedModel = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
   const constraints = constraintsFor(selectedModel);
   const supportsImageToVideo = selectedModel ? IMAGE_TO_VIDEO_MODELS.has(selectedModel.externalId) : false;
-  const hasImageInput = Boolean(firstFrame?.fileUrl || lastFrame?.fileUrl);
+  const maxImages = maxImagesFor(selectedModel);
+  const hasImageInput = images.some((i) => i.fileUrl);
+
+  const removeImage = (id: string) =>
+    setImages((prev) => {
+      const gone = prev.find((i) => i.id === id);
+      if (gone) URL.revokeObjectURL(gone.previewUrl);
+      return prev.filter((i) => i.id !== id);
+    });
 
   // Keep duration/resolution/aspectRatio valid whenever the model changes —
   // e.g. switching from Seedance (max 15s) to Veo (max 8s) with 12s selected
-  // would otherwise silently submit a value Veo rejects. Also clear any
-  // frame images the new model doesn't support.
+  // would otherwise silently submit a value Veo rejects. Also drop any
+  // images the new model can't use (none, or more than its first/last pair).
   useEffect(() => {
     if (!constraints.durations.includes(duration)) setDuration(constraints.durations[0]);
     if (!constraints.resolutions.includes(resolution)) setResolution(constraints.resolutions[0]);
     if (!constraints.aspectRatios.includes(aspectRatio)) setAspectRatio(constraints.aspectRatios[0]);
-    if (!supportsImageToVideo) {
-      setFirstFrame(null);
-      setLastFrame(null);
+    if (images.length > maxImages) {
+      images.slice(maxImages).forEach((i) => URL.revokeObjectURL(i.previewUrl));
+      setImages(images.slice(0, maxImages));
+      if (maxImages > 0) toast.error(`${selectedModel?.name} uses at most ${maxImages} images — extra ones were removed.`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedModel?.id]);
@@ -290,12 +240,11 @@ export function VideoGenerateDialog({
         duration,
         resolution,
         aspectRatio,
-        firstFrameUrl: firstFrame?.fileUrl || undefined,
-        lastFrameUrl: lastFrame?.fileUrl || undefined,
+        imageUrls: images.length > 0 ? images.map((i) => i.fileUrl) : undefined,
       });
       setPrompt("");
-      setFirstFrame(null);
-      setLastFrame(null);
+      images.forEach((i) => URL.revokeObjectURL(i.previewUrl));
+      setImages([]);
       onOpenChange(false);
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { message?: string; code?: string } } })?.response;
@@ -311,7 +260,7 @@ export function VideoGenerateDialog({
     } finally {
       setIsSubmitting(false);
     }
-  }, [prompt, modelId, duration, resolution, aspectRatio, firstFrame, lastFrame, onSubmit, onOpenChange]);
+  }, [prompt, modelId, duration, resolution, aspectRatio, images, onSubmit, onOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -366,12 +315,27 @@ export function VideoGenerateDialog({
                 ? "cheaper than text-to-video"
                 : "same price as text-to-video"}
             </p>
-            <div className="flex gap-2">
-              <FrameImagePicker label="First frame" value={firstFrame} onChange={setFirstFrame} />
-              <FrameImagePicker label="Last frame" value={lastFrame} onChange={setLastFrame} />
-            </div>
+            <ImageSequenceStrip images={images} onEdit={() => setImagesOpen(true)} onRemove={removeImage} />
+            <Button type="button" variant="outline" size="sm" onClick={() => setImagesOpen(true)}>
+              <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
+              {images.length > 0 ? "Edit images" : "Add images"}
+            </Button>
           </div>
         )}
+
+        {/* Nested inside DialogContent so Radix treats clicks in it as inside this dialog. */}
+        <MultiImageDialog
+          open={imagesOpen}
+          onOpenChange={setImagesOpen}
+          images={images}
+          onConfirm={setImages}
+          maxImages={maxImages}
+          limitNote={
+            maxImages > 0 && maxImages < MAX_STUDIO_IMAGES
+              ? `${selectedModel?.name} only uses a first and last frame, so up to ${maxImages} images. Pick a Seedance model for longer sequences.`
+              : null
+          }
+        />
 
         <div className="grid grid-cols-3 gap-2">
           <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
@@ -436,8 +400,7 @@ export function VideoGenerateDialog({
               !prompt.trim() ||
               !modelId ||
               isSubmitting ||
-              firstFrame?.uploading ||
-              lastFrame?.uploading ||
+              images.some((i) => i.uploading) ||
               !selectedModel?.allowedForPlan ||
               insufficientCredits
             }

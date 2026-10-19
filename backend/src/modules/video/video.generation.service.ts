@@ -149,19 +149,37 @@ export const submitPendingVideoJobs = async (): Promise<void> => {
         // would drop the audio — so with a reference audio, the frames go in as
         // image references instead (they guide the subject rather than pin the
         // exact first/last frame).
-        const frameImages: FrameImage[] = video.referenceAudioUrl
-          ? []
+        //
+        // A 3+ image sequence is stored in referenceImageUrls and always goes
+        // out as ordered image references (never frame_images, which would
+        // make OpenRouter ignore them).
+        const sequenceImages = video.referenceImageUrls ?? [];
+        const hasSequence = sequenceImages.length > 0;
+        const frameImages: FrameImage[] =
+          video.referenceAudioUrl || hasSequence
+            ? []
+            : [
+                ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
+                ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
+              ];
+        const imageReferences: InputReference[] = hasSequence
+          ? sequenceImages.map((url) => ({ type: "image_url" as const, url }))
           : [
-              ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
-              ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
-            ];
-        const inputReferences: InputReference[] = video.referenceAudioUrl
-          ? [
               ...(video.firstFrameUrl ? [{ type: "image_url" as const, url: video.firstFrameUrl }] : []),
               ...(video.lastFrameUrl ? [{ type: "image_url" as const, url: video.lastFrameUrl }] : []),
-              { type: "audio_url" as const, url: video.referenceAudioUrl },
-            ]
-          : [];
+            ];
+        const inputReferences: InputReference[] =
+          video.referenceAudioUrl || hasSequence
+            ? [
+                ...imageReferences,
+                ...(video.referenceAudioUrl ? [{ type: "audio_url" as const, url: video.referenceAudioUrl }] : []),
+              ]
+            : [];
+        // The references carry no frame index on the wire, so the order the
+        // user arranged is spelled out in the prompt instead.
+        const prompt = hasSequence
+          ? `${video.prompt}\n\nThe ${sequenceImages.length} reference images are an ordered frame sequence (image 1 = first frame, image ${sequenceImages.length} = last frame). Follow this order and keep the subject, style and scene consistent with them.`
+          : video.prompt;
         vlogBlock("submit", `job=${video.id} submitting to OpenRouter`, {
           model: video.model.externalId,
           duration: video.duration,
@@ -174,7 +192,7 @@ export const submitPendingVideoJobs = async (): Promise<void> => {
 
         const result = await submitVideoJob({
           model: video.model.externalId,
-          prompt: video.prompt,
+          prompt,
           duration: video.duration,
           resolution: video.resolution,
           aspectRatio: video.aspectRatio,

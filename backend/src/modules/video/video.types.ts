@@ -45,9 +45,30 @@ export interface CreateVideoInput {
   /** Image-to-video: public HTTPS URLs from the existing attachment upload flow. */
   firstFrameUrl?: string;
   lastFrameUrl?: string;
+  /**
+   * Ordered image sequence (frame 1 … n) from the multi-image picker. Takes
+   * precedence over firstFrameUrl/lastFrameUrl when present.
+   */
+  imageUrls?: string[];
   /** Optional voice/dialogue/music reference, uploaded via POST /videos/reference-audio. */
   referenceAudioUrl?: string;
 }
+
+/** Most images one request may carry (matches the picker's cap). */
+export const MAX_INPUT_IMAGES = 8;
+
+/**
+ * Models that accept 3+ ordered images as reference images. Veo 3.1 Lite only
+ * takes first/last frame, so a longer sequence would be silently dropped —
+ * create() rejects it instead of charging for a clip that ignored the images.
+ */
+export const MULTI_IMAGE_MODELS = new Set([
+  "bytedance/seedance-2.0",
+  "bytedance/seedance-2.0-mini",
+]);
+
+/** Models limited to a first/last frame pair. */
+export const MAX_FRAME_PAIR_IMAGES = 2;
 
 /**
  * Longest reference audio accepted. Seedance's own reference-to-video caps
