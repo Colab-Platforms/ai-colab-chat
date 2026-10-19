@@ -108,3 +108,29 @@ export const createOpenRouterStream = async (
 
   return stream;
 };
+
+export interface OpenRouterChatCompletionOptions {
+  model: string;
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+/**
+ * Non-streaming plain-text completion over an explicit message list, for
+ * internal single-shot calls that need a conversation (e.g. answering a
+ * question about a mind map). The JSON helper above takes one system and one
+ * user message only, and forces a JSON object reply.
+ */
+export const createOpenRouterChatCompletion = async (
+  options: OpenRouterChatCompletionOptions,
+) => {
+  const { model, messages, max_tokens, temperature } = options;
+
+  return getOpenRouterClient().chat.completions.create({
+    model,
+    messages,
+    max_tokens: max_tokens ?? 800,
+    temperature: temperature ?? 0.3,
+  } as any);
+};

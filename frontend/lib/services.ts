@@ -230,6 +230,18 @@ export const documentService = {
   /** Replaces a document's stored content (manual mind-map edits). */
   updateSpec: (id: number, spec: unknown) =>
     api.put(`/documents/${id}/spec`, { spec }),
+  /** AI: suggests new branches under a node. Billed to the token wallet. */
+  expandMindmapNode: (id: number, data: { nodeId: string; instruction?: string }) =>
+    api.post(`/documents/${id}/mindmap/expand`, data),
+  /** AI: answers a question about the saved map. Billed to the token wallet. */
+  askMindmap: (
+    id: number,
+    data: {
+      question: string;
+      nodeId?: string;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
+    },
+  ) => api.post(`/documents/${id}/mindmap/ask`, data),
 };
 
 export const videoService = {

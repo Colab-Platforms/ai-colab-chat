@@ -33,6 +33,7 @@ export function MindmapEditorSurface({
       spec={editor.spec}
       tokens={tokens}
       editor={editor}
+      documentId={documentId}
       disabled={disabled}
     />
   );

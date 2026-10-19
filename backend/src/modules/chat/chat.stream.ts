@@ -300,7 +300,11 @@ async function detectAndConvertImages(
 async function buildAttachmentContentParts(
   textContent: string,
   attachments: AttachmentRecord[],
-): Promise<{ contentParts: any[]; extraPlugins: any[] }> {
+): Promise<{
+  contentParts: any[];
+  extraPlugins: any[];
+  attachmentText: string;
+}> {
   const parts: any[] = [];
   const extraPlugins: any[] = [];
   let extraText = "";
@@ -439,7 +443,7 @@ async function buildAttachmentContentParts(
     parts.unshift({ type: "text", text: processedText });
   }
 
-  return { contentParts: parts, extraPlugins };
+  return { contentParts: parts, extraPlugins, attachmentText: extraText.trim() };
 }
 
 async function checkTokenLimitsAndSetupStream(
@@ -1203,11 +1207,15 @@ export async function streamChat(req: Request, res: Response) {
     // Build multipart content for current message if attachments are present
     let attachmentPlugins: any[] = [];
     let pushedAttachmentMessage = false;
+    // Text pulled out of this turn's attached files, kept for the document
+    // pipeline (see buildAttachmentContentParts).
+    let attachmentSourceText = "";
     if (attachmentIds && attachmentIds.length > 0) {
       const attachments = await attachmentService.findMany(attachmentIds);
       if (attachments.length > 0) {
-        const { contentParts, extraPlugins } =
+        const { contentParts, extraPlugins, attachmentText } =
           await buildAttachmentContentParts(content.trim(), attachments);
+        attachmentSourceText = attachmentText;
         // Replace the last user message with the multipart version
         // (checkTokenLimitsAndSetupStream will use the last item as latestPrompt)
         conversationHistory.push({ role: "user", content: contentParts });
@@ -1315,6 +1323,7 @@ export async function streamChat(req: Request, res: Response) {
           userPrompt: content,
           lastAssistantAnswer,
           requested: requestedDocument,
+          attachmentText: attachmentSourceText,
         });
 
     if (documentTurn) {
@@ -1949,6 +1958,7 @@ export async function streamChat(req: Request, res: Response) {
       modelResponseId: (res as any).modelResponseId,
       userPrompt: content,
       assistantAnswer: fullContent,
+      attachmentText: attachmentSourceText,
       intent: documentTurn?.intent ?? null,
       effectiveFormat: documentTurn?.effectiveFormat,
       // Only honoured when the rendered format matches the one the template was

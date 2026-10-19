@@ -20,6 +20,9 @@ router.patch("/:id", auth("USER", "ADMIN", "SUPERADMIN"), documentController.upd
 // Replaces the stored content (manual edits). Distinct from PATCH "/:id",
 // which only restyles and re-renders.
 router.put("/:id/spec", auth("USER", "ADMIN", "SUPERADMIN"), documentController.updateDocumentSpec);
+// AI actions on a mind map. Both bill the caller's token wallet.
+router.post("/:id/mindmap/expand", auth("USER", "ADMIN", "SUPERADMIN"), documentController.expandMindmapNodeHandler);
+router.post("/:id/mindmap/ask", auth("USER", "ADMIN", "SUPERADMIN"), documentController.askMindmapHandler);
 router.post("/:id/retry", auth("USER", "ADMIN", "SUPERADMIN"), documentController.retryDocument);
 router.delete("/:id", auth("USER", "ADMIN", "SUPERADMIN"), documentController.deleteDocument);
 

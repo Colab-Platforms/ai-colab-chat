@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  ChevronLeft,
+  ChevronRight,
   Download,
   ImageDown,
   ListPlus,
@@ -11,10 +13,16 @@ import {
   Minus,
   Pencil,
   Plus,
+  Loader2,
+  MessageCircleQuestion,
+  Presentation,
   Redo2,
+  Send,
+  Sparkles,
   StickyNote,
   Trash2,
   Undo2,
+  X,
 } from "lucide-react";
 import { layoutMindmap, type LayoutNode, type MindmapLayout } from "./mindmap-layout";
 import {
@@ -22,6 +30,7 @@ import {
   NEW_NODE_TEXT,
   addChild,
   addSibling,
+  appendChildren,
   canMoveSibling,
   deleteNode,
   descendantIds,
@@ -35,11 +44,18 @@ import {
 } from "./mindmap-tree";
 import type { MindmapEditor, SaveStatus } from "./use-mindmap-editor";
 import type { MindmapSpec, MindmapThemeTokens } from "./mindmap-types";
+import { documentService } from "@/lib/services";
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 3;
 const PNG_SCALE = 2;
 const PNG_MAX_SIDE = 8192;
+/** Present mode zooms in further than normal fitting does: a branch should fill the screen. */
+const PRESENT_MAX_ZOOM = 1.8;
+const OVERVIEW_MAX_ZOOM = 1.4;
+const TWEEN_MS = 450;
+/** Space kept around the focused branch, in layout units. */
+const PRESENT_PAD = 70;
 /** Pointer travel before a press on a node becomes a drag rather than a click. */
 const DRAG_THRESHOLD_PX = 5;
 const NOTICE_MS = 3500;
@@ -53,13 +69,14 @@ interface View {
 const clampZoom = (k: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));
 const lineWidth = (depth: number) => (depth <= 1 ? 3 : depth === 2 ? 2 : 1.5);
 
-/** The view that centres `bounds` in a `w` x `h` container, never zooming past 140%. */
+/** The view that centres `bounds` in a `w` x `h` container, never zooming past `maxK`. */
 const fitView = (
   bounds: { x: number; y: number; width: number; height: number },
   w: number,
   h: number,
+  maxK = 1.4,
 ): View => {
-  const k = clampZoom(Math.min(w / bounds.width, h / bounds.height, 1.4));
+  const k = clampZoom(Math.min(w / bounds.width, h / bounds.height, maxK));
   return {
     k,
     x: w / 2 - (bounds.x + bounds.width / 2) * k,
@@ -109,15 +126,34 @@ export function MindmapCanvas({
   spec,
   tokens,
   editor,
+  documentId,
   disabled = false,
 }: {
   spec: MindmapSpec;
   tokens: MindmapThemeTokens;
   editor?: MindmapEditor;
+  /** Needed for the AI actions, which run against the saved document. */
+  documentId?: number;
   /** Pauses editing (e.g. while a theme change is re-rendering). */
   disabled?: boolean;
 }) {
-  const editable = Boolean(editor) && !disabled;
+  const [presenting, setPresenting] = useState(false);
+  /** 0 = whole-map overview; n = the n-th top-level branch (1-based). */
+  const [step, setStep] = useState(0);
+  // Editing is switched off while presenting: the screen belongs to the audience.
+  const editable = Boolean(editor) && !disabled && !presenting;
+  const aiEnabled = Boolean(editor) && typeof documentId === "number";
+
+  // AI actions. Both bill the user's token wallet on the server.
+  const [expandId, setExpandId] = useState<string | null>(null);
+  const [expandText, setExpandText] = useState("");
+  const [expandBusy, setExpandBusy] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [askInput, setAskInput] = useState("");
+  const [askBusy, setAskBusy] = useState(false);
+  const [askLog, setAskLog] = useState<
+    Array<{ role: "user" | "assistant"; content: string; about?: string; error?: boolean }>
+  >([]);
 
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [view, setView] = useState<View>({ k: 1, x: 0, y: 0 });
@@ -147,11 +183,25 @@ export function MindmapCanvas({
   const pan = useRef<{ px: number; py: number; vx: number; vy: number; moved: boolean } | null>(null);
   const nodeGesture = useRef<{ id: string; px: number; py: number; moved: boolean } | null>(null);
   const dragRef = useRef<typeof drag>(null);
+  const animRef = useRef<number | null>(null);
+  const viewRef = useRef(view);
+  /** Set when leaving fullscreen: the container is about to resize and the view must refit then. */
+  const needsRefit = useRef(false);
+  /** The latest tree, for async work that finishes after later renders. */
+  const specRef = useRef(spec);
+  const askScrollRef = useRef<HTMLDivElement>(null);
 
-  const layout: MindmapLayout = useMemo(
+  const editLayout: MindmapLayout = useMemo(
     () => layoutMindmap(spec.root, collapsed),
     [spec.root, collapsed],
   );
+  // Presenting always shows every branch fully, whatever was collapsed while editing.
+  const fullLayout: MindmapLayout = useMemo(
+    () => layoutMindmap(spec.root),
+    [spec.root],
+  );
+  const layout = presenting ? fullLayout : editLayout;
+  const stepCount = spec.root.children.length + 1;
   const nodesById = useMemo(
     () => new Map(layout.nodes.map((n) => [n.id, n])),
     [layout.nodes],
@@ -181,6 +231,10 @@ export function MindmapCanvas({
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       setSize({ w: width, h: height });
+      if (needsRefit.current && width > 0 && height > 0) {
+        needsRefit.current = false;
+        setView(fitView(boundsRef.current, width, height));
+      }
       // Fit once, the first time the container has a size. Later layout
       // changes (collapsing a branch, adding a node) keep the user's view.
       if (!didFit.current && width > 0 && height > 0) {
@@ -213,7 +267,10 @@ export function MindmapCanvas({
     const el = containerRef.current;
     if (!el) return;
     const onWheel = (event: WheelEvent) => {
+      // Let the AI panel scroll instead of zooming the map underneath it.
+      if ((event.target as Element).closest?.("[data-scroll]")) return;
       event.preventDefault();
+      if (animRef.current) cancelAnimationFrame(animRef.current);
       const rect = el.getBoundingClientRect();
       zoomAt(
         Math.exp(-event.deltaY * 0.0015),
@@ -224,6 +281,107 @@ export function MindmapCanvas({
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [zoomAt]);
+
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  /** Eases the camera to `target` instead of jumping, so the audience can follow where it went. */
+  const animateTo = useCallback((target: View) => {
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    const from = viewRef.current;
+    const started = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - started) / TWEEN_MS);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      setView({
+        k: from.k + (target.k - from.k) * e,
+        x: from.x + (target.x - from.x) * e,
+        y: from.y + (target.y - from.y) * e,
+      });
+      animRef.current = t < 1 ? requestAnimationFrame(tick) : null;
+    };
+    animRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+    },
+    [],
+  );
+
+  /** The region the camera frames for the current step. */
+  const stepBounds = useMemo(() => {
+    if (step === 0) return fullLayout.bounds;
+    const members = fullLayout.nodes.filter((n) => n.branch === step - 1);
+    if (members.length === 0) return fullLayout.bounds;
+    const minX = Math.min(...members.map((n) => n.x));
+    const maxX = Math.max(...members.map((n) => n.x + n.w));
+    const minY = Math.min(...members.map((n) => n.y - n.h / 2));
+    const maxY = Math.max(...members.map((n) => n.y + n.h / 2));
+    return {
+      x: minX - PRESENT_PAD,
+      y: minY - PRESENT_PAD,
+      width: maxX - minX + PRESENT_PAD * 2,
+      height: maxY - minY + PRESENT_PAD * 2,
+    };
+  }, [step, fullLayout]);
+
+  useEffect(() => {
+    if (!presenting || !size.w || !size.h) return;
+    animateTo(
+      fitView(
+        stepBounds,
+        size.w,
+        size.h,
+        step === 0 ? OVERVIEW_MAX_ZOOM : PRESENT_MAX_ZOOM,
+      ),
+    );
+  }, [presenting, step, stepBounds, size.w, size.h, animateTo]);
+
+  const stopPresenting = useCallback(() => {
+    setPresenting(false);
+    if (document.fullscreenElement) {
+      // The container is about to change size; refit once it has.
+      needsRefit.current = true;
+      void document.exitFullscreen().catch(() => {
+        needsRefit.current = false;
+      });
+    } else {
+      animateTo(fitView(editLayout.bounds, size.w, size.h));
+    }
+  }, [animateTo, editLayout.bounds, size.w, size.h]);
+
+  const startPresenting = () => {
+    setSelectedId(null);
+    setRenamingId(null);
+    setNoteId(null);
+    setExpandId(null);
+    setAskOpen(false);
+    setStep(0);
+    setPresenting(true);
+    // Real fullscreen when the browser allows it; otherwise present in place.
+    void containerRef.current?.requestFullscreen?.().catch(() => undefined);
+    containerRef.current?.focus({ preventScroll: true });
+  };
+
+  // Leaving fullscreen with the browser's own Esc must also leave present mode.
+  useEffect(() => {
+    if (!presenting) return;
+    const onChange = () => {
+      if (!document.fullscreenElement) stopPresenting();
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [presenting, stopPresenting]);
+
+  /** Opacity of a branch's nodes and edges: while presenting a branch, the others recede. */
+  const dimOf = (branch: number) => {
+    if (!presenting || step === 0) return 1;
+    if (branch === step - 1) return 1;
+    return branch < 0 ? 0.45 : 0.1;
+  };
 
   const toggle = useCallback((id: string) => {
     setCollapsed((prev) => {
@@ -370,7 +528,121 @@ export function MindmapCanvas({
     [spec, applyEdit],
   );
 
+  useEffect(() => {
+    specRef.current = spec;
+  }, [spec]);
+
+  useEffect(() => {
+    askScrollRef.current?.scrollTo({ top: askScrollRef.current.scrollHeight });
+  }, [askLog.length, askBusy]);
+
+  const apiMessage = (error: unknown, fallback: string) =>
+    (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+    fallback;
+
+  /**
+   * Asks the server for new branches under a node and applies them as one
+   * undoable edit. The server expands the SAVED map, so pending edits are
+   * flushed first; the result is then merged into whatever the tree is by the
+   * time the answer arrives.
+   */
+  const runExpand = async () => {
+    if (!editor || typeof documentId !== "number" || !expandId || expandBusy) return;
+    const parentId = expandId;
+    setExpandBusy(true);
+    try {
+      await editor.flush();
+      const res = await documentService.expandMindmapNode(documentId, {
+        nodeId: parentId,
+        instruction: expandText.trim() || undefined,
+      });
+      const result = appendChildren(specRef.current, parentId, res.data?.data?.children ?? []);
+      const applied = applyEdit(result);
+      if (applied && !isError(result)) {
+        if (result.message) showNotice(result.message);
+        const nextCollapsed = new Set(collapsed);
+        nextCollapsed.delete(parentId);
+        setCollapsed(nextCollapsed);
+        setSelectedId(parentId);
+        if (result.id) reveal(result.id, result.spec, nextCollapsed);
+        setExpandId(null);
+        setExpandText("");
+      }
+    } catch (error) {
+      showNotice(apiMessage(error, "Couldn't expand this node. Please try again."));
+    } finally {
+      setExpandBusy(false);
+    }
+  };
+
+  const runAsk = async () => {
+    const question = askInput.trim();
+    if (!question || askBusy || !editor || typeof documentId !== "number") return;
+
+    const focusNode = selectedId ? nodesById.get(selectedId) : undefined;
+    // Failed turns are shown but not sent back as history.
+    const history = askLog
+      .filter((m) => !m.error)
+      .map(({ role, content }) => ({ role, content }));
+
+    setAskLog((log) => [...log, { role: "user", content: question, about: focusNode?.text }]);
+    setAskInput("");
+    setAskBusy(true);
+    try {
+      await editor.flush();
+      const res = await documentService.askMindmap(documentId, {
+        question,
+        nodeId: focusNode?.id,
+        history,
+      });
+      setAskLog((log) => [...log, { role: "assistant", content: res.data?.data?.answer ?? "" }]);
+    } catch (error) {
+      setAskLog((log) => [
+        ...log,
+        {
+          role: "assistant",
+          content: apiMessage(error, "Couldn't get an answer. Please try again."),
+          error: true,
+        },
+      ]);
+    } finally {
+      setAskBusy(false);
+    }
+  };
+
   const onKeyDown = (event: React.KeyboardEvent) => {
+    if (presenting) {
+      switch (event.key) {
+        case "ArrowRight":
+        case "ArrowDown":
+        case "PageDown":
+        case " ":
+        case "Enter":
+          event.preventDefault();
+          setStep((s) => Math.min(s + 1, stepCount - 1));
+          break;
+        case "ArrowLeft":
+        case "ArrowUp":
+        case "PageUp":
+        case "Backspace":
+          event.preventDefault();
+          setStep((s) => Math.max(s - 1, 0));
+          break;
+        case "Home":
+          event.preventDefault();
+          setStep(0);
+          break;
+        case "End":
+          event.preventDefault();
+          setStep(stepCount - 1);
+          break;
+        case "Escape":
+          event.preventDefault();
+          stopPresenting();
+          break;
+      }
+      return;
+    }
     if (!editable || !editor) return;
     const tag = (event.target as HTMLElement).tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -447,6 +719,8 @@ export function MindmapCanvas({
   const onPointerDown = (event: React.PointerEvent) => {
     const target = event.target as Element;
     if (target.closest("[data-ui]")) return;
+    // Grabbing the map takes over from an in-flight camera move.
+    if (animRef.current) cancelAnimationFrame(animRef.current);
     containerRef.current?.focus({ preventScroll: true });
 
     const nodeEl = editable ? target.closest("[data-node]") : null;
@@ -618,7 +892,12 @@ export function MindmapCanvas({
     const hiddenForRename = renamingId === n.id;
 
     return (
-      <g key={n.id} className="group" data-node={n.id}>
+      <g
+        key={n.id}
+        className="group"
+        data-node={n.id}
+        style={{ opacity: dimOf(n.branch), transition: "opacity 0.4s" }}
+      >
         {n.note ? <title>{n.note}</title> : null}
         {/* A larger hit area: makes thin underlines easy to grab and keeps the collapse control reachable. */}
         <rect
@@ -704,7 +983,8 @@ export function MindmapCanvas({
     height: n.h * view.k,
   });
 
-  const showToolbar = Boolean(selected) && !renaming && !noting && !drag;
+  const expanding = expandId ? nodesById.get(expandId) ?? null : null;
+  const showToolbar = Boolean(selected) && !renaming && !noting && !expanding && !drag;
   const toolbarRect = selected ? screenRect(selected) : null;
   const status = editor?.status ?? "clean";
 
@@ -743,6 +1023,7 @@ export function MindmapCanvas({
               stroke={colorFor(edge.branch)}
               strokeWidth={lineWidth(edge.depth)}
               strokeLinecap="round"
+              style={{ opacity: dimOf(edge.branch), transition: "opacity 0.4s" }}
             />
           ))}
           {layout.nodes.map(renderNode)}
@@ -807,7 +1088,7 @@ export function MindmapCanvas({
       </svg>
 
       {/* Save status and refusals */}
-      {editor && STATUS_LABEL[status] && (
+      {editor && !presenting && STATUS_LABEL[status] && (
         <div
           data-ui
           className="absolute left-3 top-3 flex items-center gap-2 rounded-md border border-black/10 bg-white/90 px-2.5 py-1 text-xs text-neutral-700 shadow-sm backdrop-blur"
@@ -881,6 +1162,17 @@ export function MindmapCanvas({
           >
             <StickyNote className={`h-3.5 w-3.5 ${selected.note ? "text-amber-600" : ""}`} />
           </ToolbarButton>
+          {aiEnabled && (
+            <ToolbarButton
+              title="Expand with AI (uses tokens)"
+              onClick={() => {
+                setExpandId(selected.id);
+                setExpandText("");
+              }}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-violet-600" />
+            </ToolbarButton>
+          )}
           {selected.depth > 0 && (
             <>
               <span className="mx-0.5 h-4 w-px bg-black/10" />
@@ -1004,11 +1296,210 @@ export function MindmapCanvas({
         </div>
       )}
 
+      {/* Expand with AI */}
+      {expanding && !presenting && (
+        <div
+          data-ui
+          className="absolute z-20 w-[290px] rounded-lg border border-black/10 bg-white p-2.5 text-neutral-800 shadow-lg"
+          style={{
+            left: Math.min(Math.max(screenRect(expanding).left, 8), Math.max(size.w - 298, 8)),
+            top: screenRect(expanding).top + screenRect(expanding).height + 10,
+            cursor: "default",
+          }}
+        >
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+            <span className="truncate">Expand “{expanding.text}”</span>
+          </div>
+          <textarea
+            autoFocus
+            value={expandText}
+            maxLength={500}
+            rows={3}
+            disabled={expandBusy}
+            placeholder="Optional: what should it add? e.g. risks, real-world examples, next steps"
+            onChange={(e) => setExpandText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && !expandBusy) {
+                e.preventDefault();
+                setExpandId(null);
+              } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                void runExpand();
+              }
+              e.stopPropagation();
+            }}
+            className="w-full resize-none rounded border border-black/10 bg-white p-1.5 text-xs text-neutral-900 outline-none focus:border-neutral-400 disabled:opacity-60"
+          />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <span className="text-[11px] text-neutral-500">Uses tokens from your wallet</span>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                disabled={expandBusy}
+                className="h-7 cursor-pointer rounded-md px-2.5 text-xs text-neutral-600 hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => setExpandId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={expandBusy}
+                className="flex h-7 cursor-pointer items-center gap-1.5 rounded-md bg-neutral-900 px-2.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-70"
+                onClick={() => void runExpand()}
+              >
+                {expandBusy && <Loader2 className="h-3 w-3 animate-spin" />}
+                {expandBusy ? "Expanding…" : "Expand"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ask about this map */}
+      {aiEnabled && askOpen && !presenting && (
+        <div
+          data-ui
+          className="absolute bottom-3 left-3 z-20 flex w-[340px] max-w-[calc(100%-1.5rem)] flex-col rounded-xl border border-black/10 bg-white text-neutral-800 shadow-xl"
+          style={{ maxHeight: "65%", cursor: "default" }}
+        >
+          <div className="flex items-center justify-between border-b border-black/10 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-xs font-medium">
+              <MessageCircleQuestion className="h-3.5 w-3.5 text-violet-600" />
+              Ask about this map
+            </div>
+            <button
+              type="button"
+              title="Close"
+              aria-label="Close"
+              className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md hover:bg-black/5"
+              onClick={() => setAskOpen(false)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div ref={askScrollRef} data-scroll className="min-h-[90px] flex-1 space-y-2 overflow-y-auto px-3 py-2 text-xs">
+            {askLog.length === 0 && (
+              <p className="leading-relaxed text-neutral-500">
+                Ask anything about the map, for example &ldquo;What are the main branches?&rdquo;. Select a node
+                first to ask about it. Answers use tokens from your wallet.
+              </p>
+            )}
+            {askLog.map((m, i) =>
+              m.role === "user" ? (
+                <div key={i} className="flex flex-col items-end gap-0.5">
+                  {m.about && <span className="max-w-full truncate text-[10px] text-neutral-400">about: {m.about}</span>}
+                  <div className="max-w-[90%] whitespace-pre-wrap rounded-lg bg-neutral-900 px-2.5 py-1.5 text-white">
+                    {m.content}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className={`max-w-[95%] whitespace-pre-wrap rounded-lg px-2.5 py-1.5 leading-relaxed ${
+                    m.error ? "bg-red-50 text-red-700" : "bg-neutral-100"
+                  }`}
+                >
+                  {m.content}
+                </div>
+              ),
+            )}
+            {askBusy && (
+              <div className="flex items-center gap-1.5 text-neutral-500">
+                <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-black/10 p-2">
+            {selected && (
+              <div className="mb-1.5 truncate text-[10px] text-neutral-500">
+                About the selected node: <span className="font-medium text-neutral-700">{selected.text}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <input
+                value={askInput}
+                maxLength={1000}
+                disabled={askBusy}
+                placeholder="Ask a question…"
+                onChange={(e) => setAskInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void runAsk();
+                  }
+                  e.stopPropagation();
+                }}
+                className="h-8 min-w-0 flex-1 rounded-md border border-black/10 bg-white px-2 text-xs text-neutral-900 outline-none focus:border-neutral-400 disabled:opacity-60"
+              />
+              <button
+                type="button"
+                title="Send"
+                aria-label="Send"
+                disabled={askBusy || !askInput.trim()}
+                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-neutral-900 text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40"
+                onClick={() => void runAsk()}
+              >
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Present-mode controls */}
+      {presenting && (
+        <div
+          data-ui
+          className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/80 px-2 py-1.5 text-white shadow-lg backdrop-blur"
+          style={{ cursor: "default" }}
+        >
+          <button
+            type="button"
+            title="Previous (←)"
+            aria-label="Previous"
+            disabled={step === 0}
+            onClick={() => setStep((x) => Math.max(x - 1, 0))}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="max-w-[260px] truncate px-1 text-sm font-medium">
+            {step === 0 ? "Overview" : spec.root.children[step - 1]?.text}
+          </span>
+          <span className="px-1 text-xs tabular-nums text-white/60">
+            {step + 1} / {stepCount}
+          </span>
+          <button
+            type="button"
+            title="Next (→)"
+            aria-label="Next"
+            disabled={step >= stepCount - 1}
+            onClick={() => setStep((x) => Math.min(x + 1, stepCount - 1))}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <span className="mx-0.5 h-4 w-px bg-white/25" />
+          <button
+            type="button"
+            title="Exit (Esc)"
+            aria-label="Exit presentation"
+            onClick={stopPresenting}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full hover:bg-white/15"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Bottom toolbar */}
       <div
         data-ui
         className="absolute bottom-3 right-3 flex items-center gap-0.5 rounded-lg border border-black/10 bg-white/90 p-1 text-neutral-700 shadow-sm backdrop-blur"
-        style={{ cursor: "default" }}
+        style={{ cursor: "default", display: presenting ? "none" : undefined }}
       >
         {editor && (
           <>
@@ -1048,6 +1539,19 @@ export function MindmapCanvas({
           <Maximize2 className="h-3.5 w-3.5" />
         </ToolbarButton>
         <span className="mx-1 h-4 w-px bg-black/10" />
+        {aiEnabled && (
+          <ToolbarButton
+            title="Ask about this map (uses tokens)"
+            onClick={() => setAskOpen((open) => !open)}
+          >
+            <MessageCircleQuestion
+              className={`h-3.5 w-3.5 ${askOpen ? "text-violet-600" : ""}`}
+            />
+          </ToolbarButton>
+        )}
+        <ToolbarButton title="Present (full screen, step through branches)" onClick={startPresenting}>
+          <Presentation className="h-3.5 w-3.5" />
+        </ToolbarButton>
         <ToolbarButton title="Export as SVG" onClick={exportSvg}>
           <Download className="h-3.5 w-3.5" />
         </ToolbarButton>

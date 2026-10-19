@@ -77,7 +77,7 @@ class PromptSuggestionService {
     const systemPrompt = [
       `Write ${BATCH_SIZE} example prompts a user might type into an AI assistant that can chat,`,
       "search the web, and generate documents (PDF, PPT, DOCX, Excel), images and videos.",
-      "Each prompt is one short, natural sentence (max 80 characters) written as the user's request,",
+      "Each prompt is one short, natural sentence (max 30 characters) written as the user's request,",
       "starting with a verb or a question word, with no quotes, emojis or numbering.",
       "Use this mix:",
       "3-4 prompts asking the AI to explain a specific subject, topic, concept or the logic behind",

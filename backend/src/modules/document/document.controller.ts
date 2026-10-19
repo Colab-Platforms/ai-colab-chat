@@ -12,9 +12,12 @@ import { getPptxTemplateTokens } from "./document.pptxTemplates.js";
 import { getMindmapThemeTokens } from "./document.mindmapThemes.js";
 import {
   validateCreateDocumentSchema,
+  validateAskMindmapSchema,
+  validateExpandMindmapNodeSchema,
   validateUpdateDocumentSpecSchema,
   validateUpdateDocumentStyleSchema,
 } from "./document.validators.js";
+import { askAboutMindmap, expandMindmapNode } from "./document.mindmapAi.js";
 
 const documentService = new DocumentService();
 
@@ -307,6 +310,62 @@ export const updateDocumentSpec = async (
     sendResponse(res, true, result, "Document saved", STATUS_CODES.OK);
   } catch (error: any) {
     console.error("Update document spec error", error);
+    sendResponse(
+      res,
+      false,
+      null,
+      error.message,
+      error.statusCode ?? STATUS_CODES.SERVER_ERROR,
+    );
+  }
+};
+
+export const expandMindmapNodeHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { error, value } = validateExpandMindmapNodeSchema(req.body);
+    if (error) {
+      sendResponse(res, false, error, error.message, STATUS_CODES.BAD_REQUEST);
+      return;
+    }
+    const result = await expandMindmapNode(
+      req.user!.id,
+      parseInt(req.params.id as string),
+      value,
+    );
+    sendResponse(res, true, result, "Branches generated", STATUS_CODES.OK);
+  } catch (error: any) {
+    console.error("Expand mind map node error", error);
+    sendResponse(
+      res,
+      false,
+      null,
+      error.message,
+      error.statusCode ?? STATUS_CODES.SERVER_ERROR,
+    );
+  }
+};
+
+export const askMindmapHandler = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { error, value } = validateAskMindmapSchema(req.body);
+    if (error) {
+      sendResponse(res, false, error, error.message, STATUS_CODES.BAD_REQUEST);
+      return;
+    }
+    const result = await askAboutMindmap(
+      req.user!.id,
+      parseInt(req.params.id as string),
+      value,
+    );
+    sendResponse(res, true, result, "Answer generated", STATUS_CODES.OK);
+  } catch (error: any) {
+    console.error("Ask about mind map error", error);
     sendResponse(
       res,
       false,

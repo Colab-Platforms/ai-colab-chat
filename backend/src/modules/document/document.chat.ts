@@ -104,8 +104,8 @@ export async function prepareDocumentTurn(params: {
   chatId: number;
   userPrompt: string;
   lastAssistantAnswer?: string | null;
-  /** The user chose a format explicitly it overrides what the classifier infers. */
   requested?: RequestedDocumentOptions | null;
+  attachmentText?: string;
 }): Promise<{
   intent: DocumentIntent;
   /** What will actually be rendered may differ from `intent.format`. */
@@ -146,7 +146,8 @@ export async function prepareDocumentTurn(params: {
     const sourceAlreadyExists =
       intent.intent === "UPDATE" ||
       intent.useLastAnswer ||
-      usesPastedSource(params.userPrompt);
+      usesPastedSource(params.userPrompt) ||
+      Boolean(params.attachmentText?.trim());
 
     const { format: effectiveFormat, substituted } = resolveRenderableFormat(
       intent.format,
@@ -193,6 +194,12 @@ export async function maybeGenerateDocumentFromChat(params: {
   modelResponseId?: number | null;
   userPrompt: string;
   assistantAnswer: string;
+  /**
+   * Text extracted from files attached to this turn. When present it IS the
+   * document's source: a user who attaches a PDF and asks for a mind map of it
+   * means the PDF, not the chat answer about it.
+   */
+  attachmentText?: string;
   theme?: string;
   /**
    * Intent already resolved by `prepareDocumentTurn` before the stream.
@@ -321,7 +328,19 @@ export async function maybeGenerateDocumentFromChat(params: {
     let sourceText = assistantAnswer?.trim() || "";
     let sourceKind = "current-answer";
 
-    if (usesPastedSource(userPrompt)) {
+    const attachmentText = params.attachmentText?.trim() ?? "";
+
+    if (attachmentText) {
+      // Attached files first. Anything the user also pasted goes after them,
+      // so a long attachment cannot crowd the pasted instructions out of the
+      // character cap below.
+      sourceText = usesPastedSource(userPrompt)
+        ? `${userPrompt}
+
+${attachmentText}`
+        : attachmentText;
+      sourceKind = "attached-files";
+    } else if (usesPastedSource(userPrompt)) {
       sourceText = userPrompt;
       sourceKind = "user-pasted";
     } else if (intent.useLastAnswer) {

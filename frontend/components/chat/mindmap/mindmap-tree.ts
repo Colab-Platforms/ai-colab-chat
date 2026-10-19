@@ -19,7 +19,9 @@ export const MINDMAP_LIMITS = {
   note: 600,
 } as const;
 
-export type EditResult = { spec: MindmapSpec; id?: string } | { error: string };
+export type EditResult =
+  | { spec: MindmapSpec; id?: string; message?: string }
+  | { error: string };
 
 export const isError = (result: EditResult): result is { error: string } =>
   "error" in result;
@@ -150,6 +152,94 @@ export const addChild = (spec: MindmapSpec, parentId: string): EditResult => {
       mapNode(spec.root, parentId, (n) => ({ ...n, children: [...n.children, child] })),
     ),
     id,
+  };
+};
+
+/**
+ * Appends AI-suggested branches under `parentId` as ONE edit, so a single undo
+ * removes the whole batch. The server already trimmed the suggestion to what
+ * fit the SAVED map, but the user may have kept editing while it was being
+ * generated, so capacity is checked again against the current tree. Returns the
+ * first new node's id so the caller can bring it into view.
+ */
+export const appendChildren = (
+  spec: MindmapSpec,
+  parentId: string,
+  incoming: MindmapNodeSpec[],
+): EditResult => {
+  const parent = locate(spec, parentId);
+  if (!parent) return { error: "That node no longer exists." };
+
+  const levels = MINDMAP_LIMITS.depth - parent.depth;
+  const room = MINDMAP_LIMITS.children - parent.node.children.length;
+  const nodesLeft = MINDMAP_LIMITS.nodes - countNodes(spec.root);
+  if (levels <= 0) {
+    return { error: `Branches can go at most ${MINDMAP_LIMITS.depth} levels deep.` };
+  }
+  if (room <= 0) {
+    return { error: `A node can have at most ${MINDMAP_LIMITS.children} children.` };
+  }
+  if (nodesLeft <= 0) {
+    return { error: `A mind map can have at most ${MINDMAP_LIMITS.nodes} nodes.` };
+  }
+
+  const taken = new Set<string>();
+  const collect = (n: MindmapNodeSpec) => {
+    taken.add(n.id);
+    n.children.forEach(collect);
+  };
+  collect(spec.root);
+
+  const budget = { nodes: nodesLeft };
+  let offered = 0;
+  const count = (nodes: MindmapNodeSpec[]): number =>
+    nodes.reduce((sum, n) => sum + 1 + count(n.children), 0);
+  offered = count(incoming);
+
+  const take = (
+    nodes: MindmapNodeSpec[],
+    levelsLeft: number,
+    siblingRoom: number,
+  ): MindmapNodeSpec[] => {
+    const out: MindmapNodeSpec[] = [];
+    for (const node of nodes) {
+      if (out.length >= siblingRoom || budget.nodes <= 0) break;
+      const text = cleanText(node.text);
+      if (!text) continue;
+      budget.nodes -= 1;
+      let id = node.id;
+      // Never trust ids from the wire: a clash would make two nodes one.
+      while (!id || taken.has(id)) id = makeId(spec);
+      taken.add(id);
+      const next: MindmapNodeSpec = {
+        id,
+        text,
+        children:
+          levelsLeft > 1
+            ? take(node.children ?? [], levelsLeft - 1, MINDMAP_LIMITS.children)
+            : [],
+      };
+      const note = node.note?.replace(/\s+/g, " ").trim().slice(0, MINDMAP_LIMITS.note);
+      if (note) next.note = note;
+      out.push(next);
+    }
+    return out;
+  };
+
+  const added = take(incoming, levels, room);
+  if (added.length === 0) return { error: "There was nothing new to add." };
+
+  const addedCount = count(added);
+  return {
+    spec: withRoot(
+      spec,
+      mapNode(spec.root, parentId, (n) => ({ ...n, children: [...n.children, ...added] })),
+    ),
+    id: added[0].id,
+    message:
+      addedCount < offered
+        ? `Added ${addedCount} of ${offered} suggested nodes; the map's limits were reached.`
+        : undefined,
   };
 };
 

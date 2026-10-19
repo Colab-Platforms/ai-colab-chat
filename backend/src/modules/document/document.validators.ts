@@ -503,6 +503,35 @@ export const validateMindmapSpec = (
   return { error: undefined, value: { title, root } };
 };
 
+const nodeIdSchema = Joi.string().pattern(MINDMAP_ID_PATTERN);
+
+export const expandMindmapNodeSchema = Joi.object({
+  nodeId: nodeIdSchema.required(),
+  instruction: Joi.string().trim().max(500).allow("").optional(),
+});
+
+export const askMindmapSchema = Joi.object({
+  question: Joi.string().trim().min(1).max(1000).required().messages({
+    "string.empty": "Type a question first",
+  }),
+  nodeId: nodeIdSchema.allow(null, "").optional(),
+  history: Joi.array()
+    .items(
+      Joi.object({
+        role: Joi.string().valid("user", "assistant").required(),
+        content: Joi.string().allow("").max(4000).required(),
+      }),
+    )
+    .max(20)
+    .optional(),
+});
+
+export const validateExpandMindmapNodeSchema = (data: unknown) =>
+  expandMindmapNodeSchema.validate(data, { abortEarly: false });
+
+export const validateAskMindmapSchema = (data: unknown) =>
+  askMindmapSchema.validate(data, { abortEarly: false });
+
 /** An editor save: client ids kept, and over-limit trees rejected, not trimmed. */
 export const validateMindmapEdit = (data: unknown) =>
   validateMindmapSpec(data, { preserveIds: true, strict: true });

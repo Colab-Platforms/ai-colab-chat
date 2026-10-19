@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, FileText, LayoutTemplate, ListOrdered, Loader2, Paperclip, Presentation, X } from "lucide-react";
-import { chatService, documentService } from "@/lib/services";
+import { attachmentService, chatService, documentService } from "@/lib/services";
 import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { toast } from "@/lib/toast";
 import { FileFormatIcon } from "@/components/chat/document-card";
@@ -50,8 +50,18 @@ interface SelectedTemplate {
 }
 
 const FORMATS = Object.keys(DOC_FORMAT_LABEL) as DocFormat[];
-const MAX_SOURCE_CHARS = 20_000;
-const SOURCE_ACCEPT = ".txt,.md,.csv,.json,text/plain,text/markdown,text/csv,application/json";
+// Uploaded as a real attachment: the server already extracts text from these
+// (the same path the chat composer uses), so a PDF or Word file works as a
+// source, not just plain text.
+const SOURCE_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.txt,.md";
+
+interface SourceFile {
+  id: number;
+  name: string;
+  fileUrl: string;
+  mimeType: string;
+  uploading: boolean;
+}
 
 /** Large preview of one template, drawn from its real tokens. */
 function TemplatePreviewBody({ format, template }: { format: DocFormat; template: TemplateInfo }) {
@@ -76,7 +86,7 @@ export default function DocumentsPage() {
   const [format, setFormat] = useState<DocFormat>("PDF");
   const [length, setLength] = useState(DOC_LENGTHS.PDF[1].value);
   const [prompt, setPrompt] = useState("");
-  const [source, setSource] = useState<{ name: string; text: string } | null>(null);
+  const [source, setSource] = useState<SourceFile | null>(null);
   const [template, setTemplate] = useState<SelectedTemplate | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -128,15 +138,25 @@ export default function DocumentsPage() {
   };
 
   const handleSourceFile = useCallback(async (file: File) => {
+    setSource({ id: 0, name: file.name, fileUrl: "", mimeType: file.type, uploading: true });
     try {
-      const text = (await file.text()).slice(0, MAX_SOURCE_CHARS);
-      setSource({ name: file.name, text });
-    } catch {
-      toast.error(`Couldn't read ${file.name}`);
+      const res = await attachmentService.presend(file);
+      const data = res.data.data;
+      setSource({
+        id: data.id,
+        name: file.name,
+        fileUrl: data.fileUrl,
+        mimeType: data.mimeType || file.type,
+        uploading: false,
+      });
+    } catch (err) {
+      const failure = err as { response?: { data?: { message?: string } }; message?: string };
+      toast.error(`Couldn't upload ${file.name}: ${failure.response?.data?.message || failure.message}`);
+      setSource(null);
     }
   }, []);
 
-  const canSubmit = Boolean(prompt.trim() && documentGenEnabled);
+  const canSubmit = Boolean(prompt.trim() && documentGenEnabled && !source?.uploading);
 
   /**
    * Starts a chat whose first message asks for the chosen format. The format
@@ -150,7 +170,7 @@ export default function DocumentsPage() {
     try {
       let content = `Create a ${DOC_FORMAT_NOUN[format]}, about ${length}. ${prompt.trim()}`;
       if (template) content += `\n\nTemplate: ${template.label}.`;
-      if (source) content += `\n\nUse this source material:\n\n${source.text}`;
+      if (source) content += `\n\nUse the attached file (${source.name}) as the source material.`;
 
       const chatRes = await chatService.create({
         title: prompt.trim().substring(0, 50),
@@ -166,6 +186,14 @@ export default function DocumentsPage() {
           chatType: "STANDARD",
           documentFormat: format,
           ...(template ? { documentTheme: template.key } : {}),
+          ...(source
+            ? {
+                attachmentIds: [source.id],
+                attachmentObjects: [
+                  { id: source.id, fileName: source.name, fileUrl: source.fileUrl, mimeType: source.mimeType },
+                ],
+              }
+            : {}),
         }),
       );
       window.dispatchEvent(new CustomEvent("refresh-chats", { detail: { immediate: true } }));
@@ -195,7 +223,7 @@ export default function DocumentsPage() {
               {source ? (
                 <span className="inline-flex items-center gap-1.5 h-8 pl-2.5 pr-1.5 rounded-full border border-border bg-surface text-xs text-foreground max-w-[190px]">
                   <Paperclip className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                  <span className="truncate">{source.name}</span>
+                  <span className="truncate">{source.uploading ? `Uploading ${source.name}…` : source.name}</span>
                   <button
                     type="button"
                     title="Remove source file"
@@ -206,7 +234,7 @@ export default function DocumentsPage() {
                   </button>
                 </span>
               ) : (
-                <AttachButton onFile={handleSourceFile} accept={SOURCE_ACCEPT} icon={Paperclip} title="Add a text file as source material" />
+                <AttachButton onFile={handleSourceFile} accept={SOURCE_ACCEPT} icon={Paperclip} title="Add a file as source material (PDF, Word, PowerPoint, Excel, text)" />
               )}
               <ChipSelect
                 icon={FileText}
