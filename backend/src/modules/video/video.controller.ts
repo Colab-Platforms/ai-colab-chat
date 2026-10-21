@@ -21,6 +21,20 @@ export const createVideo = async (req: Request, res: Response): Promise<void> =>
   }
 };
 
+export const uploadReferenceAudio = async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      sendResponse(res, false, null, "No audio file provided", STATUS_CODES.BAD_REQUEST);
+      return;
+    }
+    const result = await videoService.uploadReferenceAudio(req.user!.id, req.file);
+    sendResponse(res, true, result, "Reference audio uploaded", STATUS_CODES.CREATED);
+  } catch (error: any) {
+    console.error("Upload reference audio error", error);
+    sendResponse(res, false, null, error.message, error.statusCode ?? STATUS_CODES.SERVER_ERROR);
+  }
+};
+
 export const listVideoModels = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await videoService.listAvailableModels(req.user!.id);
@@ -57,6 +71,16 @@ export const retryVideo = async (req: Request, res: Response): Promise<void> => 
     sendResponse(res, true, result, "Video generation restarted", STATUS_CODES.ACCEPTED);
   } catch (error: any) {
     console.error("Retry video error", error);
+    sendResponse(res, false, null, error.message, error.statusCode ?? STATUS_CODES.SERVER_ERROR);
+  }
+};
+
+export const cancelVideo = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await videoService.cancel(req.user!.id, parseInt(req.params.id as string));
+    sendResponse(res, true, result, "Video generation cancelled", STATUS_CODES.OK);
+  } catch (error: any) {
+    console.error("Cancel video error", error);
     sendResponse(res, false, null, error.message, error.statusCode ?? STATUS_CODES.SERVER_ERROR);
   }
 };

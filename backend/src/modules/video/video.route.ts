@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { auth } from "@/middlewares/authMiddleware.js";
 import { requirePlanCapability } from "@/middlewares/planAccessMiddleware.js";
+import { uploadAudio } from "@/middlewares/upload.js";
 import * as videoController from "./video.controller.js";
 import { openRouterVideoWebhook } from "./video.webhook.controller.js";
 
@@ -8,6 +9,13 @@ const router = Router();
 
 // Registered before "/:id" so Express doesn't treat "models" as an :id param.
 router.get("/models", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideoModels);
+router.post(
+  "/reference-audio",
+  auth("USER", "ADMIN", "SUPERADMIN"),
+  requirePlanCapability("VIDEO_GENERATION"),
+  uploadAudio.single("file"),
+  videoController.uploadReferenceAudio,
+);
 router.get("/", auth("USER", "ADMIN", "SUPERADMIN"), videoController.listVideos);
 router.get("/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.getVideoById);
 // Coarse "does this plan allow video at all" gate the specific-model
@@ -25,6 +33,8 @@ router.post(
   requirePlanCapability("VIDEO_GENERATION"),
   videoController.retryVideo,
 );
+// Cancelling only stops our own job and refunds — no plan gate needed.
+router.post("/:id/cancel", auth("USER", "ADMIN", "SUPERADMIN"), videoController.cancelVideo);
 router.delete("/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.deleteVideo);
 
 // Unauthenticated verified via HMAC signature instead (see video.webhook.controller.ts).

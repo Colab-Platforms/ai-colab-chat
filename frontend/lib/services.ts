@@ -258,8 +258,21 @@ export const videoService = {
     aspectRatio?: string;
     firstFrameUrl?: string;
     lastFrameUrl?: string;
+    /** Ordered frame sequence (frame 1…n); wins over firstFrameUrl/lastFrameUrl. */
+    imageUrls?: string[];
+    referenceAudioUrl?: string;
   }) => api.post("/videos", data),
+  /** Resolves to `{ url, durationSec }` — the url goes into create()'s referenceAudioUrl. */
+  uploadReferenceAudio: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post("/videos/reference-audio", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
   retry: (id: number) => api.post(`/videos/${id}/retry`),
+  /** Stops an in-flight job and refunds the reservation. Only valid while it's still working. */
+  cancel: (id: number) => api.post(`/videos/${id}/cancel`),
   delete: (id: number) => api.delete(`/videos/${id}`),
 };
 

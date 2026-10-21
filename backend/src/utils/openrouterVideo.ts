@@ -56,6 +56,15 @@ export interface FrameImage {
   frameType: "first_frame" | "last_frame";
 }
 
+/**
+ * A reference asset for reference-to-video (OpenRouter's input_references).
+ * Audio is only honoured by Seedance 2+; other providers ignore it.
+ */
+export interface InputReference {
+  type: "image_url" | "audio_url";
+  url: string;
+}
+
 export interface SubmitVideoJobParams {
   model: string;
   prompt: string;
@@ -65,6 +74,8 @@ export interface SubmitVideoJobParams {
   callbackUrl?: string;
   /** Image-to-video: URLs only, no base64 see OpenRouter's frame_images. */
   frameImages?: FrameImage[];
+  /** OpenRouter gives frame_images precedence when both are sent, so callers send one or the other. */
+  inputReferences?: InputReference[];
 }
 
 export interface SubmitVideoJobResult {
@@ -90,6 +101,10 @@ export const submitVideoJob = async (
         type: "image_url",
         image_url: { url: f.url },
         frame_type: f.frameType,
+      })),
+      input_references: params.inputReferences?.map((r) => ({
+        type: r.type,
+        [r.type]: { url: r.url },
       })),
     }),
   });

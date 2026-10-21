@@ -373,6 +373,10 @@ model GeneratedDocument {
 enum GeneratedVideoStatus {
   PENDING
   SUBMITTED
+  // The provider has moved the job out of its queue and is actively
+  // rendering. Split out from SUBMITTED so the studio's progress checklist
+  // reflects real provider state instead of a timer.
+  PROCESSING
   COMPLETED
   FAILED
   CANCELLED
@@ -392,6 +396,11 @@ model GeneratedVideo {
   aspectRatio        String               @default("16:9")
   firstFrameUrl      String?
   lastFrameUrl       String?
+  /** Ordered image sequence (frame 1 … n). 1–2 images are also mirrored into
+   * firstFrameUrl/lastFrameUrl so they can be submitted as exact frames; 3+
+   * are submitted as ordered reference images. Empty for text-to-video. */
+  referenceImageUrls String[]
+  referenceAudioUrl  String?
   externalJobId      String?
   reservedTokens     Int
   reservedFromBundled Int                 @default(0)

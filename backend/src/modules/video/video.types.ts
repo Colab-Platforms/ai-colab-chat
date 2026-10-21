@@ -2,6 +2,7 @@
 export type VideoStatus =
   | "PENDING"
   | "SUBMITTED"
+  | "PROCESSING"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED"
@@ -45,7 +46,47 @@ export interface CreateVideoInput {
   /** Image-to-video: public HTTPS URLs from the existing attachment upload flow. */
   firstFrameUrl?: string;
   lastFrameUrl?: string;
+  /**
+   * Ordered image sequence (frame 1 … n) from the multi-image picker. Takes
+   * precedence over firstFrameUrl/lastFrameUrl when present.
+   */
+  imageUrls?: string[];
+  /** Optional voice/dialogue/music reference, uploaded via POST /videos/reference-audio. */
+  referenceAudioUrl?: string;
 }
+
+/** Most images one request may carry (matches the picker's cap). */
+export const MAX_INPUT_IMAGES = 8;
+
+/**
+ * Models that accept 3+ ordered images as reference images. Veo 3.1 Lite only
+ * takes first/last frame, so a longer sequence would be silently dropped —
+ * create() rejects it instead of charging for a clip that ignored the images.
+ */
+export const MULTI_IMAGE_MODELS = new Set([
+  "bytedance/seedance-2.0",
+  "bytedance/seedance-2.0-mini",
+]);
+
+/** Models limited to a first/last frame pair. */
+export const MAX_FRAME_PAIR_IMAGES = 2;
+
+/**
+ * Longest reference audio accepted. Seedance's own reference-to-video caps
+ * the combined audio input at ~15s on the providers that document it.
+ */
+export const MAX_REFERENCE_AUDIO_SECONDS = 15;
+
+/**
+ * Models that actually honour an `audio_url` input reference on OpenRouter
+ * ("BytePlus Seedance generation 2 and newer" per OpenRouter's spec). Every
+ * other model silently ignores audio references, so create() rejects them
+ * rather than charging for a clip that drops the user's audio.
+ */
+export const AUDIO_REFERENCE_MODELS = new Set([
+  "bytedance/seedance-2.0",
+  "bytedance/seedance-2.0-mini",
+]);
 
 export interface ListVideosQuery {
   page?: number;

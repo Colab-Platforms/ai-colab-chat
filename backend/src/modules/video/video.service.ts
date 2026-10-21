@@ -2,12 +2,20 @@ import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import { debitCredits, creditsToCostBreakdown, USD_PER_CREDIT } from "@/utils/walletUtils.js";
-import { deleteFromCloudinary } from "@/utils/cloudinary.js";
+import { deleteFromCloudinary, uploadToCloudinary } from "@/utils/cloudinary.js";
 import { listVideoModels, type VideoModelInfo } from "@/utils/openrouterVideo.js";
-import { runPendingVideoJobs } from "./video.generation.service.js";
+import { refundReservation, runPendingVideoJobs } from "./video.generation.service.js";
 import { containsDisallowedContent } from "./video.moderation.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
-import { MAX_TITLE_CHARS, type CreateVideoInput, type ListVideosQuery } from "./video.types.js";
+import {
+  AUDIO_REFERENCE_MODELS,
+  MAX_FRAME_PAIR_IMAGES,
+  MAX_REFERENCE_AUDIO_SECONDS,
+  MAX_TITLE_CHARS,
+  MULTI_IMAGE_MODELS,
+  type CreateVideoInput,
+  type ListVideosQuery,
+} from "./video.types.js";
 import { getUserPlanContext, assertCanGenerateVideo } from "@/modules/plan-access/planAccess.service.js";
 
 const DEFAULT_LIMIT = 20;
@@ -236,6 +244,32 @@ class VideoService {
     const planContext = await getUserPlanContext(userId);
     await assertCanGenerateVideo(planContext, model);
 
+    // Other models silently drop an audio reference, so the user would pay
+    // for a clip that ignored their audio — reject up front instead.
+    if (input.referenceAudioUrl && !AUDIO_REFERENCE_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} reference audio rejected — ${model.externalId} doesn't support it`);
+      throw new ApiError(
+        `${model.name} can't use a reference audio. Pick a Seedance model or remove the audio.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    // One ordered sequence regardless of how the client sent it. 1–2 images go
+    // out as exact first/last frames; 3+ go out as ordered reference images
+    // (OpenRouter drops input_references whenever frame_images is present, so
+    // the two can't be combined in one request).
+    const images = input.imageUrls?.length
+      ? input.imageUrls
+      : [input.firstFrameUrl, input.lastFrameUrl].filter((u): u is string => Boolean(u));
+    if (images.length > MAX_FRAME_PAIR_IMAGES && !MULTI_IMAGE_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} ${images.length} images rejected — ${model.externalId} only takes a first/last frame`);
+      throw new ApiError(
+        `${model.name} can only use up to ${MAX_FRAME_PAIR_IMAGES} images (first and last frame). Pick a Seedance model or remove some images.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+    const asReferences = images.length > MAX_FRAME_PAIR_IMAGES;
+
     const duration = input.duration ?? DEFAULT_DURATION;
     const resolution = input.resolution ?? DEFAULT_RESOLUTION;
     const aspectRatio = input.aspectRatio ?? DEFAULT_ASPECT_RATIO;
@@ -274,7 +308,7 @@ class VideoService {
       vlogError("create", "model catalogue check failed (continuing without validation)", error);
     }
 
-    const hasImageInput = Boolean(input.firstFrameUrl || input.lastFrameUrl);
+    const hasImageInput = images.length > 0;
     const costPerSecond = await this.resolveExactCreditsPerSecond(model, resolution, hasImageInput);
     const reservedTokens = Math.ceil(duration * costPerSecond); // credits, despite the field name see refundReservation in video.generation.service.ts
     const costPerCreditInr = await this.getCostPerCreditInr();
@@ -286,6 +320,7 @@ class VideoService {
       resolution,
       duration,
       hasImageInput,
+      hasAudioReference: Boolean(input.referenceAudioUrl),
       creditsPerSecond: costPerSecond,
       reservedCredits: reservedTokens,
       estimatedUsd: `$${estimatedCost.usd}`,
@@ -306,8 +341,10 @@ class VideoService {
           duration,
           resolution,
           aspectRatio,
-          firstFrameUrl: input.firstFrameUrl ?? null,
-          lastFrameUrl: input.lastFrameUrl ?? null,
+          firstFrameUrl: asReferences ? null : (images[0] ?? null),
+          lastFrameUrl: asReferences ? null : (images[1] ?? null),
+          referenceImageUrls: asReferences ? images : [],
+          referenceAudioUrl: input.referenceAudioUrl ?? null,
           reservedTokens,
         },
       });
@@ -357,6 +394,34 @@ class VideoService {
     vlog("create", `job=${video.id} worker kicked`);
 
     return video;
+  }
+
+  /**
+   * Stores a reference audio clip for a later create() call. Cloudinary keeps
+   * audio under the "video" resource type, which is also what reports the
+   * clip's duration — so the length cap is enforced on the real file, not
+   * on whatever the browser claimed.
+   */
+  async uploadReferenceAudio(userId: number, file: Express.Multer.File) {
+    vlog("reference-audio", `user=${userId} uploading ${file.originalname} (${file.mimetype}, ${file.size} bytes)`);
+    const uploaded = await uploadToCloudinary(file.buffer, {
+      folder: "ai-colab-chat/video-reference-audio",
+      resourceType: "video",
+    });
+
+    if (typeof uploaded.duration === "number" && uploaded.duration > MAX_REFERENCE_AUDIO_SECONDS) {
+      await deleteFromCloudinary(uploaded.publicId, "video").catch((error) => {
+        vlogError("reference-audio", `failed to delete over-length upload ${uploaded.publicId}`, error);
+      });
+      vlog("reference-audio", `user=${userId} rejected — ${uploaded.duration}s > ${MAX_REFERENCE_AUDIO_SECONDS}s`);
+      throw new ApiError(
+        `Reference audio can be at most ${MAX_REFERENCE_AUDIO_SECONDS} seconds long.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    vlog("reference-audio", `user=${userId} stored ${uploaded.publicId} (${uploaded.duration ?? "?"}s)`);
+    return { url: uploaded.url, durationSec: uploaded.duration ?? null };
   }
 
   async list(userId: number, query: ListVideosQuery) {
@@ -474,6 +539,43 @@ class VideoService {
     });
     void runPendingVideoJobs();
     vlog("retry", `job=${id} worker kicked`);
+
+    return updated;
+  }
+
+  /**
+   * Stops a video the user no longer wants and gives the reservation back.
+   *
+   * We don't ask OpenRouter to cancel — there's no benefit, and the job may
+   * already be past the point of no return on their side. Marking the row
+   * CANCELLED is enough: `applyTerminalStatus` only acts on rows still in a
+   * working status, so a webhook or poll result that lands afterwards is
+   * ignored and the reservation can't be refunded twice.
+   */
+  async cancel(userId: number, id: number) {
+    vlog("cancel", `user=${userId} requested cancel of job=${id}`);
+    const video = await prisma.generatedVideo.findFirst({
+      where: { id, userId, isDeleted: false },
+    });
+    if (!video) {
+      throw new ApiError("Video not found", STATUS_CODES.NOT_FOUND);
+    }
+    if (video.status !== "PENDING" && video.status !== "SUBMITTED" && video.status !== "PROCESSING") {
+      vlog("cancel", `job=${id} rejected — status is ${video.status}, nothing in flight`);
+      throw new ApiError("This video has already finished", STATUS_CODES.BAD_REQUEST);
+    }
+
+    const updated = await prisma.generatedVideo.update({
+      where: { id },
+      data: {
+        status: "CANCELLED",
+        lastError: "Cancelled by the user",
+        completedAt: new Date(),
+      },
+    });
+
+    await refundReservation(video);
+    vlog("cancel", `job=${id} CANCELLED — refunded ${video.reservedTokens} credits`);
 
     return updated;
   }

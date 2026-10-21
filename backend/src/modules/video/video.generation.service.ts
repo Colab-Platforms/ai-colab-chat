@@ -7,6 +7,7 @@ import {
   submitVideoJob,
   VideoSubmitError,
   type FrameImage,
+  type InputReference,
   type VideoJobPollResult,
 } from "@/utils/openrouterVideo.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
@@ -14,6 +15,19 @@ import { vlog, vlogBlock, vlogError } from "./video.logger.js";
 const MAX_ATTEMPTS = Number(process.env.VIDEO_MAX_ATTEMPTS ?? 3);
 const BATCH_SIZE = Number(process.env.VIDEO_BATCH_SIZE ?? 3);
 const CALLBACK_BASE_URL = process.env.BACKEND_PUBLIC_URL || "";
+
+/**
+ * Statuses where the provider still owns the job: it has been handed over and
+ * we're waiting. SUBMITTED means "sitting in their queue", PROCESSING means
+ * "actively rendering" — the only progress signal OpenRouter gives us. Both
+ * are valid starting points for a terminal transition, so every poll/webhook
+ * guard has to accept either.
+ */
+export const WORKING_STATUSES = ["SUBMITTED", "PROCESSING"] as const;
+type WorkingStatus = (typeof WORKING_STATUSES)[number];
+
+const isWorkingStatus = (status: string): status is WorkingStatus =>
+  (WORKING_STATUSES as readonly string[]).includes(status);
 
 const slugify = (text: string): string =>
   text
@@ -46,7 +60,7 @@ const claimPending = async (id: number): Promise<boolean> => {
  * tokens). The `reservedTokens` field name on GeneratedVideo is unchanged to
  * avoid a wider rename, but it holds a credit amount, not wallet tokens.
  */
-const refundReservation = async (video: {
+export const refundReservation = async (video: {
   id: number;
   userId: number;
   reservedTokens: number;
@@ -144,27 +158,60 @@ export const submitPendingVideoJobs = async (): Promise<void> => {
         const callbackUrl = CALLBACK_BASE_URL
           ? `${CALLBACK_BASE_URL.replace(/\/+$/, "")}/api/videos/webhooks/openrouter`
           : undefined;
-        const frameImages: FrameImage[] = [
-          ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
-          ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
-        ];
+        // OpenRouter gives frame_images precedence over input_references, which
+        // would drop the audio — so with a reference audio, the frames go in as
+        // image references instead (they guide the subject rather than pin the
+        // exact first/last frame).
+        //
+        // A 3+ image sequence is stored in referenceImageUrls and always goes
+        // out as ordered image references (never frame_images, which would
+        // make OpenRouter ignore them).
+        const sequenceImages = video.referenceImageUrls ?? [];
+        const hasSequence = sequenceImages.length > 0;
+        const frameImages: FrameImage[] =
+          video.referenceAudioUrl || hasSequence
+            ? []
+            : [
+                ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
+                ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
+              ];
+        const imageReferences: InputReference[] = hasSequence
+          ? sequenceImages.map((url) => ({ type: "image_url" as const, url }))
+          : [
+              ...(video.firstFrameUrl ? [{ type: "image_url" as const, url: video.firstFrameUrl }] : []),
+              ...(video.lastFrameUrl ? [{ type: "image_url" as const, url: video.lastFrameUrl }] : []),
+            ];
+        const inputReferences: InputReference[] =
+          video.referenceAudioUrl || hasSequence
+            ? [
+                ...imageReferences,
+                ...(video.referenceAudioUrl ? [{ type: "audio_url" as const, url: video.referenceAudioUrl }] : []),
+              ]
+            : [];
+        // The references carry no frame index on the wire, so the order the
+        // user arranged is spelled out in the prompt instead.
+        const prompt = hasSequence
+          ? `${video.prompt}\n\nThe ${sequenceImages.length} reference images are an ordered frame sequence (image 1 = first frame, image ${sequenceImages.length} = last frame). Follow this order and keep the subject, style and scene consistent with them.`
+          : video.prompt;
         vlogBlock("submit", `job=${video.id} submitting to OpenRouter`, {
           model: video.model.externalId,
           duration: video.duration,
           resolution: video.resolution,
           aspectRatio: video.aspectRatio,
-          frameImages: frameImages.length > 0 ? frameImages : "(text-to-video)",
-          callbackUrl: callbackUrl ?? "(none BACKEND_PUBLIC_URL not set, poll-only)",
+          frameImages: frameImages.length > 0 ? frameImages : "(none)",
+          inputReferences: inputReferences.length > 0 ? inputReferences : "(none)",
+          callbackUrl: callbackUrl ?? "(none — BACKEND_PUBLIC_URL not set, poll-only)",
         });
 
         const result = await submitVideoJob({
           model: video.model.externalId,
-          prompt: video.prompt,
+          prompt,
           duration: video.duration,
           resolution: video.resolution,
           aspectRatio: video.aspectRatio,
           callbackUrl,
           frameImages: frameImages.length > 0 ? frameImages : undefined,
+          inputReferences: inputReferences.length > 0 ? inputReferences : undefined,
         });
 
         await prisma.generatedVideo.update({
@@ -195,8 +242,8 @@ export const applyTerminalStatus = async (
     vlog("terminal", `job=${videoId} not found ignoring`);
     return;
   }
-  if (video.status !== "SUBMITTED") {
-    vlog("terminal", `job=${videoId} already in terminal state (${video.status}) ignoring duplicate delivery`);
+  if (!isWorkingStatus(video.status)) {
+    vlog("terminal", `job=${videoId} already in terminal state (${video.status}) — ignoring duplicate delivery`);
     return;
   }
 
@@ -351,7 +398,19 @@ export const applyTerminalStatus = async (
       },
     });
     await refundReservation(video);
-    vlog("terminal", `job=${video.id} ${status} refunded ${video.reservedTokens} tokens (reason: ${poll.error ?? poll.status})`);
+    vlog("terminal", `job=${video.id} ${status} — refunded ${video.reservedTokens} tokens (reason: ${poll.error ?? poll.status})`);
+    return;
+  }
+
+  // Not terminal yet. `in_progress` is the provider leaving its queue and
+  // starting to render — the one intermediate signal we get, so persist it
+  // and let the client's progress checklist advance on real state.
+  if (poll.status === "in_progress" && video.status === "SUBMITTED") {
+    await prisma.generatedVideo.update({
+      where: { id: video.id },
+      data: { status: "PROCESSING" },
+    });
+    vlog("terminal", `job=${video.id} provider started rendering — SUBMITTED → PROCESSING`);
     return;
   }
 
@@ -368,7 +427,7 @@ export const pollSubmittedVideoJobs = async (): Promise<void> => {
 
   const submitted = await prisma.generatedVideo.findMany({
     where: {
-      status: "SUBMITTED",
+      status: { in: [...WORKING_STATUSES] },
       isDeleted: false,
       externalJobId: { not: null },
       startedAt: { lt: staleBefore },
@@ -378,10 +437,10 @@ export const pollSubmittedVideoJobs = async (): Promise<void> => {
   });
 
   if (submitted.length === 0) {
-    vlog("poll", "safety-net tick nothing SUBMITTED to poll");
+    vlog("poll", "safety-net tick — nothing in flight to poll");
     return;
   }
-  vlog("poll", `safety-net tick polling ${submitted.length} SUBMITTED job(s)`);
+  vlog("poll", `safety-net tick — polling ${submitted.length} in-flight job(s)`);
 
   await Promise.all(
     submitted.map(async (video) => {

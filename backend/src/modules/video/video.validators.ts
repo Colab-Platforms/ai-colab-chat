@@ -1,5 +1,6 @@
 import Joi from "joi";
 import {
+  MAX_INPUT_IMAGES,
   MAX_PROMPT_CHARS,
   SUPPORTED_ASPECT_RATIOS,
   SUPPORTED_RESOLUTIONS,
@@ -18,6 +19,12 @@ export const createVideoSchema = Joi.object({
   // uses a model-facing URL is never trusted to be http(s)-safe otherwise.
   firstFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   lastFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
+  imageUrls: Joi.array()
+    .items(Joi.string().uri({ scheme: ["https"] }).max(2000))
+    .max(MAX_INPUT_IMAGES)
+    .optional()
+    .messages({ "array.max": `You can add at most ${MAX_INPUT_IMAGES} images` }),
+  referenceAudioUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   // Duration/resolution are further checked in the service against the
   // chosen model's actual supported_durations/supported_resolutions this
   // just keeps obviously-bad input out.
