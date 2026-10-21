@@ -16,6 +16,7 @@ import {
   StudioHero,
   StudioTabs,
   TemplatesComingSoon,
+  TemplateStrip,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
 import {
@@ -107,6 +108,8 @@ export default function VideoStudioPage() {
         /* empty state is fine */
       });
   }, []);
+
+  const pickTemplate = (t: StudioTemplate) => setActiveTemplate(t);
 
   const clearAudio = () => {
     draft.clearAudio();
