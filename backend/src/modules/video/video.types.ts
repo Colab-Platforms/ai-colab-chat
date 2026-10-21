@@ -2,6 +2,7 @@
 export type VideoStatus =
   | "PENDING"
   | "SUBMITTED"
+  | "PROCESSING"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED"

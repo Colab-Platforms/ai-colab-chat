@@ -348,6 +348,10 @@ model GeneratedDocument {
 enum GeneratedVideoStatus {
   PENDING
   SUBMITTED
+  // The provider has moved the job out of its queue and is actively
+  // rendering. Split out from SUBMITTED so the studio's progress checklist
+  // reflects real provider state instead of a timer.
+  PROCESSING
   COMPLETED
   FAILED
   CANCELLED

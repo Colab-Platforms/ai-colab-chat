@@ -256,6 +256,8 @@ export const videoService = {
     });
   },
   retry: (id: number) => api.post(`/videos/${id}/retry`),
+  /** Stops an in-flight job and refunds the reservation. Only valid while it's still working. */
+  cancel: (id: number) => api.post(`/videos/${id}/cancel`),
   delete: (id: number) => api.delete(`/videos/${id}`),
 };
 

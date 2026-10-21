@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 export type VideoStatus =
   | "PENDING"
   | "SUBMITTED"
+  | "PROCESSING"
   | "COMPLETED"
   | "FAILED"
   | "CANCELLED"
@@ -23,10 +24,17 @@ export interface GeneratedVideo {
   resolution: string;
   aspectRatio: string;
   fileUrl?: string | null;
+  thumbnailUrl?: string | null;
   fileSize?: number | null;
   lastError?: string | null;
   reservedTokens?: number;
   createdAt?: string;
+  chatId?: number | null;
+  modelId?: number;
+  referenceImageUrls?: string[];
+  referenceAudioUrl?: string | null;
+  firstFrameUrl?: string | null;
+  startedAt?: string | null;
 }
 
 /**
@@ -40,6 +48,7 @@ const MAX_POLL_MS = 6 * 60 * 1000;
 const STAGES_BY_STATUS: Record<string, string> = {
   PENDING: "Queuing your request",
   SUBMITTED: "Rendering your video — this can take a couple of minutes",
+  PROCESSING: "Rendering your video — this can take a couple of minutes",
 };
 
 const formatBytes = (bytes?: number | null): string => {
@@ -75,7 +84,8 @@ export function VideoCard({
   const [isDownloading, setIsDownloading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const isWorking = video.status === "PENDING" || video.status === "SUBMITTED";
+  const isWorking =
+    video.status === "PENDING" || video.status === "SUBMITTED" || video.status === "PROCESSING";
 
   useEffect(() => {
     setVideo((prev) => (initial.status !== prev.status ? initial : prev));

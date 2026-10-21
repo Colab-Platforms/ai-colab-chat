@@ -4,7 +4,7 @@ import STATUS_CODES from "@/utils/statusCodes.js";
 import { debitCredits, creditsToCostBreakdown, USD_PER_CREDIT } from "@/utils/walletUtils.js";
 import { deleteFromCloudinary, uploadToCloudinary } from "@/utils/cloudinary.js";
 import { listVideoModels, type VideoModelInfo } from "@/utils/openrouterVideo.js";
-import { runPendingVideoJobs } from "./video.generation.service.js";
+import { refundReservation, runPendingVideoJobs } from "./video.generation.service.js";
 import { containsDisallowedContent } from "./video.moderation.js";
 import { vlog, vlogBlock, vlogError } from "./video.logger.js";
 import {
@@ -539,6 +539,43 @@ class VideoService {
     });
     void runPendingVideoJobs();
     vlog("retry", `job=${id} worker kicked`);
+
+    return updated;
+  }
+
+  /**
+   * Stops a video the user no longer wants and gives the reservation back.
+   *
+   * We don't ask OpenRouter to cancel — there's no benefit, and the job may
+   * already be past the point of no return on their side. Marking the row
+   * CANCELLED is enough: `applyTerminalStatus` only acts on rows still in a
+   * working status, so a webhook or poll result that lands afterwards is
+   * ignored and the reservation can't be refunded twice.
+   */
+  async cancel(userId: number, id: number) {
+    vlog("cancel", `user=${userId} requested cancel of job=${id}`);
+    const video = await prisma.generatedVideo.findFirst({
+      where: { id, userId, isDeleted: false },
+    });
+    if (!video) {
+      throw new ApiError("Video not found", STATUS_CODES.NOT_FOUND);
+    }
+    if (video.status !== "PENDING" && video.status !== "SUBMITTED" && video.status !== "PROCESSING") {
+      vlog("cancel", `job=${id} rejected — status is ${video.status}, nothing in flight`);
+      throw new ApiError("This video has already finished", STATUS_CODES.BAD_REQUEST);
+    }
+
+    const updated = await prisma.generatedVideo.update({
+      where: { id },
+      data: {
+        status: "CANCELLED",
+        lastError: "Cancelled by the user",
+        completedAt: new Date(),
+      },
+    });
+
+    await refundReservation(video);
+    vlog("cancel", `job=${id} CANCELLED — refunded ${video.reservedTokens} credits`);
 
     return updated;
   }

@@ -75,6 +75,16 @@ export const retryVideo = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
+export const cancelVideo = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await videoService.cancel(req.user!.id, parseInt(req.params.id as string));
+    sendResponse(res, true, result, "Video generation cancelled", STATUS_CODES.OK);
+  } catch (error: any) {
+    console.error("Cancel video error", error);
+    sendResponse(res, false, null, error.message, error.statusCode ?? STATUS_CODES.SERVER_ERROR);
+  }
+};
+
 export const deleteVideo = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await videoService.delete(req.user!.id, parseInt(req.params.id as string));

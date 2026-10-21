@@ -16,6 +16,19 @@ const MAX_ATTEMPTS = Number(process.env.VIDEO_MAX_ATTEMPTS ?? 3);
 const BATCH_SIZE = Number(process.env.VIDEO_BATCH_SIZE ?? 3);
 const CALLBACK_BASE_URL = process.env.BACKEND_PUBLIC_URL || "";
 
+/**
+ * Statuses where the provider still owns the job: it has been handed over and
+ * we're waiting. SUBMITTED means "sitting in their queue", PROCESSING means
+ * "actively rendering" — the only progress signal OpenRouter gives us. Both
+ * are valid starting points for a terminal transition, so every poll/webhook
+ * guard has to accept either.
+ */
+export const WORKING_STATUSES = ["SUBMITTED", "PROCESSING"] as const;
+type WorkingStatus = (typeof WORKING_STATUSES)[number];
+
+const isWorkingStatus = (status: string): status is WorkingStatus =>
+  (WORKING_STATUSES as readonly string[]).includes(status);
+
 const slugify = (text: string): string =>
   text
     .toLowerCase()
@@ -47,7 +60,7 @@ const claimPending = async (id: number): Promise<boolean> => {
  * tokens). The `reservedTokens` field name on GeneratedVideo is unchanged to
  * avoid a wider rename, but it holds a credit amount, not wallet tokens.
  */
-const refundReservation = async (video: {
+export const refundReservation = async (video: {
   id: number;
   userId: number;
   reservedTokens: number;
@@ -229,7 +242,7 @@ export const applyTerminalStatus = async (
     vlog("terminal", `job=${videoId} not found — ignoring`);
     return;
   }
-  if (video.status !== "SUBMITTED") {
+  if (!isWorkingStatus(video.status)) {
     vlog("terminal", `job=${videoId} already in terminal state (${video.status}) — ignoring duplicate delivery`);
     return;
   }
@@ -389,6 +402,18 @@ export const applyTerminalStatus = async (
     return;
   }
 
+  // Not terminal yet. `in_progress` is the provider leaving its queue and
+  // starting to render — the one intermediate signal we get, so persist it
+  // and let the client's progress checklist advance on real state.
+  if (poll.status === "in_progress" && video.status === "SUBMITTED") {
+    await prisma.generatedVideo.update({
+      where: { id: video.id },
+      data: { status: "PROCESSING" },
+    });
+    vlog("terminal", `job=${video.id} provider started rendering — SUBMITTED → PROCESSING`);
+    return;
+  }
+
   vlog("terminal", `job=${video.id} still ${poll.status} — nothing to do this tick`);
 };
 
@@ -402,7 +427,7 @@ export const pollSubmittedVideoJobs = async (): Promise<void> => {
 
   const submitted = await prisma.generatedVideo.findMany({
     where: {
-      status: "SUBMITTED",
+      status: { in: [...WORKING_STATUSES] },
       isDeleted: false,
       externalJobId: { not: null },
       startedAt: { lt: staleBefore },
@@ -412,10 +437,10 @@ export const pollSubmittedVideoJobs = async (): Promise<void> => {
   });
 
   if (submitted.length === 0) {
-    vlog("poll", "safety-net tick — nothing SUBMITTED to poll");
+    vlog("poll", "safety-net tick — nothing in flight to poll");
     return;
   }
-  vlog("poll", `safety-net tick — polling ${submitted.length} SUBMITTED job(s)`);
+  vlog("poll", `safety-net tick — polling ${submitted.length} in-flight job(s)`);
 
   await Promise.all(
     submitted.map(async (video) => {

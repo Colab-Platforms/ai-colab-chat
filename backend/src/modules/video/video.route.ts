@@ -33,6 +33,8 @@ router.post(
   requirePlanCapability("VIDEO_GENERATION"),
   videoController.retryVideo,
 );
+// Cancelling only stops our own job and refunds — no plan gate needed.
+router.post("/:id/cancel", auth("USER", "ADMIN", "SUPERADMIN"), videoController.cancelVideo);
 router.delete("/:id", auth("USER", "ADMIN", "SUPERADMIN"), videoController.deleteVideo);
 
 // Unauthenticated — verified via HMAC signature instead (see video.webhook.controller.ts).
