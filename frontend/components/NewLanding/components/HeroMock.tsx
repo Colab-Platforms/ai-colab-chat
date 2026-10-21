@@ -65,7 +65,7 @@ export default function HeroMock({ dark }: { dark: boolean }) {
           <div style={{ display: "flex", width: 236, flexShrink: 0, flexDirection: "column", background: "var(--sunken)", borderRight: "1px solid var(--border)", overflow: "hidden" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 8px 6px" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 4px" }}>
-                <span style={{ width: 26, height: 26, borderRadius: 8, background: "var(--accent)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}><Ms name="all_inclusive" size={18} style={{ fontVariationSettings: "normal" }} /></span>
+                <span style={{ width: 26, height: 26, borderRadius: 8, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/icons/Colab%20Infinite.png" alt="" style={{ width: 22, height: "auto" }} /></span>
                 <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Colab AI</span>
                 <Ms name="left_panel_close" size={18} style={{ color: "var(--faint)" }} />
               </span>
@@ -91,8 +91,8 @@ export default function HeroMock({ dark }: { dark: boolean }) {
               ))}
               <span style={{ flexShrink: 0, height: 1, margin: "8px 0 2px", background: "var(--border)" }} />
               <span style={histHead}>Today</span>
-              <span style={histRow}>Pizza restaurant in South Delhi</span>
-              <span style={histRow}>Pizza restaurant — GPT-5.4</span>
+              <span style={histRow}> Plan a Trip to Manali</span>
+              <span style={histRow}> Top IT Companies in Mumbai</span>
               <span style={histHead}>Yesterday</span>
               <span style={histRow}>Seed round pitch outline</span>
               <span style={histRow}>React table virtualization</span>
@@ -100,7 +100,7 @@ export default function HeroMock({ dark }: { dark: boolean }) {
             <span style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderTop: "1px solid var(--border)" }}>
               <span style={{ width: 30, height: 30, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12.5, fontWeight: 600 }}>J</span>
               <span style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>Junaid Shaikh</span>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Rohit</span>
                 <span style={{ fontSize: 11.5, color: "var(--faint)" }}>Plus plan</span>
               </span>
               <Ms name="unfold_more" size={16} style={{ color: "var(--faint)" }} />
@@ -114,7 +114,7 @@ export default function HeroMock({ dark }: { dark: boolean }) {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={mark} alt="" style={{ height: "clamp(24px,2.6vw,30px)", width: "auto" }} />
-              <span style={{ fontSize: "clamp(22px,2.6vw,30px)", lineHeight: 1.15, fontWeight: 600, letterSpacing: "-.025em" }}>Good morning, Junaid</span>
+              <span style={{ fontSize: "clamp(22px,2.6vw,30px)", lineHeight: 1.15, fontWeight: 600, letterSpacing: "-.025em" }}>Good morning, Rohit</span>
               <span style={{ fontSize: "clamp(13px,1.2vw,14.5px)", color: "var(--muted)" }}>Ask one model, or compare up to 4 side by side.</span>
             </div>
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12, padding: "12px 12px 10px 14px", borderRadius: 16, background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow)" }}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { motion } from "framer-motion";
@@ -7,6 +8,45 @@ import { EASE } from "@/components/landing/components/motionVariants";
 import HeroGrid from "./HeroGrid";
 import HeroMock from "./HeroMock";
 import { useTheme } from "@/context/theme-context";
+
+const SUBTEXT = "Experience the future of AI conversation with our multichat interface.";
+
+// Types the subtext out once, with a blinking caret. The full text is also
+// rendered invisibly so the layout doesn't shift while it types.
+function TypedSubtext() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setN(SUBTEXT.length);
+      return;
+    }
+    let i = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      i += 1;
+      setN(i);
+      if (i < SUBTEXT.length) timer = setTimeout(tick, 28);
+    };
+    timer = setTimeout(tick, 600);
+    return () => clearTimeout(timer);
+  }, []);
+  const done = n >= SUBTEXT.length;
+  return (
+    <>
+      <span className="sr-only">{SUBTEXT}</span>
+      <span aria-hidden="true" className="relative block">
+        <span className="invisible">{SUBTEXT}</span>
+        <span className="absolute inset-0">
+          {SUBTEXT.slice(0, n)}
+          {/* Zero-width so the caret can't push the last word onto a new line. */}
+          <span className="relative inline-block h-[1em] w-0 align-[-0.15em]">
+            <span className={`absolute left-0.5 top-0 block h-full w-px bg-current ${done ? "animate-pulse" : ""}`} />
+          </span>
+        </span>
+      </span>
+    </>
+  );
+}
 
 export function Hero() {
   const { theme } = useTheme();
@@ -21,8 +61,8 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: EASE, delay: 0.1 }}
           >
-            Multiple Models. <br />
-            <span className="text-black dark:text-white">One Powerful Interface.</span>
+            Multiple Models <br />
+            <span className="text-black dark:text-white">One Powerful Interface</span>
           </motion.h1>
 
           {/* Subtext */}
@@ -32,7 +72,7 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: EASE, delay: 0.25 }}
           >
-            Experience the future of AI conversation with our multichat interface.
+            <TypedSubtext />
           </motion.p>
 
           {/* CTA */}
@@ -43,10 +83,10 @@ export function Hero() {
           >
             <Link
               href="/register"
-              className="px-8 py-4 mt-2 bg-black dark:bg-white rounded-full text-white dark:text-black font-medium flex items-center gap-2 transition-all duration-300"
+              className="px-8 py-4 mt-2 bg-[linear-gradient(145deg,#6A45D9,#4A3198)] dark:bg-[linear-gradient(145deg,#9677FF,#6953B3)] hover:brightness-110 rounded-full text-white font-medium flex items-center gap-2 transition-all duration-300"
             >
               Get Started
-              <ArrowUpRight className="w-4 h-4 text-white dark:text-black" />
+              <ArrowUpRight className="w-4 h-4 text-white" />
             </Link>
           </motion.div>
         </div>

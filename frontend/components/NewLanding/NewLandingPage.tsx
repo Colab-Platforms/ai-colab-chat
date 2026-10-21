@@ -3,10 +3,10 @@
 import "./landing.css";
 import React, { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import SmoothScrollLayout from "../SmoothScrollLayout";
 import { Hero } from "./components/Hero";
+import { Navbar } from "./components/Navbar";
 import { planService } from "@/lib/services";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "@/context/theme-context";
@@ -69,128 +69,6 @@ const gradIcon: CSSProperties = {
 };
 
 // ─────────────────────────────────────────────────────
-//  Header
-// ─────────────────────────────────────────────────────
-function Header({ theme, toggleTheme, w }: { theme: string; toggleTheme: () => void; w: number }) {
-  const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const [spy, setSpy] = useState("");
-  const wide = w >= 1080;
-
-  const links = [
-    { href: "#about", label: "About", id: "about" },
-    { href: "#features", label: "Features", id: "features" },
-    { href: "/business", label: "Business", id: "" },
-    { href: "#pricing", label: "Pricing", id: "pricing" },
-    { href: "#faq", label: "FAQs", id: "faq" },
-    { href: "#testimonials", label: "Testimonials", id: "testimonials" },
-  ].map((l) => ({
-    ...l,
-    // Section links live on the landing page; from other pages go back there.
-    href: l.href.startsWith("#") && pathname !== "/" ? `/${l.href}` : l.href,
-  }));
-
-  useEffect(() => {
-    const on = () => {
-      let cur = "";
-      ["about", "features", "benefits", "testimonials", "pricing", "faq"].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el && el.getBoundingClientRect().top < 140) cur = id;
-      });
-      if (cur === "benefits") cur = "features";
-      setSpy(cur);
-    };
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
-  }, []);
-
-  const dark = theme === "dark";
-
-  return (
-    <header
-      className="cl-s"
-      style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999, background: "var(--header)",
-        backdropFilter: "saturate(1.4) blur(14px)", WebkitBackdropFilter: "saturate(1.4) blur(14px)",
-        borderBottom: "1px solid var(--border)",
-      }}
-    >
-      <div style={{ maxWidth: 1264, margin: "0 auto", height: 64, padding: `0 ${GUTTER}`, display: "flex", alignItems: "center", gap: 12 }}>
-        <Link href="/" style={{ display: "flex", alignItems: "center", color: "var(--text)" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`${A}/logos/colab-${dark ? "dark" : "light"}.webp`} alt="Colab" style={{ height: 36, width: "auto" }} />
-        </Link>
-        <div style={{ flex: 1 }} />
-        {wide && (
-          <nav style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            {links.map((l) => {
-              const on = !!l.id && spy === l.id;
-              return (
-                <Link
-                  key={l.label}
-                  href={l.href}
-                  className="cl-navlink"
-                  style={{
-                    height: 36, padding: "0 11px", borderRadius: 9, display: "flex", alignItems: "center", fontSize: 14,
-                    whiteSpace: "nowrap", color: on ? "var(--text)" : "var(--muted)", background: on ? "var(--sunken)" : "transparent",
-                  }}
-                >
-                  {l.label}
-                </Link>
-              );
-            })}
-          </nav>
-        )}
-        <button
-          onClick={toggleTheme}
-          aria-label="Toggle Theme"
-          title={dark ? "Switch to light mode" : "Switch to dark mode"}
-          className="cl-iconbtn"
-          style={{ width: 40, height: 40, flexShrink: 0, border: "1px solid var(--border)", borderRadius: 11, background: "var(--surface)", color: "var(--text)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
-        >
-          <Ms name={dark ? "light_mode" : "dark_mode"} size={20} />
-        </button>
-        {wide && (
-          <Link href="/login" className="cl-textlink" style={{ height: 38, padding: "0 6px", display: "flex", alignItems: "center", fontSize: 14, fontWeight: 500, color: "var(--text)", whiteSpace: "nowrap" }}>
-            Log in
-          </Link>
-        )}
-        <Link
-          href="/try"
-          className="cl-solid"
-          style={{ display: "flex", flexShrink: 0, alignItems: "center", height: 40, padding: "0 16px", borderRadius: 11, background: "var(--text)", color: "var(--bg)", fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}
-        >
-          Try it free
-        </Link>
-        {!wide && (
-          <button
-            onClick={() => setOpen((o) => !o)}
-            aria-label={open ? "Close menu" : "Open menu"}
-            aria-expanded={open}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, width: 44, height: 44, marginRight: -8, border: "none", background: "transparent", color: "var(--text)", cursor: "pointer" }}
-          >
-            <Ms name={open ? "close" : "menu"} size={26} />
-          </button>
-        )}
-      </div>
-      {!wide && open && (
-        <div style={{ padding: "8px 16px 16px", display: "flex", flexDirection: "column", borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
-          {links.map((l) => (
-            <Link key={l.label} href={l.href} onClick={() => setOpen(false)} style={{ height: 48, display: "flex", alignItems: "center", padding: "0 8px", fontSize: 16, color: "var(--text)", borderBottom: "1px solid var(--border)" }}>
-              {l.label}
-            </Link>
-          ))}
-          <Link href="/login" onClick={() => setOpen(false)} style={{ height: 48, display: "flex", alignItems: "center", padding: "0 8px", fontSize: 16, color: "var(--accent)", fontWeight: 500 }}>
-            Log in
-          </Link>
-        </div>
-      )}
-    </header>
-  );
-}
-
-// ─────────────────────────────────────────────────────
 //  About
 // ─────────────────────────────────────────────────────
 const ABOUT_POINTS: [string, string][] = [
@@ -229,7 +107,7 @@ function About({ dark }: { dark: boolean }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <span style={eyebrow}>About us</span>
-            <h2 style={h2Style}>One platform. Every leading AI model.</h2>
+            <h2 style={h2Style}>One platform Every leading AI model</h2>
             <p style={{ margin: 0, fontSize: 17, lineHeight: 1.55, color: "var(--muted)", textWrap: "pretty" }}>
               See which AI model is best for your task. No subscription juggling. No context switching.
             </p>
@@ -491,7 +369,7 @@ function Benefits({ dark, w }: { dark: boolean; w: number }) {
                 <span style={{ width: 24, height: 24, borderRadius: "50%", background: "#6A45D9", color: "#fff", fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>J</span>
               </span>
               <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--ph-muted)" }}><Ms name="all_inclusive" size={16} style={{ color: "var(--accent)" }} />Hi Jennie</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "var(--ph-muted)" }}><span style={{ width: 20, height: 20, borderRadius: 6, background: "#fff", border: "1px solid var(--ph-line)", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/icons/Colab%20Infinite.png" alt="" style={{ width: 17, height: "auto" }} /></span>Hi Jennie</span>
                 <span style={{ fontSize: 18, lineHeight: 1.2, fontWeight: 600, letterSpacing: "-.02em" }}>What’s on your mind today?</span>
               </span>
               <span style={{ display: "flex", flexDirection: "column", gap: 8, padding: 9, borderRadius: 14, background: "var(--ph-in)", border: "1px solid color-mix(in oklch,var(--accent) 40%,var(--ph-line))", boxShadow: "0 0 0 3px rgba(150,119,255,.12)" }}>
@@ -1034,7 +912,7 @@ function Footer({ w }: { w: number }) {
 //  Page
 // ─────────────────────────────────────────────────────
 export function NewLandingPage() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const w = useWidth();
   const dark = theme === "dark";
 
@@ -1045,7 +923,7 @@ export function NewLandingPage() {
         href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=swap"
       />
       <div className="cl-root">
-        <Header theme={theme} toggleTheme={toggleTheme} w={w} />
+        <Navbar />
         {/* Hero is intentionally untouched: it owns the SVG wormhole animation. */}
         <Hero />
         <About dark={dark} />

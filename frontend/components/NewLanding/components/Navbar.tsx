@@ -27,6 +27,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
   const { scrollY } = useScroll();
   const navLinks = [
     { href: "#about", label: "About" },
+    { href: "#features", label: "Features" },
     { href: "/business", label: "Business" },
     { href: "#pricing", label: "Pricing" },
     { href: "#faq", label: "FAQs" },
@@ -133,12 +134,12 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
               </Button>
             </Link>
             <Link href="/login" className="hidden lg:block">
-              <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-6 transition-all duration-300">
+              <Button className="rounded-full bg-[linear-gradient(145deg,#6A45D9,#4A3198)] dark:bg-[linear-gradient(145deg,#9677FF,#6953B3)] hover:brightness-110 text-white px-6 transition-all duration-300">
                 Log in
               </Button>
             </Link>
             <Link href="/login" className="lg:hidden">
-              <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-4 py-2 h-9 text-sm transition-all duration-300">
+              <Button className="rounded-full bg-[linear-gradient(145deg,#6A45D9,#4A3198)] dark:bg-[linear-gradient(145deg,#9677FF,#6953B3)] hover:brightness-110 text-white px-4 py-2 h-9 text-sm transition-all duration-300">
                 Log in
               </Button>
             </Link>
@@ -184,7 +185,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                 <li>
                   <a
                     href={demoHref}
-                    className="block rounded-2xl px-4 py-2.5 text-sm font-semibold text-landing-primary hover:bg-gray-100/80 dark:hover:bg-gray-900/70 transition-colors"
+                    className="block rounded-2xl px-4 py-2.5 text-sm font-semibold text-landing-primary hover:bg-gray-100/90 dark:hover:bg-gray-900/70 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Book a demo
