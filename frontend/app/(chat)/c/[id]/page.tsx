@@ -229,7 +229,11 @@ export default function ChatPage() {
         return incoming.map((bm: Message) => {
           const existing = cleanPrev.find((pm) => pm.id === bm.id);
           if (existing) {
-            return { ...existing, ...bm };
+            const merged = { ...existing, ...bm };
+            if (existing.modelResponses?.length && !bm.modelResponses?.length) {
+              merged.modelResponses = existing.modelResponses;
+            }
+            return merged;
           }
           return bm;
         });
