@@ -12,6 +12,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getModelIcon } from "@/lib/model-icons";
 import { useContextPicker } from "@/components/chat/use-context-picker";
 
@@ -44,6 +50,55 @@ interface ModelsModalProps {
   onChatTypeChange: (type: ChatType) => void;
   hasImageAttachment: boolean;
 }
+
+// Shown first in the picker, in this order. Matched by OpenRouter id, so a
+// model that isn't seeded/active simply doesn't appear.
+const POPULAR_MODEL_EXTERNAL_IDS = [
+  "anthropic/claude-opus-5.5",
+  "anthropic/claude-sonnet-5.5",
+  "google/gemini-4-argon",
+  "openai/gpt-5.6-sol",
+  "x-ai/grok-4.7",
+];
+
+// Corner label + hover tooltip on selected cards, keyed by OpenRouter id.
+// Editorial picks, not usage statistics.
+const MODEL_BADGES: Record<string, { label: string; tip: string }> = {
+  "anthropic/claude-opus-5.5": {
+    label: "Best response",
+    tip: "Our strongest pick for deep reasoning, coding and detailed answers.",
+  },
+  "anthropic/claude-sonnet-5.5": {
+    label: "Recommended",
+    tip: "The best balance of answer quality, speed and token use.",
+  },
+  "google/gemini-3-pro-image-preview": {
+    label: "Best for images",
+    tip: "Our top pick for generating and editing images.",
+  },
+  "openai/gpt-5.6-sol": {
+    label: "Most used",
+    tip: "A popular all-rounder for everyday questions and tasks.",
+  },
+  "x-ai/grok-4.7": {
+    label: "Great for coding",
+    tip: "Strong at coding, agentic tasks and long-running work.",
+  },
+  "anthropic/claude-haiku-5.5": {
+    label: "Fastest",
+    tip: "Quick replies that use the fewest tokens.",
+  },
+  "deepseek/deepseek-v4-flash": {
+    label: "Best value",
+    tip: "Low token use for the quality you get.",
+  },
+};
+
+// These models are added from the admin panel rather than the seed, so the
+// OpenRouter id may differ; fall back to matching on the display name.
+const getModelBadge = (model: { name: string; externalId?: string }) =>
+  (model.externalId && MODEL_BADGES[model.externalId]) ||
+  (/nano banana pro/i.test(model.name) ? MODEL_BADGES["google/gemini-3-pro-image-preview"] : undefined);
 
 const TABS: { type: ModalTab; label: string }[] = [
   { type: "STANDARD", label: "Standard Chat" },
@@ -90,7 +145,7 @@ export function ModelsModal({
     toggleContext,
   } = useContextPicker();
 
-  const { regularModels, freeModels } = useMemo(() => {
+  const { popularModels, regularModels, freeModels } = useMemo(() => {
     const effectiveType = activeTab === "CONTEXT" ? chatType : (activeTab as ChatType);
     const term = search.trim().toLowerCase();
 
@@ -113,8 +168,15 @@ export function ModelsModal({
           (m.description ?? "").toLowerCase().includes(term),
       );
 
+    const paid = selectable.filter((m) => m.tokenMultiplier !== 0);
+    const popular = POPULAR_MODEL_EXTERNAL_IDS.flatMap((extId) =>
+      paid.filter((m) => m.externalId === extId),
+    );
+    const popularIds = new Set(popular.map((m) => m.id));
+
     return {
-      regularModels: selectable.filter((m) => m.tokenMultiplier !== 0),
+      popularModels: popular,
+      regularModels: paid.filter((m) => !popularIds.has(m.id)),
       freeModels: selectable.filter((m) => m.tokenMultiplier === 0),
     };
   }, [models, activeTab, chatType, hasImageAttachment, search]);
@@ -137,6 +199,7 @@ export function ModelsModal({
   const renderModelCard = (model: Model) => {
     const selected = selectedModels.includes(model.id);
     const icon = model.externalId ? getModelIcon(model.externalId) : null;
+    const badge = getModelBadge(model);
     return (
       <button
         key={model.id}
@@ -148,9 +211,23 @@ export function ModelsModal({
             : "border-border/50 hover:border-primary/40 hover:bg-muted/40"
         }`}
       >
-        {selected && (
-          <div className="absolute top-2 right-2 rounded-full bg-primary p-0.5">
-            <Check className="w-3 h-3 text-primary-foreground" />
+        {(badge || selected) && (
+          <div className="absolute top-2 right-2 flex items-center gap-1">
+            {badge && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-primary">
+                    {badge.label}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{badge.tip}</TooltipContent>
+              </Tooltip>
+            )}
+            {selected && (
+              <div className="rounded-full bg-primary p-0.5">
+                <Check className="w-3 h-3 text-primary-foreground" />
+              </div>
+            )}
           </div>
         )}
         {model.tokenMultiplier === 0 && (
@@ -188,6 +265,7 @@ export function ModelsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <TooltipProvider delayDuration={150}>
       <DialogContent
         data-guide="capability-menu"
         className="sm:max-w-2xl w-full max-h-[80vh] p-0 flex flex-col overflow-hidden rounded-2xl gap-0"
@@ -274,10 +352,27 @@ export function ModelsModal({
             </div>
           ) : (
             <div className="flex flex-col gap-5">
+              {popularModels.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2 px-0.5">
+                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                      Most popular
+                    </span>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 rounded-md">
+                      {popularModels.length}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {popularModels.map(renderModelCard)}
+                  </div>
+                </div>
+              )}
+
+              {(regularModels.length > 0 || popularModels.length === 0) && (
               <div>
                 <div className="flex items-center justify-between mb-2 px-0.5">
                   <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                    Models
+                    {popularModels.length > 0 ? "All models" : "Models"}
                   </span>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 rounded-md">
                     {regularModels.length}
@@ -293,6 +388,7 @@ export function ModelsModal({
                   </div>
                 )}
               </div>
+              )}
 
               {freeModels.length > 0 && (
                 <div>
@@ -313,6 +409,7 @@ export function ModelsModal({
           )}
         </div>
       </DialogContent>
+      </TooltipProvider>
     </Dialog>
   );
 }
