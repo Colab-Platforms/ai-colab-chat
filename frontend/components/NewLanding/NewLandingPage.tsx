@@ -168,7 +168,10 @@ const TABS: [string, string, string, string, string][] = [
   ["projects", "folder", "Projects", "Keep related chats, files and instructions together under one brief, so every answer has the context.", "Keep every launch chat and file in one place"],
 ];
 
-const featImg = (k: string, theme: string) => (k === "video" ? `${A}/feat/video-${theme}-fix.png` : `${A}/feat/${k}-${theme}.webp`);
+const featImg = (k: string, theme: string) =>
+  k === "video" ? `${A}/feat/video-${theme}-fix.png`
+  : k === "agents" ? `${A}/feat/agent_${theme === "dark" ? "black" : "white"}_bg.png`
+  : `${A}/feat/${k}-${theme}.webp`;
 
 function Features({ theme, w }: { theme: string; w: number }) {
   const [tab, setTab] = useState(0);
@@ -265,7 +268,7 @@ function Features({ theme, w }: { theme: string; w: number }) {
                       key={k}
                       role="img"
                       aria-label={`Colab AI ${title}`}
-                      style={{ position: "absolute", inset: 0, backgroundImage: `url(${featImg(k, theme)})`, backgroundSize: "cover", backgroundPosition: "left top", opacity: i === tab ? 1 : 0, transform: `scale(${i === tab ? 1 : 1.03})`, transition: "opacity .6s ease,transform .8s cubic-bezier(.2,.8,.2,1)" }}
+                      style={{ position: "absolute", inset: 0, backgroundImage: `url(${featImg(k, theme)})`, backgroundSize: k === "agents" ? "contain" : "cover", backgroundPosition: k === "agents" ? "center" : "left top", backgroundRepeat: "no-repeat", opacity: i === tab ? 1 : 0, transform: `scale(${i === tab ? 1 : 1.03})`, transition: "opacity .6s ease,transform .8s cubic-bezier(.2,.8,.2,1)" }}
                     />
                   ))}
                 </div>

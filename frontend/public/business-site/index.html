@@ -679,7 +679,7 @@ class Component extends DCLogic {
       entFeats: ['Admin console and usage reports', 'Custom roles with per-role limits', 'Choose which AI models to allow', 'GST invoice for input tax credit', 'Data stored in India', 'No training on your data', 'Admins see usage, not conversations', 'Dedicated account manager'],
       plans: this.PLANS.map(({ label, mo, yr, desc, cta, ft, lead, feats }, pi) => { const wide = s.w >= 1040;
         const inr = n => '₹' + n.toLocaleString('en-IN'), yrOn = !!(s.yearly && mo);
-        return { label, price: !mo ? 'Free' : inr(yrOn ? Math.round(yr / 12) : mo), per: mo ? '/month' : '', showSave: yrOn, hasGst: !!mo, strike: mo ? inr(mo) : '', save: mo ? inr(mo * 12 - yr) : '',
+        return { label, price: !mo ? 'Free' : inr(yrOn ? Math.round(yr / 12) : mo), per: mo ? '/seat/month' : '', showSave: yrOn, hasGst: false, strike: mo ? inr(mo) : '', save: mo ? inr(mo * 12 - yr) : '',
           billed: !mo ? 'No card needed' : yrOn ? `Billed ${inr(yr)} per year, plus GST` : 'Billed monthly, plus GST', hasLead: !!lead, lead, desc, cta, href: '/login',
           feats: feats.map(([t, sub, off, strong]) => ({ t, sub, hasSub: !!sub, icon: off ? 'remove' : 'check', iconBg: off ? 'var(--sunken)' : 'var(--text)', iconFg: off ? 'var(--faint)' : 'var(--bg)', op: off ? '.6' : '1', fw: strong ? '600' : '400' })),
           badge: 'Most popular', badgeDisp: ft ? 'flex' : 'none', badgeBg: 'var(--surface)',
