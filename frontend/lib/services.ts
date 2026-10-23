@@ -96,6 +96,8 @@ export const userService = {
   list: (params?: Record<string, string>) => api.get("/users", { params }),
   update: (id: number, data: any) => api.put(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
+  requestAccountDeletionOtp: () => api.post("/users/me/delete-otp"),
+  deleteMyAccount: (otp: string) => api.delete("/users/me", { data: { otp } }),
   getUserUsage: (id: number, params?: Record<string, string>) =>
     api.get(`/users/${id}/usage`, { params }),
   getUserSubscription: (id: number) => api.get(`/users/${id}/subscription`),

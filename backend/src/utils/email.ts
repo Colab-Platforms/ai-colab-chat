@@ -182,20 +182,27 @@ const renderOtpTemplate = ({
 export const sendOtpEmail = async (
   to: string,
   otp: string,
-  purpose: "EMAIL_VERIFICATION" | "PASSWORD_RESET",
+  purpose: "EMAIL_VERIFICATION" | "PASSWORD_RESET" | "ACCOUNT_DELETION",
 ) => {
-  const title =
-    purpose === "EMAIL_VERIFICATION"
-      ? "Email verification code"
-      : "Password reset code";
-  const action =
-    purpose === "EMAIL_VERIFICATION"
-      ? "verify your email"
-      : "reset your password";
-  const subtitle =
-    purpose === "EMAIL_VERIFICATION"
-      ? "Enter this verification code to continue your sign in."
-      : "Enter this code to set a new password for your account.";
+  const copy = {
+    EMAIL_VERIFICATION: {
+      title: "Email verification code",
+      action: "verify your email",
+      subtitle: "Enter this verification code to continue your sign in.",
+    },
+    PASSWORD_RESET: {
+      title: "Password reset code",
+      action: "reset your password",
+      subtitle: "Enter this code to set a new password for your account.",
+    },
+    ACCOUNT_DELETION: {
+      title: "Account deletion code",
+      action: "confirm deleting your account",
+      subtitle:
+        "Enter this code to permanently delete your account. This cannot be undone.",
+    },
+  }[purpose];
+  const { title, action, subtitle } = copy;
   const template = renderOtpTemplate({
     otp,
     title,

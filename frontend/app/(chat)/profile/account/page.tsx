@@ -36,7 +36,13 @@ export default function AccountPage() {
   // Delete account states
   const [showStep1, setShowStep1] = useState(false);
   const [showStep2, setShowStep2] = useState(false);
+  const [showStep3, setShowStep3] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [deleteOtp, setDeleteOtp] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  const errorMessage = (err: any, fallback: string) =>
+    err?.response?.data?.message || fallback;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -89,18 +95,45 @@ export default function AccountPage() {
     setShowStep2(true);
   };
 
+  // Step 2 -> email the code, then ask for it in step 3.
+  const handleSendDeleteOtp = async () => {
+    setSendingOtp(true);
+    try {
+      await userService.requestAccountDeletionOtp();
+      toast.success("Verification code sent to your email");
+      setDeleteOtp("");
+      setShowStep2(false);
+      setShowStep3(true);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to send verification code"));
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleResendDeleteOtp = async () => {
+    setSendingOtp(true);
+    try {
+      await userService.requestAccountDeletionOtp();
+      toast.success("Verification code sent to your email");
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to resend code"));
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
-    if (!user) return;
+    if (!user || deleteOtp.length !== 6) return;
     setDeleting(true);
     try {
-      await userService.delete(user.id);
+      await userService.deleteMyAccount(deleteOtp);
       toast.success("Account deleted successfully");
       logout();
       router.push("/");
-    } catch {
-      toast.error("Failed to delete account");
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to delete account"));
       setDeleting(false);
-      setShowStep2(false);
     }
   };
 
@@ -249,8 +282,66 @@ export default function AccountPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendingOtp}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(e) => {
+                // Keep the dialog open until the code is actually sent.
+                e.preventDefault();
+                handleSendDeleteOtp();
+              }}
+              disabled={sendingOtp}
+            >
+              {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Send verification code
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Step 3: Email OTP confirmation */}
+      <AlertDialog open={showStep3} onOpenChange={(open) => !deleting && setShowStep3(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" /> Verify it&apos;s you
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="text-left space-y-3 text-sm text-muted-foreground">
+                <span className="block">
+                  We sent a 6-digit code to <strong>{user?.email}</strong>. Enter it below to permanently delete your account.
+                </span>
+                <Input
+                  className={inputCls}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={deleteOtp}
+                  onChange={(e) => setDeleteOtp(e.target.value.replace(/\D/g, ""))}
+                  disabled={deleting}
+                />
+                <button
+                  type="button"
+                  className="text-xs font-medium text-accent-ink hover:underline disabled:opacity-50"
+                  onClick={handleResendDeleteOtp}
+                  disabled={sendingOtp || deleting}
+                >
+                  Didn&apos;t get it? Resend code
+                </button>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleDeleteAccount} disabled={deleting}>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteAccount();
+              }}
+              disabled={deleting || deleteOtp.length !== 6}
+            >
               {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Delete my account
             </AlertDialogAction>

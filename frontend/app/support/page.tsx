@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Loader2, LifeBuoy, Mail } from "lucide-react";
+import { Loader2, LifeBuoy, Mail } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/auth-context";
 import api from "@/lib/api";
@@ -258,13 +258,6 @@ export default function SupportPage() {
           <Link href="/" className="inline-flex items-center gap-2">
             <Image src="/black.webp" alt="AI Colab" width={70} height={28} className="dark:hidden h-6 w-auto" priority />
             <Image src="/white.webp" alt="AI Colab" width={70} height={28} className="hidden dark:block h-6 w-auto" priority />
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to home
           </Link>
         </div>
       </header>

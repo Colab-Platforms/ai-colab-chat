@@ -11,6 +11,12 @@ import {
   formatPaginationResponse,
 } from "@/utils/paginationUtils.js";
 import { buildPrismaQuery } from "prisma-qb";
+import { hashPassword, comparePassword } from "@/utils/auth.js";
+import { generateOtp, getOtpExpiry } from "@/utils/otp.js";
+import { sendOtpEmail } from "@/utils/email.js";
+
+const OTP_TTL_MINUTES = 10;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -292,10 +298,88 @@ class UserService {
         isActive: false,
         isDeleted: true,
         deletedAt: new Date(),
+        // Dead credentials shouldn't outlive the account.
+        emailVerificationOtpHash: null,
+        emailVerificationOtpExpiresAt: null,
+        passwordResetOtpHash: null,
+        passwordResetOtpExpiresAt: null,
+        accountDeletionOtpHash: null,
+        accountDeletionOtpExpiresAt: null,
       },
     });
 
     return { message: "User deleted successfully" };
+  }
+
+  // Step 1 of self-service deletion: email a one-time code to the account's
+  // address. Works for password and Google accounts alike.
+  async requestAccountDeletionOtp(userId: number) {
+    const user = await prisma.user.findFirst({
+      where: { id: userId, isDeleted: false },
+      include: { userRoles: { include: { role: true } } },
+    });
+    if (!user) {
+      throw new ApiError("User not found", STATUS_CODES.NOT_FOUND);
+    }
+    this.assertNotSuperAdmin(user);
+
+    // Block resend spam: a code issued in the last minute is still the live one.
+    const issuedAt = user.accountDeletionOtpExpiresAt
+      ? user.accountDeletionOtpExpiresAt.getTime() - OTP_TTL_MINUTES * 60 * 1000
+      : 0;
+    if (Date.now() - issuedAt < OTP_RESEND_COOLDOWN_MS) {
+      throw new ApiError(
+        "A code was just sent. Please wait a minute before requesting another",
+        STATUS_CODES.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const otp = generateOtp();
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        accountDeletionOtpHash: await hashPassword(otp),
+        accountDeletionOtpExpiresAt: getOtpExpiry(OTP_TTL_MINUTES),
+      },
+    });
+    await sendOtpEmail(user.email, otp, "ACCOUNT_DELETION");
+
+    return { sent: true };
+  }
+
+  // Step 2: verify the code, then soft delete. The client logs the user out
+  // after this succeeds.
+  async deleteMyAccount(userId: number, otp: string) {
+    const user = await prisma.user.findFirst({
+      where: { id: userId, isDeleted: false },
+    });
+    if (!user) {
+      throw new ApiError("User not found", STATUS_CODES.NOT_FOUND);
+    }
+
+    if (
+      !user.accountDeletionOtpHash ||
+      !user.accountDeletionOtpExpiresAt ||
+      user.accountDeletionOtpExpiresAt.getTime() < Date.now() ||
+      !(await comparePassword(otp, user.accountDeletionOtpHash))
+    ) {
+      throw new ApiError("Invalid or expired OTP", STATUS_CODES.BAD_REQUEST);
+    }
+
+    await this.softDelete(userId);
+    return { message: "Your account has been deleted" };
+  }
+
+  private assertNotSuperAdmin(user: { userRoles: { role: { name: string } }[] }) {
+    const isSuperAdmin = user.userRoles.some(
+      (ur) => ur.role.name === "SUPERADMIN" || ur.role.name === "SUPER_ADMIN",
+    );
+    if (isSuperAdmin) {
+      throw new ApiError(
+        "SUPERADMIN account cannot be deleted",
+        STATUS_CODES.FORBIDDEN,
+      );
+    }
   }
 
   async getUserUsage(userId: number, query: any) {
