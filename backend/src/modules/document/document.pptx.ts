@@ -1,3 +1,8 @@
+import {
+  getDeckFileTemplate,
+  renderDeckFromTemplate,
+  specMatchesDeckTemplate,
+} from "./document.deckFile.js";
 import PptxGenJS from "pptxgenjs";
 import { dlog } from "./document.logger.js";
 
@@ -487,6 +492,9 @@ const addDecoration = (
 const SPLIT_PHOTO_LAYOUT: Partial<Record<string, { textRatio: number; kicker?: string }>> = {
   corporate: { textRatio: 0.36 },
   emerald: { textRatio: 0.48, kicker: "PRESENTATION" },
+  "marketing-plan": { textRatio: 0.44, kicker: "MARKETING PLAN" },
+  "sales-proposal": { textRatio: 0.42, kicker: "PROPOSAL" },
+  "training-deck": { textRatio: 0.44, kicker: "TRAINING" },
 };
 
 const addSolidTitleSlide = (
@@ -870,6 +878,12 @@ export const renderSpecToPptx = async (
   spec: PresentationSpec,
   theme: string,
 ): Promise<Buffer> => {
+  // A deck generated for a designed template file is filled into that file.
+  const deckTemplate = getDeckFileTemplate(theme);
+  if (deckTemplate && specMatchesDeckTemplate(deckTemplate, spec)) {
+    return renderDeckFromTemplate(deckTemplate, spec);
+  }
+
   const t = getPptxTemplateTokens(theme);
   const pptx = new PptxGen();
 

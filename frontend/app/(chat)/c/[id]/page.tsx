@@ -317,62 +317,70 @@ export default function ChatPage() {
       setModels(activeModels);
       modelsRef.current = activeModels;
       
-      // Only apply default model logic if:
-      // 1. Models haven't been restored from DB yet (for new chats)
-      // 2. OR we have no selections yet AND we are sure we are not waiting for fetchChat
-      if (activeModels.length > 0 && selectedModelsRef.current.length === 0 && !modelsRestoredRef.current) {
+      // Default model for a chat that has none yet. Pure (no state writes) so
+      // the pending first message below can use it however the race with
+      // fetchChat resolves.
+      const pickDefaultModelIds = (): number[] => {
         const storedModelId = localStorage.getItem("preferredModelId");
         const parsedId = storedModelId ? Number(storedModelId) : null;
-        
-        let resolvedModelIds: number[];
-        if (parsedId && activeModels.find((m: any) => m.id === parsedId)) {
-          resolvedModelIds = [parsedId];
-        } else {
-          const defaultModels = activeModels.filter((m: any) => m.defaultForCapabilities?.includes("STANDARD"));
-          resolvedModelIds = defaultModels.length > 0
-            ? defaultModels.map((m: any) => m.id)
-            : [activeModels[0].id];
-        }
-        setSelectedModels(resolvedModelIds);
+        if (parsedId && activeModels.find((m: any) => m.id === parsedId)) return [parsedId];
+        const defaultModels = activeModels.filter((m: any) => m.defaultForCapabilities?.includes("STANDARD"));
+        return defaultModels.length > 0 ? defaultModels.map((m: any) => m.id) : [activeModels[0].id];
+      };
 
-        if (!firstMessageSent.current) {
-          const raw = sessionStorage.getItem(`pending_chat_${chatId}`);
-          if (raw) {
-            firstMessageSent.current = true;
-            sessionStorage.removeItem(`pending_chat_${chatId}`);
-            try {
-              const { content, modelIds, chatType, attachmentIds, attachmentObjects, documentFormat, documentTheme } = JSON.parse(raw);
-              documentOptionsRef.current = documentFormat
-                ? { documentFormat, ...(documentTheme ? { documentTheme } : {}) }
-                : null;
-              const targetIds = Array.isArray(modelIds) && modelIds.length > 0 ? modelIds : resolvedModelIds;
-              setSelectedModels(targetIds);
-              void (async () => {
-                const pendingCtx = localStorage.getItem("pending_new_chat_context_ids");
-                if (pendingCtx) {
-                  try {
-                    const parsed = JSON.parse(pendingCtx);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                      const contextIds = parsed
-                        .map((id: unknown) => Number(id))
-                        .filter((id: number) => !Number.isNaN(id));
-                      if (contextIds.length > 0) {
-                        try {
-                          await chatService.replaceContexts(chatId, contextIds);
-                          localStorage.removeItem("pending_new_chat_context_ids");
-                        } catch {
-                          /* still send; stream may apply default contexts */
-                        }
+      // Only apply default model logic if models haven't been restored from the
+      // DB yet and nothing is selected.
+      let resolvedModelIds: number[] | null = null;
+      if (activeModels.length > 0 && selectedModelsRef.current.length === 0 && !modelsRestoredRef.current) {
+        resolvedModelIds = pickDefaultModelIds();
+        setSelectedModels(resolvedModelIds);
+      }
+
+      // The first message handed over from /documents, /image-studio or the new
+      // chat page must be sent whenever models are available. It used to live
+      // inside the default-model branch above, so if fetchChat finished first
+      // (it sets modelsRestoredRef) the branch was skipped and the message was
+      // never sent: the user saw their own message and no reply.
+      if (activeModels.length > 0 && !firstMessageSent.current) {
+        const raw = sessionStorage.getItem(`pending_chat_${chatId}`);
+        if (raw) {
+          firstMessageSent.current = true;
+          sessionStorage.removeItem(`pending_chat_${chatId}`);
+          try {
+            const { content, modelIds, chatType, attachmentIds, attachmentObjects, documentFormat, documentTheme } = JSON.parse(raw);
+            documentOptionsRef.current = documentFormat
+              ? { documentFormat, ...(documentTheme ? { documentTheme } : {}) }
+              : null;
+            const fallbackIds =
+              resolvedModelIds ??
+              (selectedModelsRef.current.length > 0 ? selectedModelsRef.current : pickDefaultModelIds());
+            const targetIds = Array.isArray(modelIds) && modelIds.length > 0 ? modelIds : fallbackIds;
+            setSelectedModels(targetIds);
+            void (async () => {
+              const pendingCtx = localStorage.getItem("pending_new_chat_context_ids");
+              if (pendingCtx) {
+                try {
+                  const parsed = JSON.parse(pendingCtx);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    const contextIds = parsed
+                      .map((id: unknown) => Number(id))
+                      .filter((id: number) => !Number.isNaN(id));
+                    if (contextIds.length > 0) {
+                      try {
+                        await chatService.replaceContexts(chatId, contextIds);
+                        localStorage.removeItem("pending_new_chat_context_ids");
+                      } catch {
+                        /* still send; stream may apply default contexts */
                       }
                     }
-                  } catch {
-                    /* ignore malformed localStorage */
                   }
+                } catch {
+                  /* ignore malformed localStorage */
                 }
-                sendMessage(content, attachmentIds, targetIds, chatType, attachmentObjects);
-              })();
-            } catch { /* ignore */ }
-          }
+              }
+              sendMessage(content, attachmentIds, targetIds, chatType, attachmentObjects);
+            })();
+          } catch { /* ignore */ }
         }
       }
     } catch { /* ignore */ }

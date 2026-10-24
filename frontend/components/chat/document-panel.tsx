@@ -22,6 +22,7 @@ import {
   type SpecKind,
   type ThemeTokens,
   type PptxTemplateTokens,
+  type DeckPreview,
 } from "./document-spec-renderer";
 
 const THEMES: Array<{ value: string; label: string }> = [
@@ -29,6 +30,28 @@ const THEMES: Array<{ value: string; label: string }> = [
   { value: "minimal", label: "Minimal" },
   { value: "report", label: "Report" },
 ];
+
+// Format-specific templates, added to THEMES per format. Keys must match
+// DOCX_TEMPLATES / XLSX_TEMPLATES in
+// backend/src/modules/document/document.types.ts.
+const FORMAT_THEMES: Record<string, Array<{ value: string; label: string }>> = {
+  DOCX: [
+    { value: "business-plan", label: "Business Plan" },
+    { value: "client-proposal", label: "Client Proposal" },
+    { value: "cover-letter", label: "Cover Letter" },
+    { value: "lesson-plan", label: "Lesson Plan" },
+    { value: "meeting-minutes", label: "Meeting Minutes" },
+    { value: "service-agreement", label: "Service Agreement" },
+  ],
+  XLSX: [
+    { value: "financial-model", label: "Financial Model" },
+    { value: "inventory-tracker", label: "Inventory Tracker" },
+    { value: "monthly-budget", label: "Monthly Budget" },
+    { value: "project-tracker", label: "Project Tracker" },
+    { value: "sales-tracker", label: "Sales Tracker" },
+    { value: "timesheet", label: "Timesheet" },
+  ],
+};
 
 // PPTX-only a deck gets its own richer templates (fonts, decoration, photo
 // layouts) rather than the flat document themes above. Keys must match
@@ -39,6 +62,12 @@ const PPTX_TEMPLATES: Array<{ value: string; label: string }> = [
   { value: "sunset", label: "Sunset" },
   { value: "emerald", label: "Emerald" },
   { value: "mono", label: "Mono" },
+  { value: "marketing-plan", label: "Marketing Plan" },
+  { value: "pitch-deck", label: "Pitch Deck" },
+  { value: "project-kickoff", label: "Project Kickoff" },
+  { value: "quarterly-review", label: "Quarterly Review" },
+  { value: "sales-proposal", label: "Sales Proposal" },
+  { value: "training-deck", label: "Training Deck" },
 ];
 
 // Mind-map-only palettes. Keys must match MINDMAP_THEMES in
@@ -79,6 +108,8 @@ interface SpecPayload {
   spec: AnySpec;
   theme: string;
   themeTokens: ThemeTokens | PptxTemplateTokens | MindmapThemeTokens;
+  /** Present for a deck filled into a designed template file. */
+  deckPreview?: DeckPreview;
 }
 
 /**
@@ -295,7 +326,7 @@ export function DocumentPanel() {
                 ? PPTX_TEMPLATES
                 : payload.specKind === "mindmap"
                   ? MINDMAP_THEME_OPTIONS
-                  : THEMES
+                  : [...THEMES, ...(FORMAT_THEMES[payload.format] ?? [])]
               ).map((t) => (
                 <SelectItem key={t.value} value={t.value}>
                   {t.label}
@@ -394,6 +425,7 @@ export function DocumentPanel() {
               specKind={payload.specKind}
               spec={payload.spec}
               themeTokens={payload.themeTokens}
+              deckPreview={payload.deckPreview}
             />
           </div>
         )}

@@ -10,7 +10,7 @@ import { dlog, dlogBlock, dlogError } from "./document.logger.js";
 import { resolveRenderableFormat } from "./document.renderers.js";
 import {
   DOCUMENT_FORMATS,
-  DOCUMENT_THEMES,
+  DOCUMENT_THEMES_BY_FORMAT,
   MAX_SOURCE_TEXT_CHARS,
   MAX_TITLE_CHARS,
   MINDMAP_THEMES,
@@ -42,7 +42,7 @@ export function parseRequestedDocumentOptions(
       ? PPTX_TEMPLATES
       : upper === "MINDMAP"
         ? MINDMAP_THEMES
-        : DOCUMENT_THEMES;
+        : DOCUMENT_THEMES_BY_FORMAT[upper as "PDF" | "DOCX" | "XLSX"] ?? DOCUMENT_THEMES_BY_FORMAT.PDF;
   return {
     format: upper,
     theme: typeof theme === "string" && allowed.includes(theme) ? theme : undefined,
