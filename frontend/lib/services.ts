@@ -11,6 +11,7 @@ export const chatService = {
     assistantId?: number | null;
     modelIds?: number[];
     capability?: string;
+    websiteTemplateId?: number;
   }) => api.post("/chats", data),
   list: (params?: Record<string, string>) => api.get("/chats", { params }),
   getById: (id: number) => api.get(`/chats/${id}`),
@@ -275,6 +276,16 @@ export const studioTemplateService = {
     api.put(`/studio-templates/${id}`, data),
   delete: (id: number) => api.delete(`/studio-templates/${id}`),
   recordUse: (id: number) => api.post(`/studio-templates/${id}/use`),
+};
+
+export const websiteTemplateService = {
+  list: () => api.get("/website-templates"),
+  adminList: () => api.get("/website-templates", { params: { all: "true" } }),
+  create: (data: Record<string, unknown>) => api.post("/website-templates", data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/website-templates/${id}`, data),
+  delete: (id: number) => api.delete(`/website-templates/${id}`),
+  recordUse: (id: number) => api.post(`/website-templates/${id}/use`),
 };
 
 export const demoRequestService = {

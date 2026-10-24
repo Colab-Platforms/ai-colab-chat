@@ -135,6 +135,16 @@ interface ChatInputProps {
   compact?: boolean;
   /** Small caption under the composer. */
   footerNote?: string;
+  /**
+   * Shows the website template this turn will be built from, with a × to drop
+   * it. Attaching one also switches the composer into Code mode, since a
+   * template only means anything for a code turn.
+   */
+  templateChip?: {
+    name: string;
+    thumbnailUrl: string;
+    onClear: () => void;
+  };
   /** Shows which assistant this chat is with, with a × to leave it. */
   assistantChip?: {
     name: string;
@@ -381,6 +391,7 @@ export function ChatInput({
   compact = false,
   footerNote,
   assistantChip,
+  templateChip,
 }: ChatInputProps) {
   const [content, setContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
@@ -497,16 +508,29 @@ export function ChatInput({
 
   // The Code pill: back to STANDARD, and one model — a project is written by
   // a single model (the backend also refuses multi-model code turns).
-  const toggleCodeMode = () => {
-    if (codeMode) {
-      setCodeMode(false);
-      return;
-    }
+  const enableCodeMode = () => {
     if (chatType !== "STANDARD") applyChatType("STANDARD", true);
     if (maxModels !== 1) handleModeToggle("single");
     else if (selectedModels.length > 1) onModelChange([selectedModels[0]]);
     setCodeMode(true);
   };
+
+  const toggleCodeMode = () => {
+    if (codeMode) {
+      setCodeMode(false);
+      return;
+    }
+    enableCodeMode();
+  };
+
+  // Through a ref so the effect depends only on *whether* a template is
+  // attached — templateChip is a fresh object on every parent render.
+  const enableCodeModeRef = useRef(enableCodeMode);
+  enableCodeModeRef.current = enableCodeMode;
+  const hasTemplate = Boolean(templateChip);
+  useEffect(() => {
+    if (hasTemplate && supportsCodeMode) enableCodeModeRef.current();
+  }, [hasTemplate, supportsCodeMode]);
 
   // Auto-capability detection disabled as per user request to use manual selection.
   // Predictability is prioritized over automation.
@@ -990,6 +1014,28 @@ export function ChatInput({
                       type="button"
                       onClick={assistantChip.onClear}
                       title={`Leave ${assistantChip.name}`}
+                      className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                </div>
+              )}
+
+              {templateChip && (
+                <div className="mb-1 mt-1 flex flex-shrink-0 items-center px-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent-soft py-1 pl-1 pr-2.5 text-xs font-medium text-accent-ink">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={templateChip.thumbnailUrl}
+                      alt=""
+                      className="h-5 w-7 rounded object-cover"
+                    />
+                    {templateChip.name}
+                    <button
+                      type="button"
+                      onClick={templateChip.onClear}
+                      title={`Remove the ${templateChip.name} template`}
                       className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <X className="h-3 w-3" />

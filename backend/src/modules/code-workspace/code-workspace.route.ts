@@ -8,6 +8,7 @@ import * as controller from "./code-workspace.controller.js";
 const router = Router();
 const authed = auth("USER", "ADMIN", "SUPERADMIN");
 
+router.get("/", authed, controller.listProjects);
 router.get("/:id", authed, controller.getProject);
 router.patch("/:id", authed, controller.updateProject);
 router.delete("/:id", authed, controller.deleteProject);

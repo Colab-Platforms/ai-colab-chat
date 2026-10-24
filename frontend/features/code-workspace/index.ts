@@ -8,6 +8,8 @@ export { CodeProjectCard } from "./components/CodeProjectCard";
 // statically, and every chat page imports this index — app/code-preview
 // imports it by path instead. (CodePanel lazy-loads Sandpack/Monaco.)
 export { codeWorkspace, useCodeWorkspace } from "./store/codeWorkspaceStore";
+export { codeWorkspaceApi } from "./api";
+export type { CodeProjectSummaryDto } from "./types";
 export { reduceCodeTurn, affectsCodeTurn, codeTurnFromResponse } from "./lib/codeTurn";
 export { isCodeStreamEvent } from "./types";
 export { GithubMenu } from "./github/GithubMenu";

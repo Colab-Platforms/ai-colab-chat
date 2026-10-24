@@ -4,6 +4,7 @@ export interface CreateChatBody {
   assistantId?: number | null;
   modelIds?: number[];
   capability?: string;
+  websiteTemplateId?: number | null;
 }
 
 export interface UpdateChatContextsBody {

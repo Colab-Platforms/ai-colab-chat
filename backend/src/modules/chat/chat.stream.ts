@@ -1274,6 +1274,7 @@ export async function streamChat(req: Request, res: Response) {
       userPrompt: content,
       assistantSlug,
       forceCode,
+      websiteTemplateId: chat.websiteTemplateId,
     });
     if (codeTurn) {
       injectCodeTurnMessages(conversationHistory, codeTurn, model.externalId);

@@ -37,6 +37,11 @@ function validate<T>(schema: Joi.ObjectSchema, input: unknown): T {
   return value as T;
 }
 
+export const listProjects = handle("list projects", async (req) => ({
+  data: await codeWorkspaceService.listProjects(req.user!.id),
+  message: "Projects fetched",
+}));
+
 export const getProject = handle("get project", async (req) => ({
   data: await codeWorkspaceService.getProject(req.user!.id, projectId(req)),
   message: "Project fetched",

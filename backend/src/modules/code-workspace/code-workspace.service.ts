@@ -172,6 +172,19 @@ async function markDirty(projectId: number) {
   await prisma.codeProject.update({ where: { id: projectId }, data: { dirtySinceSnapshot: true } });
 }
 
+/**
+ * The user's own projects for the "Your projects" gallery tab — newest first,
+ * file contents left out (the list only needs counts and metadata).
+ */
+export async function listProjects(userId: number) {
+  const projects = await prisma.codeProject.findMany({
+    where: { userId, isDeleted: false },
+    select: { ...projectSummarySelect, _count: { select: { files: true } } },
+    orderBy: { updatedAt: "desc" },
+  });
+  return projects.map(({ _count, ...project }) => ({ ...project, fileCount: _count.files }));
+}
+
 export async function getProject(userId: number, projectId: number) {
   const project = await prisma.codeProject.findFirst({
     where: { id: projectId, userId, isDeleted: false },

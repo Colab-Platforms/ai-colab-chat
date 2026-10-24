@@ -240,7 +240,12 @@ model Chat {
   assistantId        Int?
   capability         ModelCapability          @default(STANDARD)
   modelIds           Int[]
+  // Set once when the chat is started from a website template; every code
+  // turn in this chat then gets that template's design brief (see
+  // code-workspace.chat.ts), so follow-up edits keep the same look.
+  websiteTemplateId  Int?
   assistant          Assistant?               @relation(fields: [assistantId], references: [id])
+  websiteTemplate    WebsiteTemplate?         @relation(fields: [websiteTemplateId], references: [id])
   folder             Folder?                  @relation(fields: [folderId], references: [id])
   user               User                     @relation(fields: [userId], references: [id])
   chatContexts       ChatContext[]
@@ -630,6 +635,7 @@ model Model {
   generatedVideos        GeneratedVideo[]
   generatedImages        GeneratedImage[]
   allowedInPlans         PlanVideoModel[]
+  websiteTemplates       WebsiteTemplate[]
 
   @@unique([modelProviderId, externalId])
 }
@@ -1162,6 +1168,32 @@ model StudioTemplate {
   updatedAt       DateTime           @updatedAt
 
   @@index([type, isActive, isDeleted, sortOrder])
+}
+
+/// Admin-curated website designs shown under the Software Engineer composer.
+/// `prompt` is the design brief injected into that chat's code turns; it is
+/// never shown to the user and never part of their message.
+model WebsiteTemplate {
+  id           Int      @id @default(autoincrement())
+  name         String
+  description  String
+  previewUrl   String
+  thumbnailUrl String
+  techStack    String[] @default([])
+  prompt       String
+  modelId      Int?
+  category     String?
+  sortOrder    Int      @default(0)
+  usageCount   Int      @default(0)
+  isActive     Boolean  @default(true)
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  model Model? @relation(fields: [modelId], references: [id])
+  chats Chat[]
+
+  @@index([isActive, isDeleted, sortOrder])
 }
 
 enum DemoRequestStatus {

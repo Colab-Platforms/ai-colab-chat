@@ -24,6 +24,13 @@ export interface CodeProjectDto extends CodeProjectInfo {
   files: { path: string; language: string; content: string; updatedAt: string }[];
 }
 
+/** GET /api/code-projects — the "Your projects" gallery list, no file bodies. */
+export interface CodeProjectSummaryDto extends CodeProjectInfo {
+  fileCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CodeVersionDto {
   version: number;
   source: "AI" | "USER" | "RESTORE" | "GITHUB";

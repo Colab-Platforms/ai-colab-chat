@@ -3,7 +3,8 @@ import { buildSystemMessage } from "@/utils/systemPrompt.js";
 import { detectCodeIntent } from "./code-workspace.intent.js";
 import { pushAfterAiTurn } from "@/modules/github/github.sync.js";
 import { CodeStreamParser } from "./code-workspace.parser.js";
-import { buildCodeTurnNote, CODE_SYSTEM_PROMPT } from "./code-workspace.protocol.js";
+import { buildCodeTurnNote, buildTemplateBrief, CODE_SYSTEM_PROMPT } from "./code-workspace.protocol.js";
+import WebsiteTemplateService from "@/modules/website-template/website-template.service.js";
 import {
   createProject,
   findActiveProject,
@@ -50,12 +51,19 @@ export function resolveCodeChatType(chatType: string | undefined): { chatType: s
   return { chatType, forceCode: false };
 }
 
+const websiteTemplates = new WebsiteTemplateService();
+
 export interface CodeTurn {
   intent: CodeIntent;
   /** Existing project for EDIT/ASK; null for NEW. */
   projectId: number | null;
   /** The stable protocol prompt — null for ASK turns, which answer in plain chat. */
   protocolPrompt: string | null;
+  /**
+   * Design brief for chats started from a website template — null otherwise,
+   * and on ASK turns, which do not write files.
+   */
+  templateBrief: string | null;
   /** Per-turn note: turn kind + current project files. */
   note: string;
 }
@@ -70,6 +78,8 @@ export async function prepareCodeTurn(params: {
   userPrompt: string;
   assistantSlug: string | null | undefined;
   forceCode: boolean;
+  /** From the Chat row — set when the chat was started from a template. */
+  websiteTemplateId?: number | null;
 }): Promise<CodeTurn | null> {
   if (params.assistantSlug !== CODE_ASSISTANT_SLUG) return null;
   try {
@@ -92,10 +102,22 @@ export async function prepareCodeTurn(params: {
       userPrompt: params.userPrompt,
     });
     console.log(`[code-workspace] chat=${params.chatId} intent=${intent.intent} title="${intent.title}"`);
+    // ASK turns answer in plain chat and write nothing, so the design brief
+    // would only be noise.
+    let templateBrief: string | null = null;
+    if (params.websiteTemplateId && intent.intent !== "ASK") {
+      const template = await websiteTemplates.findBriefSource(params.websiteTemplateId);
+      if (template) templateBrief = buildTemplateBrief(template);
+      console.log(
+        `[code-workspace] chat=${params.chatId} template=${params.websiteTemplateId} brief=${templateBrief ? "injected" : "template-missing"}`,
+      );
+    }
+
     return {
       intent,
       projectId: intent.intent === "NEW" ? null : (project?.id ?? null),
       protocolPrompt: intent.intent === "ASK" ? null : CODE_SYSTEM_PROMPT,
+      templateBrief,
       note,
     };
   } catch (error: any) {
@@ -114,6 +136,7 @@ export function injectCodeTurnMessages(history: any[], turn: CodeTurn, modelExte
   const at = firstNonSystem === -1 ? history.length : firstNonSystem;
   const blocks: any[] = [];
   if (turn.protocolPrompt) blocks.push(buildSystemMessage(turn.protocolPrompt, modelExternalId));
+  if (turn.templateBrief) blocks.push(buildSystemMessage(turn.templateBrief, modelExternalId));
   if (turn.note) blocks.push({ role: "system", content: turn.note });
   history.splice(at, 0, ...blocks);
 }

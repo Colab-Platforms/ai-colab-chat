@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { MessageBubble } from "./message-bubble";
+import { MessageBubble, type MessageTemplate } from "./message-bubble";
 import { SelectionContextTooltip } from "./selection-context-tooltip";
 import { VideoCard, type GeneratedVideo } from "./video-card";
 
@@ -46,6 +46,8 @@ interface MessageListProps {
    */
   videos?: GeneratedVideo[];
   onVideoDeleted?: (id: number) => void;
+  /** The website template this chat started from — shown on its first user message. */
+  websiteTemplate?: MessageTemplate | null;
 }
 
 /**
@@ -178,7 +180,7 @@ export function MessageList({
   messages, activeModelTabs, onModelTabChange, onRegenerate, onFeedback,
   onEditMessage, editVersionIndices = {}, onEditVersionChange, onFollowUpClick,
   showSelectionTooltip = true, sharedView = false, onToggleStar, bottomAnchorId, forceScrollToBottom = false, scrollContainerId, onContinue, onRetryAssistantResponse,
-  onSwitchToFreeModel, videos = [], onVideoDeleted
+  onSwitchToFreeModel, videos = [], onVideoDeleted, websiteTemplate
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -201,6 +203,8 @@ export function MessageList({
 
   const processed = processMessagesWithVersions(messages, editVersionIndices);
   const merged = mergeWithVideos(processed, videos);
+  // The template was attached to the message that started the chat.
+  const firstUserIdx = merged.findIndex((e) => e.kind !== "video" && e.message.role === "USER");
 
   return (
     <>
@@ -216,6 +220,7 @@ export function MessageList({
               <MessageBubble
                 key={entry.message.id}
                 message={entry.message}
+                template={idx === firstUserIdx ? websiteTemplate : undefined}
                 activeModelTab={activeModelTabs[entry.message.id]}
                 onModelTabChange={(modelId) => onModelTabChange(entry.message.id, modelId)}
                 onRegenerate={onRegenerate}
