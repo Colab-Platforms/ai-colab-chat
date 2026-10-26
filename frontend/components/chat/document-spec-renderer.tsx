@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { MindmapCanvas } from "./mindmap/mindmap-canvas";
 import type { MindmapSpec, MindmapThemeTokens } from "./mindmap/mindmap-types";
 
@@ -363,6 +363,9 @@ function DocumentPreview({ spec, tokens }: { spec: DocumentSpec; tokens: ThemeTo
 const SPLIT_PHOTO_LAYOUT: Record<string, { textRatio: number; kicker?: string }> = {
   corporate: { textRatio: 0.36 },
   emerald: { textRatio: 0.48, kicker: "PRESENTATION" },
+  "marketing-plan": { textRatio: 0.44, kicker: "MARKETING PLAN" },
+  "sales-proposal": { textRatio: 0.42, kicker: "PROPOSAL" },
+  "training-deck": { textRatio: 0.44, kicker: "TRAINING" },
 };
 
 function SlideDecoration({ tokens, variant, bigNumber }: { tokens: PptxTemplateTokens; variant: "section" | "content"; bigNumber?: string }) {
@@ -592,6 +595,56 @@ function PresentationPreview({ spec, tokens }: { spec: PresentationSpec; tokens:
   );
 }
 
+/**
+ * One filled slide of a real template file, drawn by the backend as HTML on a
+ * fixed canvas (see document.deckFile.preview.ts). The canvas is scaled to the
+ * available width, so it looks like the slide whatever size the panel is.
+ */
+export interface DeckPreview {
+  width: number;
+  height: number;
+  slides: string[];
+}
+
+function TemplateSlidesPreview({ preview }: { preview: DeckPreview }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / preview.width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [preview.width]);
+
+  return (
+    <div ref={ref} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {preview.slides.map((html, i) => (
+        <div
+          key={i}
+          style={{
+            position: "relative",
+            width: "100%",
+            height: preview.height * scale,
+            borderRadius: 8,
+            overflow: "hidden",
+            boxShadow: "0 0 0 1px rgba(0,0,0,.08)",
+          }}
+        >
+          <div
+            style={{ width: preview.width, height: preview.height, transform: `scale(${scale})`, transformOrigin: "top left" }}
+            // The HTML is produced by our own backend from the filled template; all text in it is escaped there.
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function WorkbookPreview({ spec, tokens }: { spec: WorkbookSpec; tokens: ThemeTokens }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -656,10 +709,12 @@ export function DocumentSpecRenderer({
   specKind,
   spec,
   themeTokens,
+  deckPreview,
 }: {
   specKind: SpecKind;
   spec: AnySpec;
   themeTokens: ThemeTokens | PptxTemplateTokens | MindmapThemeTokens;
+  deckPreview?: DeckPreview;
 }) {
   return (
     <Fragment>
@@ -669,7 +724,8 @@ export function DocumentSpecRenderer({
           tokens={themeTokens as MindmapThemeTokens}
         />
       )}
-      {specKind === "presentation" && (
+      {specKind === "presentation" && deckPreview && <TemplateSlidesPreview preview={deckPreview} />}
+      {specKind === "presentation" && !deckPreview && (
         <PresentationPreview
           spec={spec as PresentationSpec}
           tokens={themeTokens as PptxTemplateTokens}

@@ -1,3 +1,9 @@
+import {
+  getDeckFileTemplate,
+  renderDeckPreview,
+  specMatchesDeckTemplate,
+  type DeckPreview,
+} from "./document.deckFile.js";
 import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
@@ -23,6 +29,7 @@ import {
   type CreateDocumentInput,
   type DocumentFormat,
   type DocumentTheme,
+  type PresentationSpec,
   type ListDocumentsQuery,
   type UpdateDocumentStyleInput,
 } from "./document.types.js";
@@ -170,9 +177,23 @@ class DocumentService {
     }
 
     const format = document.format as DocumentFormat;
+
+    // A deck filled into a designed template file previews as that file's own
+    // slides, not as the generic slide layout.
+    let deckPreview: DeckPreview | undefined;
+    const deckTemplate = format === "PPTX" ? getDeckFileTemplate(document.theme) : null;
+    if (deckTemplate && specMatchesDeckTemplate(deckTemplate, document.spec as unknown as PresentationSpec)) {
+      try {
+        deckPreview = await renderDeckPreview(deckTemplate, document.spec as unknown as PresentationSpec);
+      } catch (error) {
+        console.error("Deck preview failed, falling back to the generic preview", error);
+      }
+    }
+
     return {
       format,
       specKind: FORMAT_SPEC_KIND[format],
+      ...(deckPreview ? { deckPreview } : {}),
       spec: document.spec as unknown as AnySpec,
       theme: document.theme,
       // PPTX gets its own richer token shape (fonts/layout/photos); every

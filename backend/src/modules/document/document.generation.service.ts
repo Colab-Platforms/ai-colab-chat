@@ -1,4 +1,5 @@
 import prisma from "@root/prisma.js";
+import { getDeckFileTemplate } from "./document.deckFile.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
 import { debitTokens } from "@/utils/walletUtils.js";
 import { dlog, dlogBlock, dlogError, dtime } from "./document.logger.js";
@@ -154,13 +155,13 @@ export const processDocument = async (id: number): Promise<void> => {
         "worker",
         `job=${id} spec ${revision ? `revision of document ${document.baseDocumentId}` : "generation"}`,
         () =>
-          generateSpec(specKind, document.prompt, document.sourceText, revision),
+          generateSpec(specKind, document.prompt, document.sourceText, revision, document.theme),
       );
       spec = generated.spec;
       promptTokens = generated.promptTokens;
       completionTokens = generated.completionTokens;
 
-      if (format === "PPTX") {
+      if (format === "PPTX" && !getDeckFileTemplate(document.theme)) {
         spec = await dtime("worker", `job=${id} stock photo enrichment`, () =>
           enrichPresentationImages(spec as PresentationSpec, document.theme),
         );

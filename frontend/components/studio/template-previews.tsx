@@ -340,8 +340,40 @@ export function MindmapPreview({ tokens: t, fontSize = 5 }: { tokens: Tokens; fo
   );
 }
 
+/**
+ * Templates that have a real screenshot of their design in
+ * public/template-previews/<FORMAT>/<key>.jpg (first page/slide of the files in
+ * frontend/Templates). Keys without one fall back to the token-drawn mock.
+ */
+const IMAGE_PREVIEWS: Record<string, readonly string[]> = {
+  DOCX: ["business-plan", "client-proposal", "cover-letter", "lesson-plan", "meeting-minutes", "service-agreement"],
+  PPTX: ["marketing-plan", "pitch-deck", "project-kickoff", "quarterly-review", "sales-proposal", "training-deck"],
+  XLSX: ["financial-model", "inventory-tracker", "monthly-budget", "project-tracker", "sales-tracker", "timesheet"],
+};
+
+export const templateImageSrc = (format: string, key: string): string | null =>
+  IMAGE_PREVIEWS[format]?.includes(key) ? `/template-previews/${format}/${key}.jpg` : null;
+
+/** The real design screenshot for a template, sized to its container. */
+export function TemplateImage({ format, templateKey, alt, className }: { format: string; templateKey: string; alt: string; className?: string }) {
+  const src = templateImageSrc(format, templateKey);
+  if (!src) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} loading="lazy" draggable={false} className={className} />;
+}
+
 /** Card thumbnail for any format. */
-export function TemplateThumb({ format, tokens }: { format: string; tokens: Tokens }) {
+export function TemplateThumb({ format, tokens, templateKey, label }: { format: string; tokens: Tokens; templateKey?: string; label?: string }) {
+  if (templateKey && templateImageSrc(format, templateKey)) {
+    return (
+      <TemplateImage
+        format={format}
+        templateKey={templateKey}
+        alt={label ?? templateKey}
+        className="max-h-[148px] max-w-[88%] rounded-md object-contain shadow-sm"
+      />
+    );
+  }
   if (format === "MINDMAP") return <MindmapPreview tokens={tokens} fontSize={4.6} />;
   if (format === "PPTX") return <DeckTitleSlide tokens={tokens} fontSize={4.6} />;
   if (format === "XLSX") return <SheetPreview tokens={tokens} fontSize={4.6} />;

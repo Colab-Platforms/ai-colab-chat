@@ -3,7 +3,7 @@ import {
   COLUMN_TOTALS,
   COLUMN_TYPES,
   DOCUMENT_FORMATS,
-  DOCUMENT_THEMES,
+  ALL_DOCUMENT_THEMES,
   MINDMAP_THEMES,
   PPTX_TEMPLATES,
   MAX_BLOCKS,
@@ -52,7 +52,7 @@ export const createDocumentSchema = Joi.object({
   // both, since which set applies is decided by the document's format, not
   // by the schema (see document.types.ts:PptxTemplate).
   theme: Joi.string()
-    .valid(...DOCUMENT_THEMES, ...PPTX_TEMPLATES, ...MINDMAP_THEMES)
+    .valid(...ALL_DOCUMENT_THEMES, ...PPTX_TEMPLATES, ...MINDMAP_THEMES)
     .optional(),
   sourceText: Joi.string()
     .trim()
@@ -73,7 +73,7 @@ export const validateCreateDocumentSchema = (data: unknown) => {
 export const updateDocumentStyleSchema = Joi.object({
   title: Joi.string().trim().min(1).max(MAX_TITLE_CHARS).optional(),
   theme: Joi.string()
-    .valid(...DOCUMENT_THEMES, ...PPTX_TEMPLATES, ...MINDMAP_THEMES)
+    .valid(...ALL_DOCUMENT_THEMES, ...PPTX_TEMPLATES, ...MINDMAP_THEMES)
     .optional(),
 })
   .min(1)
