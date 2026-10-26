@@ -27,6 +27,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
   const { scrollY } = useScroll();
   const navLinks = [
     { href: "#about", label: "About" },
+    { href: "#features", label: "Features" },
     { href: "/business", label: "Business" },
     { href: "#pricing", label: "Pricing" },
     { href: "#faq", label: "FAQs" },
@@ -41,27 +42,28 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
   const demoHref = "/business#demo";
 
   useMotionValueEvent(scrollY, "change", (latest) => {
-    if (latest > 50) {
-      setIsScrolled(true);
-    } else {
-      setIsScrolled(false);
-    }
+    // Hysteresis: the navbar changes shape when it flips, which can nudge the
+    // scroll position; a single threshold flickered on trackpad momentum and
+    // iOS rubber-banding near the top.
+    setIsScrolled((prev) => (prev ? latest > 20 : latest > 80));
   });
 
   return (
     <motion.nav
-      className={`fixed top-0 left-0 right-0 z-9999 transition-[padding] duration-300 ease-in-out ${
+      className={`fixed top-0 left-0 right-0 z-9999 transform-gpu transition-[padding] duration-300 ease-in-out ${
         isScrolled ? "pt-5 pb-2" : "py-5"
       }`}
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
+      // Slide only: starting at opacity 0 left the navbar invisible whenever
+      // the entrance animation was delayed or skipped.
+      initial={{ y: -20 }}
+      animate={{ y: 0 }}
       transition={{ duration: 0.55, ease: EASE }}
     >
       <div className={`bg-linear-to-b from-white dark:from-black to-transparent w-full h-24 fixed top-0 left-0 right-0 -z-10 ${isScrolled ? "opacity-100" : "opacity-0"}`}></div>
       <div
         className={`mx-auto flex h-14 flex-col justify-center transition-all duration-300 ease-in-out ${
           isScrolled
-            ? "container max-w-7xl px-5 sm:px-10 rounded-full border border-gray-200/50 dark:border-gray-800/50 bg-[#e7e4eb]/80 dark:bg-[#060104]/80 backdrop-blur-md shadow-sm max-md:max-w-[95%]"
+            ? "container max-w-7xl px-5 sm:px-10 rounded-full border border-gray-200/50 dark:border-gray-800/50 bg-[#e7e4eb]/95 dark:bg-[#060104]/95 shadow-sm max-md:max-w-[95%]"
             : "container max-w-7xl px-5 sm:px-10 bg-transparent"
         }`}
       >
@@ -115,13 +117,29 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
             >
               Book a demo
             </a> */}
+            <Link href="/try" className="hidden lg:block">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-6 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Try it free
+              </Button>
+            </Link>
+            <Link href="/try" className="lg:hidden">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-3 py-2 h-9 text-sm text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Try free
+              </Button>
+            </Link>
             <Link href="/login" className="hidden lg:block">
-              <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-6 transition-all duration-300">
+              <Button className="rounded-full bg-[linear-gradient(145deg,#6A45D9,#4A3198)] dark:bg-[linear-gradient(145deg,#9677FF,#6953B3)] hover:brightness-110 text-white px-6 transition-all duration-300">
                 Log in
               </Button>
             </Link>
             <Link href="/login" className="lg:hidden">
-              <Button className="rounded-full bg-landing-primary hover:bg-landing-primary-hover text-white px-4 py-2 h-9 text-sm transition-all duration-300">
+              <Button className="rounded-full bg-[linear-gradient(145deg,#6A45D9,#4A3198)] dark:bg-[linear-gradient(145deg,#9677FF,#6953B3)] hover:brightness-110 text-white px-4 py-2 h-9 text-sm transition-all duration-300">
                 Log in
               </Button>
             </Link>
@@ -167,7 +185,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                 <li>
                   <a
                     href={demoHref}
-                    className="block rounded-2xl px-4 py-2.5 text-sm font-semibold text-landing-primary hover:bg-gray-100/80 dark:hover:bg-gray-900/70 transition-colors"
+                    className="block rounded-2xl px-4 py-2.5 text-sm font-semibold text-landing-primary hover:bg-gray-100/90 dark:hover:bg-gray-900/70 transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Book a demo

@@ -136,7 +136,7 @@ export function CodeEditor() {
       }
       options={{
         readOnly: isGenerating,
-        readOnlyMessage: { value: "The AI is writing this project — you can edit once it finishes." },
+        readOnlyMessage: { value: "The AI is writing this project you can edit once it finishes." },
         minimap: { enabled: false },
         fontSize: 13,
         lineHeight: 20,

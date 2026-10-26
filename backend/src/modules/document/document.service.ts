@@ -1,8 +1,18 @@
+import {
+  getDeckFileTemplate,
+  renderDeckPreview,
+  specMatchesDeckTemplate,
+  type DeckPreview,
+} from "./document.deckFile.js";
 import prisma from "@root/prisma.js";
 import { ApiError } from "@/utils/ApiError.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import { deleteFromCloudinary } from "@/utils/cloudinary.js";
-import { runPendingDocumentJobs } from "./document.generation.service.js";
+import {
+  refreshDocumentFile,
+  runPendingDocumentJobs,
+} from "./document.generation.service.js";
+import { validateMindmapEdit } from "./document.validators.js";
 import { getUserPlanContext, assertCanGenerateDocument } from "@/modules/plan-access/planAccess.service.js";
 import {
   getSupportedFormats,
@@ -10,13 +20,16 @@ import {
 } from "./document.renderers.js";
 import { getThemeTokens } from "./document.theme.js";
 import { getPptxTemplateTokens } from "./document.pptxTemplates.js";
+import { getMindmapThemeTokens } from "./document.mindmapThemes.js";
 import {
+  defaultThemeFor,
   FORMAT_SPEC_KIND,
   MAX_TITLE_CHARS,
   type AnySpec,
   type CreateDocumentInput,
   type DocumentFormat,
   type DocumentTheme,
+  type PresentationSpec,
   type ListDocumentsQuery,
   type UpdateDocumentStyleInput,
 } from "./document.types.js";
@@ -27,7 +40,7 @@ class DocumentService {
   /**
    * Enqueues a document and returns immediately with a PENDING row, so the UI
    * can render a "generating" state right away. Generation itself is a
-   * background job — a large PDF takes far longer than a request should.
+   * background job a large PDF takes far longer than a request should.
    */
   async create(userId: number, input: CreateDocumentInput) {
     const planContext = await getUserPlanContext(userId);
@@ -35,12 +48,12 @@ class DocumentService {
 
     // Document generation is now metered against the token wallet (real
     // OpenRouter cost, deducted once actual usage is known in the background
-    // worker — see document.generation.service.ts). Reject up front if the
+    // worker see document.generation.service.ts). Reject up front if the
     // wallet is already empty rather than letting the job fail asynchronously.
     const wallet = await prisma.userWallet.findUnique({ where: { userId } });
     if (!wallet || wallet.tokensRemaining <= 0) {
       throw new ApiError(
-        "You're out of tokens — upgrade your plan or wait for your next renewal to generate documents.",
+        "You're out of tokens upgrade your plan or wait for your next renewal to generate documents.",
         STATUS_CODES.BAD_REQUEST,
       );
     }
@@ -81,11 +94,11 @@ class DocumentService {
         ),
         prompt: input.prompt.trim(),
         sourceText: input.sourceText?.trim() || null,
-        theme: input.theme ?? (format === "PPTX" ? "corporate" : "professional"),
+        theme: input.theme ?? defaultThemeFor(format),
       },
     });
 
-    // Kick the worker now rather than waiting for the next cron tick — the
+    // Kick the worker now rather than waiting for the next cron tick the
     // user is watching a spinner, so poll latency is user-visible here.
     void runPendingDocumentJobs();
 
@@ -164,9 +177,23 @@ class DocumentService {
     }
 
     const format = document.format as DocumentFormat;
+
+    // A deck filled into a designed template file previews as that file's own
+    // slides, not as the generic slide layout.
+    let deckPreview: DeckPreview | undefined;
+    const deckTemplate = format === "PPTX" ? getDeckFileTemplate(document.theme) : null;
+    if (deckTemplate && specMatchesDeckTemplate(deckTemplate, document.spec as unknown as PresentationSpec)) {
+      try {
+        deckPreview = await renderDeckPreview(deckTemplate, document.spec as unknown as PresentationSpec);
+      } catch (error) {
+        console.error("Deck preview failed, falling back to the generic preview", error);
+      }
+    }
+
     return {
       format,
       specKind: FORMAT_SPEC_KIND[format],
+      ...(deckPreview ? { deckPreview } : {}),
       spec: document.spec as unknown as AnySpec,
       theme: document.theme,
       // PPTX gets its own richer token shape (fonts/layout/photos); every
@@ -175,13 +202,15 @@ class DocumentService {
       themeTokens:
         format === "PPTX"
           ? getPptxTemplateTokens(document.theme)
-          : getThemeTokens(document.theme as DocumentTheme),
+          : format === "MINDMAP"
+            ? getMindmapThemeTokens(document.theme)
+            : getThemeTokens(document.theme as DocumentTheme),
     };
   }
 
   /**
    * v1 editing: theme and title only. Both are cheap to change because they
-   * are re-render, not re-generation — the stored spec already exists, so
+   * are re-render, not re-generation the stored spec already exists, so
    * this reuses the exact PENDING→worker path a retry uses, just without
    * clearing the spec. No model call happens on this path.
    */
@@ -226,6 +255,67 @@ class DocumentService {
     });
 
     void runPendingDocumentJobs();
+
+    return updated;
+  }
+
+  /**
+   * Saves a manual edit of a document's content, in place.
+   *
+   * Only mind maps for now: their spec is a plain tree the editor can change
+   * safely. The other formats' structural editing is a separate phase.
+   *
+   * The client sends the whole tree. The title is taken from the row, not the
+   * client: the title is edited through `updateStyle`, which rewrites both the
+   * column and the spec, so a client still holding the old title in its copy of
+   * the spec must not be able to revert it here.
+   *
+   * Unlike `updateStyle` this does NOT flip the row to PENDING. The canvas
+   * already shows the edit, so the downloadable file is refreshed quietly in
+   * the background rather than putting an "Updating…" overlay over the map.
+   */
+  async updateSpec(userId: number, id: number, input: { spec: unknown }) {
+    const document = await prisma.generatedDocument.findFirst({
+      where: { id, userId, isDeleted: false },
+      select: { id: true, format: true, status: true, title: true },
+    });
+
+    if (!document) {
+      throw new ApiError("Document not found", STATUS_CODES.NOT_FOUND);
+    }
+    if ((document.format as DocumentFormat) !== "MINDMAP") {
+      throw new ApiError(
+        "Editing the content of this kind of document isn't supported yet.",
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+    // A theme/title re-render is mid-flight. 409 (not 400) because this is
+    // transient: the client keeps its edit and retries shortly.
+    if (document.status === "PENDING" || document.status === "PROCESSING") {
+      throw new ApiError(
+        "This document is still updating. Your edit will be saved in a moment.",
+        STATUS_CODES.CONFLICT,
+      );
+    }
+
+    const { error, value } = validateMindmapEdit({
+      ...(input.spec as Record<string, unknown>),
+      title: document.title,
+    });
+    if (error) {
+      throw new ApiError(
+        `Couldn't save the mind map: ${error.message}`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+
+    const updated = await prisma.generatedDocument.update({
+      where: { id },
+      data: { spec: value as any },
+      select: { id: true, updatedAt: true },
+    });
+
+    void refreshDocumentFile(id);
 
     return updated;
   }

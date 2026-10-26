@@ -5,13 +5,14 @@ declare global {
     namespace Express {
         interface User {
             id: number;
-            role: "USER" | "ADMIN" | "SUPERADMIN";
+            role: "USER" | "ADMIN" | "SUPERADMIN" | "GUEST";
             timezone: string;
         }
 
         interface Request {
             user?: User;
             planContext?: PlanContext;
+            org?: { orgId: number; memberId: number; memberRole: "OWNER" | "ADMIN" | "MEMBER" };
         }
     }
 }

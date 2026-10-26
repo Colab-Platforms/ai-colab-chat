@@ -12,7 +12,7 @@ import { CodePanelHeader } from "./CodePanelHeader";
 import { FileTree } from "./FileTree";
 import { PreviewErrorBoundary } from "./PreviewErrorBoundary";
 
-// Monaco and Sandpack are browser-only and heavy — load them with the panel.
+// Monaco and Sandpack are browser-only and heavy load them with the panel.
 const CodeEditor = dynamic(() => import("./CodeEditor").then((m) => m.CodeEditor), { ssr: false });
 const PreviewPane = dynamic(() => import("./PreviewPane").then((m) => m.PreviewPane), { ssr: false });
 
@@ -115,7 +115,7 @@ function PanelBody({ onClose }: { onClose: () => void }) {
   const loading = useCodeWorkspace((s) => s.loading);
   const projectId = useCodeWorkspace((s) => s.project?.id ?? null);
   const hasProject = projectId !== null;
-  // Sandpack spins up a whole bundler — only start it once the user actually
+  // Sandpack spins up a whole bundler only start it once the user actually
   // opens Preview, then keep it alive so toggling back is instant.
   //
   // Deferred one tick on purpose: mounting SandpackProvider synchronously on
@@ -131,7 +131,7 @@ function PanelBody({ onClose }: { onClose: () => void }) {
     return () => clearTimeout(id);
   }, [view, projectId, previewProjectId]);
   // Sandpack's bundler occasionally fails its first handshake (a known,
-  // unresolved upstream issue — codesandbox/sandpack#1108 — more likely on
+  // unresolved upstream issue codesandbox/sandpack#1108 more likely on
   // the very first mount in dev, where React Strict Mode double-invokes
   // effects). There's no in-place recovery from that, so "Reload preview"
   // bumps this key to fully unmount and recreate the bundler from scratch.
@@ -201,7 +201,7 @@ export function CodePanel() {
   widthRef.current = width;
 
   // The panel belongs to one chat: leaving it closes the panel (and tears
-  // down its preview bundler — keeping that alive in the background across
+  // down its preview bundler keeping that alive in the background across
   // unrelated chats is expensive and made the whole app feel sluggish).
   // Coming back after a reload reopens it (see restoreForChat).
   useEffect(() => {

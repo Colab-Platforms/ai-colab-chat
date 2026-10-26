@@ -9,6 +9,7 @@ import {
   useCallback,
 } from "react";
 import api from "@/lib/api";
+import { mergeGuestChatsIntoAccount } from "@/lib/guest";
 
 interface User {
   id: number;
@@ -20,6 +21,15 @@ interface User {
   isGuideTaken: boolean;
   timezone: string;
   userRoles: { role: { id: number; name: string } }[];
+  // Set only for enterprise org seats; null/absent for everyone else.
+  orgMembership?: {
+    orgId: number;
+    orgName: string;
+    memberRole: "OWNER" | "ADMIN" | "MEMBER";
+    status: "ACTIVE" | "SUSPENDED";
+    // false = manage-only admin: no seat, uses the personal plan path.
+    takesSeat?: boolean;
+  } | null;
 }
 
 interface AuthContextType {
@@ -117,6 +127,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(tokenData);
     localStorage.setItem("token", tokenData);
     localStorage.setItem("user", JSON.stringify(userData));
+    // Carry over any free-trial chats the visitor had before signing in.
+    void mergeGuestChatsIntoAccount();
   };
 
   const login = async (email: string, password: string) => {
@@ -192,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Listen for 401 unauthorized events fired by the API interceptor.
-  // Clearing user state here is enough — layout useEffects that watch `user`
+  // Clearing user state here is enough layout useEffects that watch `user`
   // will handle the client-side redirect via Next.js router (no page reload).
   useEffect(() => {
     const handleUnauthorized = () => {

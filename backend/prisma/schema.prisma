@@ -44,10 +44,15 @@ model User {
   emailVerificationOtpExpiresAt DateTime?
   passwordResetOtpHash          String?
   passwordResetOtpExpiresAt     DateTime?
-  isGuideTaken                  Boolean             @default(false)
+  accountDeletionOtpHash        String?
+  accountDeletionOtpExpiresAt   DateTime?
+  isGuideTaken                 Boolean             @default(false)
   isActive                      Boolean             @default(true)
   isVerified                    Boolean             @default(false)
   isDeleted                     Boolean             @default(false)
+  // Shadow user created for a logged-out visitor's free trial (see
+  // modules/guest). Never sees login; chats are reassigned on signup.
+  isGuest                       Boolean             @default(false)
   profileImage                  String?
   timezone                      String              @default("Asia/Kolkata")
   createdAt                     DateTime            @default(now())
@@ -59,6 +64,7 @@ model User {
   usageLogs                     UsageLog[]
   subscriptions                 Subscription[]
   userWallet                    UserWallet?
+  guestSession                  GuestSession?
   creditWallet                  CreditWallet?
   userRoles                     UserRole[]
   preference                    UserPreference?
@@ -73,13 +79,31 @@ model User {
   supportRequests               SupportRequest[]
   githubConnection              GithubConnection?
   vercelConnection              VercelConnection?
+  orgMember                     OrgMember?
+}
+
+// Free-trial bookkeeping for a guest shadow user. ipHash = sha256(ip + salt),
+// never the raw IP. mergedIntoUserId is set once the guest signs up.
+model GuestSession {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  ipHash           String
+  userAgent        String?
+  singleUsed       Int      @default(0)
+  multiUsed        Int      @default(0)
+  mergedIntoUserId Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+
+  @@index([ipHash, createdAt])
 }
 
 model UserPreference {
   id                      Int      @id @default(autoincrement())
   userId                  Int      @unique
   enableFollowUpQuestions Boolean  @default(true)
-  // Null means "use the voice-agent's env-configured default" — see
+  // Null means "use the voice-agent's env-configured default" see
   // ELEVENLABS_DEFAULT_VOICE_ID fallback in voice-agent/src/bot.py.
   voiceId                 String?
   createdAt               DateTime @default(now())
@@ -166,7 +190,7 @@ model WalletTransaction {
 }
 
 // Separate from UserWallet: video-generation spend is billed in credits, not
-// tokens. Split into two balances because they reset differently — bundledCredits
+// tokens. Split into two balances because they reset differently bundledCredits
 // is overwritten to the plan's monthly grant on every renewal, while topupCredits
 // only ever increases (pay-as-you-go purchase) and is never reset/expired.
 model CreditWallet {
@@ -299,6 +323,7 @@ enum GeneratedDocumentFormat {
   PPTX
   XLSX
   CSV
+  MINDMAP
 }
 
 enum GeneratedDocumentStatus {
@@ -313,9 +338,11 @@ model GeneratedDocument {
   userId             Int
   chatId             Int?
   messageId          Int?
-  // In compare mode one assistant Message owns several ModelResponse rows, so
-  // messageId alone cannot say which model's answer this document came from.
+
+
+
   modelResponseId    Int?
+  baseDocumentId     Int?
   format             GeneratedDocumentFormat @default(PDF)
   status             GeneratedDocumentStatus @default(PENDING)
   title              String
@@ -444,7 +471,7 @@ model GeneratedImage {
 }
 
 // ---------------------------------------------------------------------------
-// Code workspace (AI coding assistant — Software Engineer assistant only).
+// Code workspace (AI coding assistant Software Engineer assistant only).
 // A generated multi-file project lives in a chat; every AI turn that touches
 // it records a version snapshot so edits can be reverted. See
 // src/modules/code-workspace/README.md for the full flow.
@@ -504,7 +531,7 @@ model CodeProjectVersion {
   version         Int
   // AI (end of an AI turn) | USER (manual edits preserved before an AI edit/restore) | RESTORE
   source          String
-  // The AI turn that produced this version — how a chat bubble finds its project card.
+  // The AI turn that produced this version how a chat bubble finds its project card.
   modelResponseId Int?
   // The model's <plan> for this turn, shown again in the chat after a reload.
   plan            String?
@@ -617,13 +644,13 @@ model Model {
   videoCostPerSecond     Int?
   videoCostPerSecondByResolution Json?
   videoCostPerSecondByResolutionImageInput Json?
-  // Video-credit pricing (the CreditWallet unit, pegged to $0.03/credit —
+  // Video-credit pricing (the CreditWallet unit, pegged to $0.03/credit  
   // real cost, no multiplier). Independent of the legacy videoCostPerSecond*
   // fields above, which priced video in wallet *tokens* before video moved
   // to its own credit wallet.
   // Float, unlike the legacy videoCostPerSecond* (Int) fields above: credit
   // amounts are small (single/low-double digits), so per-second fractions
-  // matter — rounding happens once, on the ceil()'d total for a clip, not on
+  // matter rounding happens once, on the ceil()'d total for a clip, not on
   // the rate itself (see video.service.ts).
   creditCostPerSecond    Float?
   creditCostPerSecondByResolution Json?
@@ -638,6 +665,11 @@ model Model {
   websiteTemplates       WebsiteTemplate[]
 
   @@unique([modelProviderId, externalId])
+}
+
+enum AssistantKind {
+  SPECIALIST
+  AGENT
 }
 
 model Assistant {
@@ -656,6 +688,7 @@ model Assistant {
   deletedAt        DateTime?
   greeting         String?
   suggestedPrompts Json?
+  kind             AssistantKind @default(SPECIALIST)
   bgFrom           String?
   bgTo             String?
   bgVia            String?
@@ -706,6 +739,9 @@ model UsageLog {
   billableTotalTokens      Int             @default(0)
   messageId                Int?
   groupId                  String?         @default(cuid())
+  // Set only for org seats (enterprise); null for every regular user.
+  orgId                    Int?
+  organization             Organization?   @relation(fields: [orgId], references: [id])
   chat                     Chat?           @relation(fields: [chatId], references: [id])
   message                  Message?        @relation(fields: [messageId], references: [id])
   model                    Model           @relation(fields: [modelId], references: [id])
@@ -719,6 +755,7 @@ model UsageLog {
   @@index([modelId, createdAt])
   @@index([capability, createdAt])
   @@index([groupId])
+  @@index([orgId, createdAt])
 }
 
 model Plan {
@@ -729,7 +766,7 @@ model Plan {
   yearlyPrice          Decimal
   tokenLimit           Int
   features             Json
-  // Real, enforced access-control flags — `features` above stays for
+  // Real, enforced access-control flags `features` above stays for
   // display-only metadata (support tier, attachments, etc.) but is never
   // branched on in code; these columns are what planAccess.service.ts reads.
   restrictToFreeModels Boolean          @default(false)
@@ -737,8 +774,11 @@ model Plan {
   imageGenEnabled      Boolean          @default(false)
   videoGenEnabled      Boolean          @default(false)
   // Bundled video-credit grant applied (overwritten, not incremented) on
-  // every renewal — see CreditWallet.bundledCredits.
+  // every renewal see CreditWallet.bundledCredits.
   monthlyVideoCredits  Int              @default(0)
+  // Enterprise/Business plans are attached to an Organization by a platform
+  // admin and are hidden from the public plans list.
+  isEnterprise         Boolean          @default(false)
   isActive             Boolean          @default(true)
   isDeleted            Boolean          @default(false)
   createdAt            DateTime         @default(now())
@@ -746,6 +786,7 @@ model Plan {
   deletedAt            DateTime?
   subscriptions        Subscription[]
   allowedVideoModels   PlanVideoModel[]
+  orgSubscriptions     OrgSubscription[]
 }
 
 // Which video models a plan may use, e.g. Free -> none, Pro -> Seedance 2.0
@@ -788,12 +829,21 @@ model Subscription {
   lastPaymentId          String?
   mandateId              String?
   nextBillingDate        DateTime?
+  // Yearly one-time plans (billingCycle YEARLY, autoRenew false): the year is
+  // paid up front and each month's tokens/credits are added by the yearly-grant
+  // cron. Month N is due at grantAnchorAt + N months (anchored, so a 31st start
+  // never drifts); grantsIssued counts months already granted, including the
+  // one given at payment time. Null on every other kind of subscription.
+  grantAnchorAt          DateTime?
+  grantsIssued           Int                @default(0)
+  nextGrantAt            DateTime?
   payments               Payment[]
   plan                   Plan               @relation(fields: [planId], references: [id])
   user                   User               @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([status])
+  @@index([nextGrantAt])
 }
 
 enum SubscriptionCycle {
@@ -836,16 +886,19 @@ enum PaymentStatus {
 enum PaymentPurpose {
   SUBSCRIPTION
   CREDIT_TOPUP
+  // Enterprise org invoice (see OrgBill); the bill id is in Payment.metadata.
+  ORG_BILLING
 }
 
 model Payment {
   id                     Int            @id @default(autoincrement())
   userId                 Int
+  orgId                  Int?
   walletId               Int?
   subscriptionId         Int?
   type                   PaymentType
   // Distinguishes a subscription charge from a standalone pay-as-you-go
-  // video-credit top-up — the latter has no subscriptionId and its webhook
+  // video-credit top-up the latter has no subscriptionId and its webhook
   // credits CreditWallet.topupCredits instead of activating a Subscription.
   purpose                PaymentPurpose @default(SUBSCRIPTION)
   creditsGranted         Int?
@@ -854,11 +907,11 @@ model Payment {
   providerPaymentId      String?
   providerSubscriptionId String?
   amount                 Decimal
-  // Tax breakdown for `amount` — nullable because older rows predate this
+  // Tax breakdown for `amount` nullable because older rows predate this
   // split and credit top-ups compute tax differently (extracted, not added
   // on top; see calculateTopUpCredits). When set, baseAmount + taxAmount ==
   // amount and taxPercent is the rate actually applied AT THE TIME of this
-  // charge — never re-derive this later from the live CreditPricingConfig,
+  // charge never re-derive this later from the live CreditPricingConfig,
   // since that rate can change and an invoice must reflect what was true
   // when the charge happened, not today's rate.
   baseAmount             Decimal?
@@ -871,27 +924,29 @@ model Payment {
   updatedAt              DateTime       @updatedAt
   invoice                Invoice?
   subscription           Subscription?  @relation(fields: [subscriptionId], references: [id])
+  organization           Organization?  @relation(fields: [orgId], references: [id])
   user                   User           @relation(fields: [userId], references: [id])
 
   @@unique([provider, providerPaymentId])
   @@index([userId])
   @@index([providerOrderId])
   @@index([subscriptionId])
+  @@index([orgId])
 }
 
 // Single-row, admin-editable config for pay-as-you-go video-credit top-ups.
 // Kept out of code as a constant so pricing can be tuned without a deploy.
 // Pay-as-you-go top-up pricing. costPerCreditInr is the RAW cost basis (no
-// margin) — a top-up's rupee amount is de-taxed, has marginPercent taken off
+// margin) a top-up's rupee amount is de-taxed, has marginPercent taken off
 // the top as margin, and only what's left converts to credits at cost. This
 // keeps top-up margin explicit and independently tunable from whatever
 // margin is implied by a subscription plan's bundled credit grant.
-// Despite the name (kept for historical/migration reasons — this started as
+// Despite the name (kept for historical/migration reasons this started as
 // video-credit-only pricing), this is now the single global pricing-config
 // row for BOTH wallet currencies: costPerCreditInr/marginPercent/gstPercent
 // price video credit top-ups, and usdPerToken prices chat/image/doc wallet
 // tokens (see computeBillableTokens in walletUtils.ts). One shared row so an
-// admin can retune either rate without a code change or redeploy — a plan's
+// admin can retune either rate without a code change or redeploy a plan's
 // tokenLimit/monthlyVideoCredits are what change per-plan, not these rates.
 model CreditPricingConfig {
   id                Int      @id @default(autoincrement())
@@ -899,7 +954,7 @@ model CreditPricingConfig {
   marginPercent     Decimal  @default(15)
   gstPercent        Decimal  @default(18)
   // $ real cost per wallet token, billed off OpenRouter's actual usage.cost
-  // per response. Default derived from the $19 plan's budget math — see the
+  // per response. Default derived from the $19 plan's budget math see the
   // comment on DEFAULT_USD_PER_TOKEN in walletUtils.ts.
   usdPerToken       Decimal  @default(0.0000035)
   updatedAt         DateTime @updatedAt
@@ -915,6 +970,7 @@ model Invoice {
   id            Int           @id @default(autoincrement())
   paymentId     Int           @unique
   userId        Int
+  orgId         Int?
   invoiceNumber String        @unique
   invoiceUrl    String?
   amount        Decimal
@@ -925,8 +981,10 @@ model Invoice {
   updatedAt     DateTime      @updatedAt
   payment       Payment       @relation(fields: [paymentId], references: [id])
   user          User          @relation(fields: [userId], references: [id])
+  organization  Organization? @relation(fields: [orgId], references: [id])
 
   @@index([userId])
+  @@index([orgId])
 }
 
 enum WebhookEventStatus {
@@ -1224,4 +1282,247 @@ model DemoRequest {
 
   @@index([status, createdAt])
   @@index([email])
+}
+
+model PromptSuggestion {
+  id        Int      @id @default(autoincrement())
+  text      String
+  batchId   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([batchId])
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enterprise / Business organizations (see ENTERPRISE_ORG_PLAN.md).
+// Every seat is a normal User with its own UserWallet/CreditWallet; the org
+// only funds those wallets and governs access via OrgRole. Org admins see
+// usage metrics only nothing here links to chat/message content.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum OrgMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum OrgMemberStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum OrgBillingMode {
+  CASHFREE
+  MANUAL_INVOICE
+}
+
+model Organization {
+  id                  Int               @id @default(autoincrement())
+  name                String
+  slug                String            @unique
+  gstin               String?
+  billingEmail        String
+  billingAddress      Json?
+  status              OrgStatus         @default(ACTIVE)
+  // Empty = any email domain may be invited.
+  allowedEmailDomains String[]
+  createdByAdminId    Int
+  demoRequestId       Int?              @unique
+  isDeleted           Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  roles               OrgRole[]
+  members             OrgMember[]
+  invites             OrgInvite[]
+  subscriptions       OrgSubscription[]
+  auditLogs           OrgAuditLog[]
+  usageLogs           UsageLog[]
+  payments            Payment[]
+  invoices            Invoice[]
+  bills               OrgBill[]
+
+  @@index([status])
+}
+
+// Admin-defined role = the policy applied to every member holding it.
+model OrgRole {
+  id                   Int          @id @default(autoincrement())
+  orgId                Int
+  name                 String
+  description          String?
+  isDefault            Boolean      @default(false)
+  monthlyTokens        Int          @default(0)
+  monthlyVideoCredits  Int          @default(0)
+  imageGenEnabled      Boolean      @default(false)
+  documentGenEnabled   Boolean      @default(true)
+  videoGenEnabled      Boolean      @default(false)
+  codeWorkspaceEnabled Boolean      @default(false)
+  voiceEnabled         Boolean      @default(false)
+  // {"mode":"ALL"|"ALLOWLIST"|"BLOCKLIST","modelIds":[...]}
+  modelPolicy          Json         @default("{\"mode\":\"ALL\",\"modelIds\":[]}")
+  videoModelIds        Int[]
+  dailyTokenCap        Int?
+  perRequestTokenCap   Int?
+  isDeleted            Boolean      @default(false)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  organization         Organization @relation(fields: [orgId], references: [id])
+  members              OrgMember[]
+  invites              OrgInvite[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model OrgMember {
+  id             Int             @id @default(autoincrement())
+  orgId          Int
+  // One org per user.
+  userId         Int             @unique
+  memberRole     OrgMemberRole   @default(MEMBER)
+  orgRoleId      Int
+  status         OrgMemberStatus @default(ACTIVE)
+  seatAssignedAt DateTime        @default(now())
+  suspendedAt    DateTime?
+  removedAt      DateTime?
+  // One-off extra tokens granted by an admin for the current period.
+  tokenBonus     Int             @default(0)
+  // false = a manage-only admin/owner: no seat used, no org tokens or role
+  // limits. Plain members always take a seat.
+  takesSeat      Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [orgId], references: [id])
+  user           User            @relation(fields: [userId], references: [id])
+  role           OrgRole         @relation(fields: [orgRoleId], references: [id])
+
+  @@index([orgId, status])
+  @@index([orgRoleId])
+}
+
+model OrgInvite {
+  id              Int           @id @default(autoincrement())
+  orgId           Int
+  email           String
+  orgRoleId       Int
+  memberRole      OrgMemberRole @default(MEMBER)
+  takesSeat       Boolean       @default(true)
+  // sha256 of the emailed token; the raw token is never stored.
+  tokenHash       String        @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  invitedByUserId Int?
+  createdAt       DateTime      @default(now())
+  organization    Organization  @relation(fields: [orgId], references: [id])
+  role            OrgRole       @relation(fields: [orgRoleId], references: [id])
+
+  @@index([orgId])
+  @@index([email])
+}
+
+model OrgSubscription {
+  id                     Int                @id @default(autoincrement())
+  orgId                  Int
+  planId                 Int
+  status                 SubscriptionStatus @default(PENDING)
+  billingMode            OrgBillingMode
+  billingCycle           SubscriptionCycle  @default(MONTHLY)
+  seatsPurchased         Int
+  minSeats               Int                @default(1)
+  // Snapshot at purchase time never re-derived from a live price.
+  pricePerSeat           Decimal
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  nextBillingDate        DateTime?
+  cashfreeSubscriptionId String?            @unique
+  // {"seats": n, "effectiveAt": ISO} reduction applied at renewal.
+  pendingSeatChange      Json?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  organization           Organization       @relation(fields: [orgId], references: [id])
+  plan                   Plan               @relation(fields: [planId], references: [id])
+  bills                  OrgBill[]
+
+  @@index([orgId, status])
+}
+
+// Admin ACTIONS only (invites, role edits, seat changes, quota grants, billing).
+model OrgAuditLog {
+  id           Int          @id @default(autoincrement())
+  orgId        Int
+  actorUserId  Int
+  action       String
+  targetType   String?
+  targetId     String?
+  meta         Json?
+  ip           String?
+  createdAt    DateTime     @default(now())
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, createdAt])
+}
+
+enum OrgBillKind {
+  INITIAL
+  RENEWAL
+  SEAT_ADD
+}
+
+enum OrgBillStatus {
+  DUE
+  PAID
+  VOID
+}
+
+// A tax invoice for an organization. Amounts are snapshots taken when the bill
+// is created (price, GST rate, seats) and never re-derived. `seats` is the
+// seat total the org will have once the bill is paid.
+model OrgBill {
+  id                Int             @id @default(autoincrement())
+  orgId             Int
+  orgSubscriptionId Int
+  number            String          @unique
+  kind              OrgBillKind
+  status            OrgBillStatus   @default(DUE)
+  seats             Int
+  pricePerSeat      Decimal
+  months            Int
+  periodStart       DateTime
+  periodEnd         DateTime
+  baseAmount        Decimal
+  taxPercent        Decimal
+  taxAmount         Decimal
+  totalAmount       Decimal
+  currency          String          @default("INR")
+  // Renewal: the day the paid period ends. Seat additions: when it was raised.
+  dueDate           DateTime
+  paidAt            DateTime?
+  // "CASHFREE" | "BANK_TRANSFER"
+  paymentMethod     String?
+  // Bank reference / UTR entered by the platform admin, or the Cashfree payment id.
+  paymentReference  String?
+  providerOrderId   String?
+  invoiceUrl        String?
+  reminderCount     Int             @default(0)
+  // Proration details etc.
+  meta              Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  organization      Organization    @relation(fields: [orgId], references: [id])
+  subscription      OrgSubscription @relation(fields: [orgSubscriptionId], references: [id])
+
+  @@index([orgId, status])
+  @@index([orgSubscriptionId, kind])
+  @@index([providerOrderId])
 }

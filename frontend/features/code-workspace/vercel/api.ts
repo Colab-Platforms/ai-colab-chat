@@ -3,7 +3,7 @@ import type { VercelDeploymentDto, VercelDetectDto, VercelLinkDto, VercelStatusD
 
 // REST calls for backend/src/modules/vercel (mounted at /api/vercel).
 // Same { status, data, message } envelope as the rest of the app.
-// The three streaming endpoints (deploy, redeploy, logs) live in deployStream.ts —
+// The three streaming endpoints (deploy, redeploy, logs) live in deployStream.ts  
 // axios can't read a response body incrementally in the browser.
 
 export const vercelApi = {
@@ -35,6 +35,6 @@ export const vercelApi = {
   cancel: (projectId: number, deploymentId: string) =>
     api.post(`/vercel/projects/${projectId}/deploy/${encodeURIComponent(deploymentId)}/cancel`),
 
-  /** Deletes only our link — the Vercel project and the live site stay. */
+  /** Deletes only our link the Vercel project and the live site stay. */
   unlinkProject: (projectId: number) => api.delete(`/vercel/projects/${projectId}/link`),
 };

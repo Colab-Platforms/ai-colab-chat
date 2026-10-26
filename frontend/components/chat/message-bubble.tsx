@@ -21,6 +21,7 @@ import {
 } from "@/features/code-workspace";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
+import { unpackStudioPrompt } from "@/lib/studio-prompt";
 import { PhotoProvider, PhotoView } from "react-photo-view";
 import "react-photo-view/dist/react-photo-view.css";
 
@@ -38,7 +39,7 @@ interface ModelResponse {
   // Attached per response, not per message: in compare mode each model's
   // answer produces its own document.
   generatedDocuments?: GeneratedDocument[];
-  /** Code workspace turn — live while streaming (codeTurn), from the API after (codeVersions). */
+  /** Code workspace turn live while streaming (codeTurn), from the API after (codeVersions). */
   codeTurn?: CodeTurnInfo;
   codeVersions?: CodeVersionOnResponse[];
   insufficientBalance?: boolean;
@@ -63,7 +64,7 @@ function isInsufficientBalanceFailure(resp?: ModelResponse | null): boolean {
 }
 
 // A hard plan restriction (free-tier picked a paid model, or a plan without
-// image/video generation) — unlike insufficient balance, switching to a free
+// image/video generation) unlike insufficient balance, switching to a free
 // model can't fix this, so it gets a different recovery action.
 function isPlanRestrictedFailure(resp?: ModelResponse | null): boolean {
   if (!resp || resp.status !== "FAILED") return false;
@@ -79,7 +80,7 @@ function isImageGenerationMessage(message: Message): boolean {
 }
 
 // A user-initiated stop mid-stream is marked FAILED (there's no separate
-// "stopped" status), but it isn't an error — whatever text had streamed in
+// "stopped" status), but it isn't an error whatever text had streamed in
 // should stay on screen as-is, not flip to the destructive/retry UI.
 function isStoppedByUser(resp?: ModelResponse | null): boolean {
   if (!resp || resp.status !== "FAILED") return false;
@@ -257,7 +258,7 @@ export const MessageBubble = React.memo(function MessageBubble({
     setVersionIndices(prev => ({ ...prev, [modelId]: Math.max(0, Math.min(list.length - 1, cur + dir)) }));
   };
 
-  // Edit state — two-phase for smooth open/close
+  // Edit state two-phase for smooth open/close
   const [showEdit, setShowEdit] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [editText, setEditText] = useState("");
@@ -383,7 +384,7 @@ export const MessageBubble = React.memo(function MessageBubble({
             // Display mode
             <div className="group/user relative">
               <div className="bg-sunken text-foreground rounded-2xl px-4 py-3 break-words">
-                <p data-message-text="true" className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                <p data-message-text="true" className="text-[14.5px] leading-relaxed whitespace-pre-wrap">{unpackStudioPrompt(message.content).visible}</p>
               </div>
               
               {/* Action buttons below the message - left aligned */}
@@ -415,13 +416,13 @@ export const MessageBubble = React.memo(function MessageBubble({
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 rounded-full text-muted-foreground hover:bg-muted/80 opacity-100 sm:opacity-0 group-hover/user:opacity-100 transition-opacity"
-                  onClick={() => { navigator.clipboard.writeText(message.content); toast.success("Copied"); }}
+                  onClick={() => { navigator.clipboard.writeText(unpackStudioPrompt(message.content).visible); toast.success("Copied"); }}
                 >
                   <Copy className="w-3.5 h-3.5" />
                 </Button>
 
                 {/* Edit button */}
-                {onEditMessage && (
+                {onEditMessage && !unpackStudioPrompt(message.content).hasHidden && (
                   <Button
                     variant="ghost"
                     size="icon"
@@ -738,7 +739,7 @@ function ResponseBody({
   let body: React.ReactNode;
   if (!resp) {
     // An assistant turn with no saved response yet is still generating on the
-    // server (e.g. the user left the page and came back) — show progress, not a blank.
+    // server (e.g. the user left the page and came back) show progress, not a blank.
     body =
       parsed.cleanText || message.content ? (
         <p className="text-sm whitespace-pre-wrap">{parsed.cleanText || message.content}</p>

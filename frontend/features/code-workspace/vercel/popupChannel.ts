@@ -1,7 +1,7 @@
 /**
  * How the Vercel connect popup tells the editor window it is done.
  *
- * A copy of ../github/popupChannel.ts with its own channel name — sharing
+ * A copy of ../github/popupChannel.ts with its own channel name sharing
  * "github-connect" would let each integration's popup result reach the other's
  * dialog. Same reasoning applies: once the popup has been to vercel.com, the
  * browser may sever `window.opener`, so a BroadcastChannel (any same-origin
@@ -32,14 +32,14 @@ export function postPopupResult(result: VercelPopupResult): void {
     channel.postMessage(message);
     channel.close();
   } catch {
-    // BroadcastChannel unavailable — the opener path below may still work.
+    // BroadcastChannel unavailable the opener path below may still work.
   }
 
   try {
     const opener = window.opener as Window | null;
     if (opener && !opener.closed) opener.postMessage(message, window.location.origin);
   } catch {
-    // Opener was severed or is cross-origin — nothing more to try.
+    // Opener was severed or is cross-origin nothing more to try.
   }
 }
 

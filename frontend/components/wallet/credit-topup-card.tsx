@@ -36,7 +36,7 @@ export function CreditTopUpCard({ onCheckoutStart }: CreditTopUpCardProps) {
   const effectiveAmount = customAmount ? Number(customAmount) : amount;
 
   // Mirrors calculateTopUpCredits in backend/src/utils/walletUtils.ts exactly
-  // — strip GST, take the margin off the top, convert what's left at cost.
+  // strip GST, take the margin off the top, convert what's left at cost.
   const estimatedCredits = useMemo(() => {
     if (!pricing || !effectiveAmount || effectiveAmount <= 0) return null;
     const preTax = effectiveAmount / (1 + pricing.gstPercent / 100);
@@ -112,7 +112,7 @@ export function CreditTopUpCard({ onCheckoutStart }: CreditTopUpCardProps) {
       <div className="rounded-2xl bg-sunken p-4">
         <p className="text-xs text-muted-foreground">You&apos;ll get</p>
         <p className="mt-1 text-2xl font-semibold tracking-tight">
-          {estimatedCredits !== null ? `≈ ${estimatedCredits.toLocaleString()} credits` : "—"}
+          {estimatedCredits !== null ? `≈ ${estimatedCredits.toLocaleString()} credits` : " "}
         </p>
         <Button className="mt-3 h-10 w-full rounded-xl" onClick={handleTopUp} disabled={submitting || !effectiveAmount}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

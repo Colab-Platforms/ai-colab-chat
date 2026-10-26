@@ -2,13 +2,16 @@
 
 import { memo, type Dispatch, type ElementType, type SetStateAction } from "react";
 import * as LucideIcons from "lucide-react";
-import { Bot, ChevronRight } from "lucide-react";
+import { Bot, ChevronRight, type LucideIcon } from "lucide-react";
 import { useTheme } from "@/context/theme-context";
 import type { Assistant } from "@/components/sidebar/sidebar-types";
 import { getAssistantLook } from "@/components/chat/assistant-theme";
 import { lift } from "@/components/chat/assistant-hero";
 
 export const AssistantsSection = memo(function AssistantsSection({
+  title = "Assistants",
+  icon: SectionIcon = Bot,
+  guideId = "assistants",
   assistants,
   assistantsExpanded,
   setAssistantsExpanded,
@@ -16,6 +19,9 @@ export const AssistantsSection = memo(function AssistantsSection({
   onLoadMoreAssistants,
   onAssistantSelected,
 }: {
+  title?: string;
+  icon?: LucideIcon;
+  guideId?: string;
   assistants: Assistant[];
   assistantsExpanded: boolean;
   setAssistantsExpanded: Dispatch<SetStateAction<boolean>>;
@@ -31,13 +37,13 @@ export const AssistantsSection = memo(function AssistantsSection({
     <>
       <button
         type="button"
-        data-guide="assistants"
+        data-guide={guideId}
         onClick={() => setAssistantsExpanded((p) => !p)}
         aria-expanded={assistantsExpanded}
         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] text-foreground transition-colors cursor-pointer hover:bg-sidebar-accent"
       >
-        <Bot className="w-4 h-4 shrink-0 text-muted-foreground" />
-        <span className="truncate">Assistants</span>
+        <SectionIcon className="w-4 h-4 shrink-0 text-muted-foreground" />
+        <span className="truncate">{title}</span>
         <ChevronRight
           className={`ml-auto h-3.5 w-3.5 text-faint transition-transform ${assistantsExpanded ? "rotate-90" : ""}`}
         />

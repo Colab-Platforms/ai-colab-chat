@@ -7,7 +7,7 @@ export interface ThemeTokens {
   text: string;
   muted: string;
   border: string;
-  /** CSS font stacks — used by the HTML/PDF renderer. */
+  /** CSS font stacks used by the HTML/PDF renderer. */
   headingFont: string;
   bodyFont: string;
   /**
@@ -24,7 +24,88 @@ export interface ThemeTokens {
   tableHeaderText: string;
 }
 
-const THEME_TOKENS: Record<DocumentTheme, ThemeTokens> = {
+const SANS_STACK = `"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`;
+const SERIF_STACK = `Georgia, "Times New Roman", serif`;
+
+type TemplateOverrides = Pick<ThemeTokens, "accent" | "accentSoft" | "text" | "muted" | "border"> &
+  Partial<ThemeTokens>;
+
+/**
+ * Colours are sampled from the designs in frontend/Templates. Word and Excel
+ * resolve one installed font name per run, so the *FontName fields use a
+ * system font close to the design's web font (noted per template); the CSS
+ * stacks still lead with the design's own face for the PDF renderer.
+ */
+const template = (o: TemplateOverrides): ThemeTokens => ({
+  headingFont: SANS_STACK,
+  bodyFont: SANS_STACK,
+  headingFontName: "Segoe UI",
+  bodyFontName: "Segoe UI",
+  monoFontName: "Consolas",
+  baseFontPt: 11,
+  headingWeight: 600,
+  tableHeaderBg: o.accent,
+  tableHeaderText: "#ffffff",
+  ...o,
+});
+
+const TEMPLATE_THEME_TOKENS: Record<string, ThemeTokens> = {
+  /* ---- DOCX ---- */
+  // Source Serif 4 / Source Sans 3 -> Cambria / Calibri
+  "business-plan": template({
+    accent: "#1f3a68", accentSoft: "#e9eef7", text: "#1b1d21", muted: "#5b6270", border: "#d5dbe6",
+    headingFont: `"Source Serif 4", Cambria, ${SERIF_STACK}`, bodyFont: `"Source Sans 3", Calibri, ${SANS_STACK}`,
+    headingFontName: "Cambria", bodyFontName: "Calibri", headingWeight: 700,
+  }),
+  // Plus Jakarta Sans -> Segoe UI
+  "client-proposal": template({
+    accent: "#5b3fd1", accentSoft: "#efebfb", text: "#1b1d21", muted: "#5f5c6e", border: "#ddd7f3",
+    headingFont: `"Plus Jakarta Sans", ${SANS_STACK}`, bodyFont: `"Plus Jakarta Sans", ${SANS_STACK}`,
+    headingWeight: 700,
+  }),
+  // EB Garamond -> Garamond
+  "cover-letter": template({
+    accent: "#1f3a68", accentSoft: "#eef1f7", text: "#1b1d21", muted: "#5b6270", border: "#d9dee8",
+    headingFont: `"EB Garamond", Garamond, ${SERIF_STACK}`, bodyFont: `"EB Garamond", Garamond, ${SERIF_STACK}`,
+    headingFontName: "Garamond", bodyFontName: "Garamond", baseFontPt: 12, headingWeight: 500,
+  }),
+  // Atkinson Hyperlegible -> Verdana
+  "lesson-plan": template({
+    accent: "#c2410c", accentSoft: "#fdefe6", text: "#1b1d21", muted: "#6a5f58", border: "#f0d8ca",
+    headingFont: `"Atkinson Hyperlegible", Verdana, ${SANS_STACK}`, bodyFont: `"Atkinson Hyperlegible", Verdana, ${SANS_STACK}`,
+    headingFontName: "Verdana", bodyFontName: "Verdana", baseFontPt: 10.5, headingWeight: 700,
+  }),
+  // IBM Plex Sans -> Calibri
+  "meeting-minutes": template({
+    accent: "#0e7490", accentSoft: "#e3f3f7", text: "#1b1d21", muted: "#566b72", border: "#cde5ec",
+    headingFont: `"IBM Plex Sans", Calibri, ${SANS_STACK}`, bodyFont: `"IBM Plex Sans", Calibri, ${SANS_STACK}`,
+    headingFontName: "Calibri", bodyFontName: "Calibri",
+  }),
+  // Crimson Pro headings / Karla body -> Georgia / Calibri
+  "service-agreement": template({
+    accent: "#111827", accentSoft: "#f3f4f6", text: "#1b1d21", muted: "#555b66", border: "#d9dce2",
+    headingFont: `"Crimson Pro", ${SERIF_STACK}`, bodyFont: `Karla, Calibri, ${SANS_STACK}`,
+    headingFontName: "Georgia", bodyFontName: "Calibri", headingWeight: 700,
+  }),
+
+  /* ---- XLSX (Calibri throughout, as in the source workbooks) ---- */
+  "financial-model": xlsxTemplate("#1e4e8c", "#dce8fb"),
+  "inventory-tracker": xlsxTemplate("#b45309", "#fdefd3"),
+  "monthly-budget": xlsxTemplate("#1d6f42", "#ddf3e4"),
+  "project-tracker": xlsxTemplate("#be185d", "#fce7f1"),
+  "sales-tracker": xlsxTemplate("#6d28d9", "#eae3fb"),
+  timesheet: xlsxTemplate("#0f766e", "#d5f2ee"),
+};
+
+function xlsxTemplate(accent: string, accentSoft: string): ThemeTokens {
+  return template({
+    accent, accentSoft, text: "#1b1d21", muted: "#6b7079", border: "#e3e5e9",
+    headingFont: `Calibri, ${SANS_STACK}`, bodyFont: `Calibri, ${SANS_STACK}`,
+    headingFontName: "Calibri", bodyFontName: "Calibri",
+  });
+}
+
+const THEME_TOKENS: Record<string, ThemeTokens> = {
   professional: {
     accent: "#1f4e78",
     accentSoft: "#eaf1f8",
@@ -75,6 +156,7 @@ const THEME_TOKENS: Record<DocumentTheme, ThemeTokens> = {
     tableHeaderBg: "#0f766e",
     tableHeaderText: "#ffffff",
   },
+  ...TEMPLATE_THEME_TOKENS,
 };
 
 const CALLOUT_COLORS: Record<string, { bg: string; border: string }> = {
@@ -87,7 +169,7 @@ const CALLOUT_COLORS: Record<string, { bg: string; border: string }> = {
 /**
  * The theme as raw tokens, for renderers that are not CSS-based.
  *
- * A theme is a set of design decisions, not a stylesheet — each renderer
+ * A theme is a set of design decisions, not a stylesheet each renderer
  * expresses the same tokens in its own medium. Sharing the tokens is what
  * keeps a "report" PDF and a "report" Word file recognisably the same theme.
  */

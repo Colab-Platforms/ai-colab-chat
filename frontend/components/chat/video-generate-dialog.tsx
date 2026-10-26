@@ -36,14 +36,14 @@ export interface VideoModelOption {
   externalId: string;
   creditCostPerSecond: number;
   /** Per-resolution credit rate, when the model's real price varies by
-   * resolution (e.g. Seedance 2.0 is ~11x pricier at 4K than 480p) — takes
+   * resolution (e.g. Seedance 2.0 is ~11x pricier at 4K than 480p) takes
    * priority over the flat creditCostPerSecond above when present. */
   creditCostPerSecondByResolution?: Record<string, number> | null;
-  /** Same shape, but for image-to-video — some models (Seedance) charge
+  /** Same shape, but for image-to-video some models (Seedance) charge
    * LESS when a frame image is supplied. Falls back to the map above when
    * absent (true for Veo, which has no distinct image-input rate). */
   creditCostPerSecondByResolutionImageInput?: Record<string, number> | null;
-  /** Whether the current user's plan is allowed to use this model — locked
+  /** Whether the current user's plan is allowed to use this model locked
    * models are still shown (not hidden) with an upgrade badge. */
   allowedForPlan: boolean;
   unlockPlanName?: string | null;
@@ -52,7 +52,7 @@ export interface VideoModelOption {
 /**
  * Duration/resolution/aspect-ratio limits per model, taken from OpenRouter's
  * own live GET /api/v1/videos/models catalogue (not the marketing page,
- * which rounds these down to a range) — the backend cross-checks the same
+ * which rounds these down to a range) the backend cross-checks the same
  * live data too, but offering only valid options here means a request never
  * round-trips just to fail. Falls back to a conservative default for any
  * model not listed here yet.
@@ -72,7 +72,7 @@ const MODEL_CONSTRAINTS: Record<
     aspectRatios: ["16:9", "9:16", "1:1"],
   },
   // OpenRouter's actual supported_durations for this model is exactly
-  // [4, 6, 8] — not every integer in that range. The dialog used to offer
+  // [4, 6, 8] not every integer in that range. The dialog used to offer
   // 5s/7s, which the provider would have rejected.
   "google/veo-3.1-lite": {
     durations: [4, 6, 8],
@@ -90,7 +90,7 @@ const DEFAULT_CONSTRAINTS = {
 export const constraintsFor = (model: VideoModelOption | undefined) =>
   (model && MODEL_CONSTRAINTS[model.externalId]) || DEFAULT_CONSTRAINTS;
 
-// All 3 current models support image-to-video via first/last frame — this
+// All 3 current models support image-to-video via first/last frame this
 // stays a per-model flag (rather than assumed universal) since it comes
 // from each model's own supported_frame_images in OpenRouter's catalogue.
 export const IMAGE_TO_VIDEO_MODELS = new Set([
@@ -137,7 +137,7 @@ export interface VideoGenerateParams {
 }
 
 /**
- * Pure form UI — no chatId/chatService knowledge. The caller decides what a
+ * Pure form UI no chatId/chatService knowledge. The caller decides what a
  * submission actually does: create a video in an existing chat, or (from the
  * landing page, where no chat exists yet) create the chat first. This is
  * what lets the same "Video Gen" pill work from both places without video
@@ -163,7 +163,7 @@ export function VideoGenerateDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
 
-  // Fetch once per time the dialog opens rather than once on mount — pricing
+  // Fetch once per time the dialog opens rather than once on mount pricing
   // can change, and this dialog can stay mounted in the background for a
   // whole chat session.
   useEffect(() => {
@@ -174,7 +174,7 @@ export function VideoGenerateDialog({
         const items: VideoModelOption[] = res.data?.data || [];
         setModels(items);
         if (items.length > 0) {
-          // Default to the first ALLOWED model rather than just items[0] —
+          // Default to the first ALLOWED model rather than just items[0]  
           // otherwise a locked (pricier) model could be pre-selected for a
           // user whose plan can't actually use it.
           const firstAllowed = items.find((m) => m.allowedForPlan) ?? items[0];
@@ -203,7 +203,7 @@ export function VideoGenerateDialog({
       return prev.filter((i) => i.id !== id);
     });
 
-  // Keep duration/resolution/aspectRatio valid whenever the model changes —
+  // Keep duration/resolution/aspectRatio valid whenever the model changes  
   // e.g. switching from Seedance (max 15s) to Veo (max 8s) with 12s selected
   // would otherwise silently submit a value Veo rejects. Also drop any
   // images the new model can't use (none, or more than its first/last pair).
@@ -251,9 +251,9 @@ export function VideoGenerateDialog({
       const message =
         response?.data?.message ?? (err as { message?: string })?.message ?? "Failed to start video generation";
       if (response?.data?.code === "PLAN_RESTRICTED") {
-        toast.error(`${message} — upgrade your plan to unlock this.`);
+        toast.error(`${message} upgrade your plan to unlock this.`);
       } else if (message.toLowerCase().includes("insufficient")) {
-        toast.error(`${message} — top up your video credits.`);
+        toast.error(`${message} top up your video credits.`);
       } else {
         toast.error(message);
       }
@@ -268,7 +268,7 @@ export function VideoGenerateDialog({
         <DialogHeader>
           <DialogTitle>Generate a video</DialogTitle>
           <DialogDescription>
-            Describe the video you want — this spends your video credits and can take a couple of minutes.
+            Describe the video you want this spends your video credits and can take a couple of minutes.
           </DialogDescription>
         </DialogHeader>
 
@@ -311,7 +311,7 @@ export function VideoGenerateDialog({
         {supportsImageToVideo && (
           <div>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-              Image-to-video (optional) — {selectedModel?.creditCostPerSecondByResolutionImageInput
+              Image-to-video (optional) {selectedModel?.creditCostPerSecondByResolutionImageInput
                 ? "cheaper than text-to-video"
                 : "same price as text-to-video"}
             </p>
@@ -380,7 +380,7 @@ export function VideoGenerateDialog({
 
         {insufficientCredits && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            Not enough credits for this — you need {estimatedCredits}, you have {creditsRemaining}.{" "}
+            Not enough credits for this you need {estimatedCredits}, you have {creditsRemaining}.{" "}
             <Link href="/profile/wallet" className="underline underline-offset-2">
               Top up credits
             </Link>

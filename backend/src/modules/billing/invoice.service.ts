@@ -4,6 +4,7 @@ import prisma from "@root/prisma.js";
 import { uploadToCloudinary } from "@/utils/cloudinary.js";
 import { invoiceTemplate } from "./invoice.template.js";
 import { invoiceLogoBase64 } from "@/assets/invoiceLogo.js";
+import { sendPaymentConfirmationEmail } from "./paymentConfirmation.email.js";
 
 class InvoiceService {
   /**
@@ -21,6 +22,7 @@ class InvoiceService {
     });
     if (!invoice) return;
 
+    let pdfBuffer: Buffer | null = null;
     try {
       const subscription = invoice.payment.subscription;
       const planName = subscription?.plan?.name ?? "Wallet Top-up";
@@ -40,7 +42,7 @@ class InvoiceService {
         : null;
 
       // baseAmount/taxPercent/taxAmount are null for payments predating this
-      // split (or for flows that don't add GST on top, e.g. credit top-ups) —
+      // split (or for flows that don't add GST on top, e.g. credit top-ups)  
       // the template falls back to a single-line total in that case rather
       // than showing a fabricated $0 tax row.
       const baseAmount = invoice.payment.baseAmount;
@@ -72,7 +74,6 @@ class InvoiceService {
         headless: true,
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
-      let pdfBuffer: Buffer;
       try {
         const page = await browser.newPage();
         await page.setContent(html, { waitUntil: "load" });
@@ -97,6 +98,31 @@ class InvoiceService {
         where: { id: invoice.id },
         data: { status: "FAILED", errorMessage: error?.message ?? "Invoice generation failed" },
       });
+    }
+
+    // Confirmation goes out even if the PDF failed (without the attachment)  
+    // the user still paid. Email trouble must never affect the webhook.
+    try {
+      const subscription = invoice.payment.subscription;
+      const { baseAmount, taxPercent, taxAmount } = invoice.payment;
+      await sendPaymentConfirmationEmail({
+        to: invoice.user.email,
+        customerName:
+          [invoice.user.firstName, invoice.user.lastName].filter(Boolean).join(" ").trim() ||
+          invoice.user.email,
+        invoiceNumber: invoice.invoiceNumber,
+        planName: subscription?.plan?.name ?? "Wallet Top-up",
+        billingCycle: subscription?.billingCycle ?? null,
+        currency: invoice.currency,
+        amount: invoice.amount.toString(),
+        baseAmount: baseAmount != null && taxPercent != null && taxAmount != null ? baseAmount.toString() : null,
+        taxPercent: taxPercent != null ? taxPercent.toString() : null,
+        taxAmount: taxAmount != null ? taxAmount.toString() : null,
+        validUntil: subscription?.expiresAt ?? null,
+        invoicePdf: pdfBuffer,
+      });
+    } catch (error: any) {
+      console.error("Payment confirmation email failed", { paymentId, message: error?.message ?? String(error) });
     }
   }
 }

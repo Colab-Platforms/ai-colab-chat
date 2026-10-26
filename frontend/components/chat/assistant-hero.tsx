@@ -22,7 +22,7 @@ export const lift = (color: string, dark: boolean) =>
 /**
  * An assistant's start-screen header: its icon in an accent-tinted tile,
  * six small icons floating around it, then the name and description.
- * The page background is the normal chat background — only these tiles carry
+ * The page background is the normal chat background only these tiles carry
  * the assistant's colour.
  */
 export function AssistantHero({
@@ -40,7 +40,7 @@ export function AssistantHero({
 
   return (
     <div className="relative mx-auto w-full max-w-[640px] text-center">
-      {/* Floating icons — decorative, wide screens only (they extend ~310px each side) */}
+      {/* Floating icons decorative, wide screens only (they extend ~310px each side) */}
       <div className="pointer-events-none absolute inset-x-0 top-0 hidden h-0 lg:block" aria-hidden="true">
         {SLOTS.map((slot, i) => {
           const Float = look.icons[i];

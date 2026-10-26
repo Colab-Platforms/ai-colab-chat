@@ -28,6 +28,9 @@ class UsageLogService {
         { key: "totalTokens", field: "totalTokens" },
         { key: "promptTokens", field: "promptTokens" },
         { key: "completionTokens", field: "completionTokens" },
+        { key: "billableTotalTokens", field: "billableTotalTokens" },
+        { key: "billablePromptTokens", field: "billablePromptTokens" },
+        { key: "billableCompletionTokens", field: "billableCompletionTokens" },
       ],
       defaultSort: { key: "createdAt", order: "desc" },
       allowedQueryKeys: ["page", "pageSize"],
@@ -105,7 +108,16 @@ class UsageLogService {
     }
 
     // Preserve sorting
-    const paginatedLogs = groupsToFetch.map((g) => grouped.get(g)).filter(Boolean);
+    let paginatedLogs = groupsToFetch.map((g) => grouped.get(g)).filter(Boolean);
+
+    // Plain users only ever see billable tokens; raw provider counts stay admin-only.
+    if (callerRole === "USER") {
+      const stripActual = ({ promptTokens, completionTokens, totalTokens, ...rest }: any) => rest;
+      paginatedLogs = paginatedLogs.map((g) => ({
+        ...stripActual(g),
+        subLogs: g.subLogs.map(stripActual),
+      }));
+    }
 
     // Get total distinct groups reliably
     const distinctGroups = await prisma.usageLog.groupBy({ by: ['groupId'], where });
@@ -114,7 +126,7 @@ class UsageLogService {
     return formatPaginationResponse(paginatedLogs, totalRecords, page, pageSize);
   }
 
-  /** Total tokens logged per calendar day (UTC) per model, for charts. */
+  /** Billable tokens logged per calendar day (UTC) per model, for charts. */
   async getDailyTokensByModel(userId: number, days: number) {
     const safeDays = Math.min(Math.max(Math.floor(days), 1), 90);
     const from = new Date();
@@ -133,7 +145,7 @@ class UsageLogService {
         (ul."createdAt" AT TIME ZONE 'UTC')::date AS day,
         ul."modelId",
         m.name AS "modelName",
-        COALESCE(SUM(ul."totalTokens"), 0)::bigint AS tokens
+        COALESCE(SUM(ul."billableTotalTokens"), 0)::bigint AS tokens
       FROM "UsageLog" ul
       INNER JOIN "Model" m ON m.id = ul."modelId"
       WHERE ul."userId" = ${userId}

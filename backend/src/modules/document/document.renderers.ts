@@ -3,12 +3,14 @@ import { renderSpecToDocx } from "./document.docx.js";
 import { renderSpecToPptx } from "./document.pptx.js";
 import { renderSpecToXlsx } from "./document.xlsx.js";
 import { renderSpecToCsv } from "./document.csv.js";
+import { renderSpecToMindmap } from "./document.mindmap.js";
 import {
   DOCUMENT_FORMATS,
   type AnyTheme,
   type DocumentFormat,
   type DocumentSpec,
   type DocumentTheme,
+  type MindmapSpec,
   type PresentationSpec,
   type WorkbookSpec,
 } from "./document.types.js";
@@ -16,7 +18,7 @@ import {
 /**
  * A renderer turns a validated spec into the bytes of one file format.
  *
- * Every format shares the same `DocumentSpec` input on purpose — the spec is
+ * Every format shares the same `DocumentSpec` input on purpose the spec is
  * the contract with the model, so adding a format must never mean adding a
  * second thing for the model to learn.
  */
@@ -24,7 +26,7 @@ import {
  * A renderer, tagged with the spec shape it consumes.
  *
  * Tagged rather than widened to a union parameter so the worker has to narrow
- * before calling — handing a `DocumentSpec` to the PPTX renderer would
+ * before calling handing a `DocumentSpec` to the PPTX renderer would
  * otherwise typecheck and fail at runtime on `spec.slides`.
  */
 export type RendererEntry =
@@ -39,6 +41,10 @@ export type RendererEntry =
   | {
       kind: "workbook";
       render: (spec: WorkbookSpec, theme: DocumentTheme) => Promise<Buffer>;
+    }
+  | {
+      kind: "mindmap";
+      render: (spec: MindmapSpec, theme: string) => Promise<Buffer>;
     };
 
 /**
@@ -46,7 +52,7 @@ export type RendererEntry =
  *
  * Deliberately `Partial`: the Prisma enum lists all four formats, but only the
  * ones registered here are real. Everything else in the pipeline asks this map
- * rather than assuming — which is what stops "make me an excel" from quietly
+ * rather than assuming which is what stops "make me an excel" from quietly
  * handing back a PDF. Implementing a format means adding one line here.
  */
 const RENDERERS: Partial<Record<DocumentFormat, RendererEntry>> = {
@@ -55,6 +61,7 @@ const RENDERERS: Partial<Record<DocumentFormat, RendererEntry>> = {
   PPTX: { kind: "presentation", render: renderSpecToPptx },
   XLSX: { kind: "workbook", render: renderSpecToXlsx },
   CSV: { kind: "workbook", render: renderSpecToCsv },
+  MINDMAP: { kind: "mindmap", render: renderSpecToMindmap },
 };
 
 export const isFormatSupported = (format: DocumentFormat): boolean =>
@@ -71,7 +78,7 @@ export const getSupportedFormats = (): DocumentFormat[] =>
  *
  * PDF is the fallback because it is the only format guaranteed to be
  * registered. Callers must disclose the substitution to the user rather than
- * silently swapping — an undisclosed swap is the exact failure this registry
+ * silently swapping an undisclosed swap is the exact failure this registry
  * exists to prevent.
  */
 export const FALLBACK_FORMAT: DocumentFormat = "PDF";

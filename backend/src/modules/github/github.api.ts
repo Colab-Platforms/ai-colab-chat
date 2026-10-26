@@ -5,7 +5,7 @@ import { GITHUB_API, GITHUB_API_VERSION } from "./github.types.js";
 /**
  * Thin wrapper over api.github.com. Callers pass whichever token fits the
  * call (installation token for git data, user token for repo listing/creation).
- * Every failure becomes an ApiError with a message a user can act on — GitHub's
+ * Every failure becomes an ApiError with a message a user can act on GitHub's
  * raw error bodies are never forwarded.
  */
 
@@ -30,16 +30,16 @@ export class GithubHttpError extends ApiError {
 
 function friendlyMessage(status: number, path: string, detail: string, headers: Headers): { message: string; code: number } {
   if (status === 401) {
-    return { message: "GitHub rejected the credentials — reconnect your GitHub account", code: STATUS_CODES.UNAUTHORIZED };
+    return { message: "GitHub rejected the credentials reconnect your GitHub account", code: STATUS_CODES.UNAUTHORIZED };
   }
   if (status === 403 || status === 429) {
     const remaining = headers.get("x-ratelimit-remaining");
     const retryAfter = headers.get("retry-after");
     if (remaining === "0" || status === 429 || retryAfter) {
-      return { message: "GitHub rate limit reached — try again in a few minutes", code: STATUS_CODES.CONFLICT };
+      return { message: "GitHub rate limit reached try again in a few minutes", code: STATUS_CODES.CONFLICT };
     }
     return {
-      message: "GitHub denied access to this repository — check the app's repository access on GitHub",
+      message: "GitHub denied access to this repository check the app's repository access on GitHub",
       code: STATUS_CODES.FORBIDDEN,
     };
   }
@@ -50,7 +50,7 @@ function friendlyMessage(status: number, path: string, detail: string, headers: 
     };
   }
   if (status === 409) {
-    return { message: "The repository changed while syncing — try again", code: STATUS_CODES.CONFLICT };
+    return { message: "The repository changed while syncing try again", code: STATUS_CODES.CONFLICT };
   }
   if (status === 422) {
     let reason = "";
@@ -76,7 +76,7 @@ export interface GithubRawResponse<T> {
 }
 
 /**
- * Never throws for HTTP errors — returns the status so callers can branch on
+ * Never throws for HTTP errors returns the status so callers can branch on
  * it (an empty repository answers 409 on every git-data call, and a missing
  * branch answers 404; both are normal states, not failures).
  * Still throws ApiError for network failures and timeouts.
@@ -103,7 +103,7 @@ export async function githubRaw<T = unknown>(
   } catch (error: any) {
     const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
     throw new ApiError(
-      timedOut ? "GitHub took too long to respond — try again" : "Could not reach GitHub — check your connection",
+      timedOut ? "GitHub took too long to respond try again" : "Could not reach GitHub check your connection",
       STATUS_CODES.BAD_REQUEST,
     );
   }

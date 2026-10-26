@@ -1,7 +1,7 @@
 import type { CodeStreamEvent, CodeTurnInfo, CodeVersionOnResponse } from "../types";
 
 /**
- * Folds one SSE event into the bubble's turn info (pure — the chat page keeps
+ * Folds one SSE event into the bubble's turn info (pure the chat page keeps
  * the result on the model response as `codeTurn`). Deltas are ignored here:
  * the bubble only shows which files were written, not their contents.
  */

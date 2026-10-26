@@ -19,7 +19,7 @@ type LoadState =
  * Full-screen preview for the header's "Open in a new tab"
  * (app/code-preview/[id]). It boots its own Sandpack instance: the panel's
  * preview URL (*.nodebox.codesandbox.io) can't be opened directly, because
- * that dev server lives inside the panel page's in-browser VM — a standalone
+ * that dev server lives inside the panel page's in-browser VM a standalone
  * tab gets "Could not connect".
  */
 export function StandalonePreview({ projectId }: { projectId: number }) {

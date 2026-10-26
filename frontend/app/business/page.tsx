@@ -5,7 +5,7 @@ import { useTheme } from "@/context/theme-context";
 import { Navbar } from "@/components/NewLanding/components/Navbar";
 
 /**
- * "Colab AI for Business" — a standalone public landing page (no app shell,
+ * "Colab AI for Business" a standalone public landing page (no app shell,
  * no sign-in needed), under the same floating navbar as the main landing page.
  * The page itself is a self-contained site served unchanged from
  * /business-site/ (its own header removed), so it is embedded rather than

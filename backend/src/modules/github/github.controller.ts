@@ -68,7 +68,7 @@ export const getInstallUrl = handle("install url", async (req) => ({
   message: "Install URL created",
 }));
 
-/** PUBLIC — GitHub redirects the popup here with no Bearer token. Always redirects, never renders JSON. */
+/** PUBLIC GitHub redirects the popup here with no Bearer token. Always redirects, never renders JSON. */
 export async function callback(req: Request, res: Response): Promise<void> {
   try {
     const query = req.query as Record<string, string | undefined>;

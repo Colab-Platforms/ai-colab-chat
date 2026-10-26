@@ -1,14 +1,16 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { MindmapCanvas } from "./mindmap/mindmap-canvas";
+import type { MindmapSpec, MindmapThemeTokens } from "./mindmap/mindmap-types";
 
 /**
  * Mirrors the shapes in `backend/src/modules/document/document.types.ts` and
  * `document.theme.ts`. Kept as a local, minimal copy rather than a shared
- * package — frontend and backend are separate deploys here — but the field
+ * package frontend and backend are separate deploys here but the field
  * names must stay identical to what `GET /documents/:id/spec` returns.
  */
-export type SpecKind = "document" | "presentation" | "workbook";
+export type SpecKind = "document" | "presentation" | "workbook" | "mindmap";
 
 export type CalloutVariant = "info" | "warning" | "success" | "danger";
 
@@ -39,7 +41,7 @@ export interface SlideSpec {
   subtitle?: string;
   blocks: DocumentBlock[];
   notes?: string;
-  /** A topic photo the backend attached (document.pptxImages.ts) — never
+  /** A topic photo the backend attached (document.pptxImages.ts) never
    * authored by the model. Absent when no PPTX template is in play, or the
    * stock-photo lookup found nothing. */
   photoUrl?: string;
@@ -73,7 +75,11 @@ export interface WorkbookSpec {
   sheets: SheetSpec[];
 }
 
-export type AnySpec = DocumentSpec | PresentationSpec | WorkbookSpec;
+export type AnySpec =
+  | DocumentSpec
+  | PresentationSpec
+  | WorkbookSpec
+  | MindmapSpec;
 
 export interface ThemeTokens {
   accent: string;
@@ -90,7 +96,7 @@ export interface ThemeTokens {
 }
 
 /**
- * PPTX-only template tokens — mirrors
+ * PPTX-only template tokens mirrors
  * `backend/src/modules/document/document.pptxTemplates.ts`. A richer shape
  * than `ThemeTokens` because a slide is a fixed canvas with layout decisions
  * (photo placement, split panels, decoration) a reflowing PDF/DOCX page never
@@ -272,7 +278,7 @@ function BlockView({ block, tokens }: { block: DocumentBlock; tokens: ThemeToken
           {block.text}
           {block.attribution && (
             <span style={{ display: "block", marginTop: 6, fontStyle: "normal", fontSize: "9.5pt" }}>
-              — {block.attribution}
+              {block.attribution}
             </span>
           )}
         </blockquote>
@@ -352,11 +358,14 @@ function DocumentPreview({ spec, tokens }: { spec: DocumentSpec; tokens: ThemeTo
   );
 }
 
-/** Mirrors document.pptx.ts's SPLIT_PHOTO_LAYOUT — how much of a "splitPhoto"
+/** Mirrors document.pptx.ts's SPLIT_PHOTO_LAYOUT how much of a "splitPhoto"
  * title slide the text panel occupies, and an optional kicker label. */
 const SPLIT_PHOTO_LAYOUT: Record<string, { textRatio: number; kicker?: string }> = {
   corporate: { textRatio: 0.36 },
   emerald: { textRatio: 0.48, kicker: "PRESENTATION" },
+  "marketing-plan": { textRatio: 0.44, kicker: "MARKETING PLAN" },
+  "sales-proposal": { textRatio: 0.42, kicker: "PROPOSAL" },
+  "training-deck": { textRatio: 0.44, kicker: "TRAINING" },
 };
 
 function SlideDecoration({ tokens, variant, bigNumber }: { tokens: PptxTemplateTokens; variant: "section" | "content"; bigNumber?: string }) {
@@ -586,6 +595,56 @@ function PresentationPreview({ spec, tokens }: { spec: PresentationSpec; tokens:
   );
 }
 
+/**
+ * One filled slide of a real template file, drawn by the backend as HTML on a
+ * fixed canvas (see document.deckFile.preview.ts). The canvas is scaled to the
+ * available width, so it looks like the slide whatever size the panel is.
+ */
+export interface DeckPreview {
+  width: number;
+  height: number;
+  slides: string[];
+}
+
+function TemplateSlidesPreview({ preview }: { preview: DeckPreview }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / preview.width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [preview.width]);
+
+  return (
+    <div ref={ref} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {preview.slides.map((html, i) => (
+        <div
+          key={i}
+          style={{
+            position: "relative",
+            width: "100%",
+            height: preview.height * scale,
+            borderRadius: 8,
+            overflow: "hidden",
+            boxShadow: "0 0 0 1px rgba(0,0,0,.08)",
+          }}
+        >
+          <div
+            style={{ width: preview.width, height: preview.height, transform: `scale(${scale})`, transformOrigin: "top left" }}
+            // The HTML is produced by our own backend from the filled template; all text in it is escaped there.
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function WorkbookPreview({ spec, tokens }: { spec: WorkbookSpec; tokens: ThemeTokens }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -643,21 +702,30 @@ function WorkbookPreview({ spec, tokens }: { spec: WorkbookSpec; tokens: ThemeTo
 /**
  * Renders the same JSON spec the backend renderers turn into a real file, as
  * plain HTML. This is intentionally an approximation, not a pixel-exact
- * render of the PDF/DOCX/PPTX/XLSX — the point is to preview and edit
+ * render of the PDF/DOCX/PPTX/XLSX the point is to preview and edit
  * content/theme, then let the real renderer produce the actual file.
  */
 export function DocumentSpecRenderer({
   specKind,
   spec,
   themeTokens,
+  deckPreview,
 }: {
   specKind: SpecKind;
   spec: AnySpec;
-  themeTokens: ThemeTokens | PptxTemplateTokens;
+  themeTokens: ThemeTokens | PptxTemplateTokens | MindmapThemeTokens;
+  deckPreview?: DeckPreview;
 }) {
   return (
     <Fragment>
-      {specKind === "presentation" && (
+      {specKind === "mindmap" && (
+        <MindmapCanvas
+          spec={spec as MindmapSpec}
+          tokens={themeTokens as MindmapThemeTokens}
+        />
+      )}
+      {specKind === "presentation" && deckPreview && <TemplateSlidesPreview preview={deckPreview} />}
+      {specKind === "presentation" && !deckPreview && (
         <PresentationPreview
           spec={spec as PresentationSpec}
           tokens={themeTokens as PptxTemplateTokens}

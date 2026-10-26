@@ -45,7 +45,7 @@ function toRepoName(title: string) {
 }
 
 type Tab = "existing" | "new";
-/** Set when the chosen repo already has commits — the user must pick what happens to them. */
+/** Set when the chosen repo already has commits the user must pick what happens to them. */
 interface NonEmptyChoice {
   owner: string;
   repo: string;
@@ -60,7 +60,7 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
   const [authorizeUrl, setAuthorizeUrl] = useState<string | null>(null);
   const [authorizing, setAuthorizing] = useState(false);
 
-  // Step 1 — connect
+  // Step 1 connect
   const [connecting, setConnecting] = useState(false);
   const popupRef = useRef<Window | null>(null);
   // Read by the message / popup-closed handlers, which outlive a single render.
@@ -68,19 +68,19 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
   /**
    * True from the moment a GitHub window opens until its result arrives. Kept apart
    * from `connecting`: some browsers make a popup that has visited github.com look
-   * `closed` to its opener, which stops the spinner early — the result that follows
+   * `closed` to its opener, which stops the spinner early the result that follows
    * must still be honoured.
    */
   const awaitingRef = useRef(false);
   const retryRef = useRef<() => void | Promise<void>>(() => {});
 
-  // Step 2 — existing repo
+  // Step 2 existing repo
   const [query, setQuery] = useState("");
   const [repos, setRepos] = useState<GithubRepoDto[] | null>(null);
   const [reposLoading, setReposLoading] = useState(false);
   const [selected, setSelected] = useState<GithubRepoDto | null>(null);
 
-  // Step 2 — new repo
+  // Step 2 new repo
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
@@ -124,10 +124,10 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
   /* ---------------- Step 1: connect through a popup ---------------- */
 
   // The popup's landing page reports back over a BroadcastChannel (no reliance on
-  // window.opener, which the browser may have severed) — see popupChannel.ts.
+  // window.opener, which the browser may have severed) see popupChannel.ts.
   useEffect(() => {
     return subscribePopupResult((result) => {
-      if (!awaitingRef.current) return; // not waiting on a GitHub window — stale or foreign
+      if (!awaitingRef.current) return; // not waiting on a GitHub window stale or foreign
       awaitingRef.current = false;
       const wasAuthorizing = authorizingRef.current;
       setConnecting(false);
@@ -171,7 +171,7 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
     if (!authorizeUrl) return;
     const popup = window.open(authorizeUrl, "github-authorize", POPUP_FEATURES);
     if (!popup) {
-      setError("Your browser blocked the GitHub window — allow pop-ups for this site and try again.");
+      setError("Your browser blocked the GitHub window allow pop-ups for this site and try again.");
       return;
     }
     popupRef.current = popup;
@@ -186,7 +186,7 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
     // treated as an unsolicited popup and blocked. Navigate it once the URL is known.
     const popup = window.open("", "github-connect", POPUP_FEATURES);
     if (!popup) {
-      setError("Your browser blocked the GitHub window — allow pop-ups for this site and try again.");
+      setError("Your browser blocked the GitHub window allow pop-ups for this site and try again.");
       return;
     }
     popupRef.current = popup;
@@ -280,7 +280,7 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
     await link(repo.owner, repo.name, "push");
   }
 
-  // After the user approves on GitHub, repeat what they were doing — creating a repo.
+  // After the user approves on GitHub, repeat what they were doing creating a repo.
   useEffect(() => {
     retryRef.current = () => {
       if (tab === "new" && open && connected) return submitNew();
@@ -353,7 +353,7 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
                   {authorizing ? "Waiting for GitHub…" : "Authorize on GitHub"}
                 </Button>
                 {authorizing && (
-                  <span className="text-[11px]">Approve on GitHub, then close that window — we&apos;ll continue automatically.</span>
+                  <span className="text-[11px]">Approve on GitHub, then close that window we&apos;ll continue automatically.</span>
                 )}
               </div>
             )}
@@ -466,7 +466,7 @@ export function GithubConnectDialog({ open, onOpenChange, status, projectId, pro
                   <Switch checked={isPrivate} onCheckedChange={setIsPrivate} disabled={!!createdRepo} />
                 </label>
                 {createdRepo && (
-                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300">Repository {createdRepo.fullName} was created — finishing the connection.</p>
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-300">Repository {createdRepo.fullName} was created finishing the connection.</p>
                 )}
               </div>
             )}

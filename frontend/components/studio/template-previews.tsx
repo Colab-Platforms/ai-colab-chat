@@ -285,8 +285,96 @@ export function DeckContentSlide({ tokens: t, fontSize = 5 }: { tokens: Tokens; 
   );
 }
 
+/**
+ * A fixed miniature of a mind map in the theme's colours: a central node with
+ * coloured branches on both sides. Not the real layout, just enough to show the
+ * palette, the underline-on-text style and the left/right balance.
+ */
+export function MindmapPreview({ tokens: t, fontSize = 5 }: { tokens: Tokens; fontSize?: number }) {
+  const colors: string[] = t.branchColors ?? [];
+  const pick = (i: number) => colors[i % Math.max(colors.length, 1)] ?? t.rootBg;
+  // [side, y of the branch label, [y of each leaf]]
+  const branches: Array<[1 | -1, number, number[]]> = [
+    [1, 38, [24, 38, 52]],
+    [1, 98, [84, 98, 112]],
+    [-1, 52, [40, 64]],
+    [-1, 118, [106, 120, 134]],
+  ];
+  return (
+    <div
+      style={{
+        fontSize,
+        width: "30em",
+        aspectRatio: "300 / 170",
+        background: t.bg,
+        borderRadius: "0.3em",
+        boxShadow: "0 0.1em 0.5em rgba(0,0,0,.14)",
+        border: "0.05em solid rgba(128,128,128,.25)",
+        overflow: "hidden",
+      }}
+    >
+      <svg viewBox="0 0 300 170" width="100%" height="100%" fontFamily={t.fontFamily}>
+        {branches.map(([side, y, leaves], i) => {
+          const c = pick(i);
+          const bx = 150 + side * 52;
+          const lx = 150 + side * 104;
+          return (
+            <g key={i}>
+              <path d={`M 150 85 C ${150 + side * 26} 85, ${bx - side * 14} ${y}, ${bx} ${y}`} fill="none" stroke={c} strokeWidth={2.4} strokeLinecap="round" />
+              <line x1={bx} y1={y} x2={bx + side * 42} y2={y} stroke={c} strokeWidth={2.4} strokeLinecap="round" />
+              {leaves.map((ly, j) => (
+                <g key={j}>
+                  <path d={`M ${bx + side * 42} ${y} C ${bx + side * 54} ${y}, ${lx - side * 12} ${ly}, ${lx} ${ly}`} fill="none" stroke={c} strokeWidth={1.2} strokeLinecap="round" />
+                  <line x1={lx} y1={ly} x2={lx + side * 34} y2={ly} stroke={c} strokeWidth={1.2} strokeLinecap="round" />
+                </g>
+              ))}
+            </g>
+          );
+        })}
+        <rect x={120} y={72} width={60} height={26} rx={7} fill={t.rootBg} />
+        <text x={150} y={89} fontSize={9} fontWeight={700} textAnchor="middle" fill={t.rootText}>
+          Main idea
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+/**
+ * Templates that have a real screenshot of their design in
+ * public/template-previews/<FORMAT>/<key>.jpg (first page/slide of the files in
+ * frontend/Templates). Keys without one fall back to the token-drawn mock.
+ */
+const IMAGE_PREVIEWS: Record<string, readonly string[]> = {
+  DOCX: ["business-plan", "client-proposal", "cover-letter", "lesson-plan", "meeting-minutes", "service-agreement"],
+  PPTX: ["marketing-plan", "pitch-deck", "project-kickoff", "quarterly-review", "sales-proposal", "training-deck"],
+  XLSX: ["financial-model", "inventory-tracker", "monthly-budget", "project-tracker", "sales-tracker", "timesheet"],
+};
+
+export const templateImageSrc = (format: string, key: string): string | null =>
+  IMAGE_PREVIEWS[format]?.includes(key) ? `/template-previews/${format}/${key}.jpg` : null;
+
+/** The real design screenshot for a template, sized to its container. */
+export function TemplateImage({ format, templateKey, alt, className }: { format: string; templateKey: string; alt: string; className?: string }) {
+  const src = templateImageSrc(format, templateKey);
+  if (!src) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={alt} loading="lazy" draggable={false} className={className} />;
+}
+
 /** Card thumbnail for any format. */
-export function TemplateThumb({ format, tokens }: { format: string; tokens: Tokens }) {
+export function TemplateThumb({ format, tokens, templateKey, label }: { format: string; tokens: Tokens; templateKey?: string; label?: string }) {
+  if (templateKey && templateImageSrc(format, templateKey)) {
+    return (
+      <TemplateImage
+        format={format}
+        templateKey={templateKey}
+        alt={label ?? templateKey}
+        className="max-h-[148px] max-w-[88%] rounded-md object-contain shadow-sm"
+      />
+    );
+  }
+  if (format === "MINDMAP") return <MindmapPreview tokens={tokens} fontSize={4.6} />;
   if (format === "PPTX") return <DeckTitleSlide tokens={tokens} fontSize={4.6} />;
   if (format === "XLSX") return <SheetPreview tokens={tokens} fontSize={4.6} />;
   return <DocPagePreview tokens={tokens} fontSize={3.9} />;

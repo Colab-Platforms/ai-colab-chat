@@ -1,4 +1,4 @@
-// Mirrors backend/src/modules/github/github.types.ts (DTOs only — tokens never reach the browser).
+// Mirrors backend/src/modules/github/github.types.ts (DTOs only tokens never reach the browser).
 
 export type GithubSyncState = "IDLE" | "SYNCING" | "ERROR";
 
@@ -22,7 +22,7 @@ export interface GithubLinkDto {
   lastSyncedAt: string | null;
   syncState: GithubSyncState;
   lastError: string | null;
-  /** GitHub has commits the project lacks — offer Pull or Force push. */
+  /** GitHub has commits the project lacks offer Pull or Force push. */
   needsPull: boolean;
   currentVersion: number;
   /** Editor edits not yet held by any version. */
@@ -31,7 +31,7 @@ export interface GithubLinkDto {
 
 /** GET /api/github/status */
 export interface GithubStatusDto {
-  /** False when the server has no GitHub App credentials — the button is hidden entirely. */
+  /** False when the server has no GitHub App credentials the button is hidden entirely. */
   configured: boolean;
   connected: boolean;
   connection: GithubConnectionDto | null;

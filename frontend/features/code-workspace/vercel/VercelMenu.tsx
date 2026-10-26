@@ -71,7 +71,7 @@ const LABEL: Record<Health, string> = {
 
 /**
  * Header button for the Vercel integration. Renders nothing at all until the
- * server reports Vercel as configured — so a deployment without the
+ * server reports Vercel as configured so a deployment without the
  * integration's credentials shows no half-working button.
  *
  * Unlike GithubMenu's icon-only trigger this one carries a label while the
@@ -116,7 +116,7 @@ export function VercelMenu() {
     if (!link) return;
     if (
       !window.confirm(
-        `Unpublish this project from "${link.vercelProjectName}"? The live site and the Vercel project are NOT deleted — only the link from this workspace. Delete the project on Vercel to take the site down.`,
+        `Unpublish this project from "${link.vercelProjectName}"? The live site and the Vercel project are NOT deleted only the link from this workspace. Delete the project on Vercel to take the site down.`,
       )
     ) {
       return;
@@ -204,7 +204,7 @@ export function VercelMenu() {
             variant="ghost"
             size="sm"
             className="relative h-8 w-8 shrink-0 p-0"
-            title={`${LABEL[health]} — ${link.vercelProjectName}`}
+            title={`${LABEL[health]} ${link.vercelProjectName}`}
           >
             {deploying || working ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -263,7 +263,7 @@ export function VercelMenu() {
             ) : (
               <>
                 <FileCode2 className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
-                <p className="min-w-0 flex-1 text-muted-foreground">No GitHub repo — published from this workspace.</p>
+                <p className="min-w-0 flex-1 text-muted-foreground">No GitHub repo published from this workspace.</p>
               </>
             )}
           </div>

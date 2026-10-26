@@ -13,6 +13,7 @@ import {
   Loader2,
   MessageSquare,
   MoreHorizontal,
+  Network,
   Play,
   PlayCircle,
   Search,
@@ -122,6 +123,7 @@ function toAssets(docs: any[], images: any[], videos: any[]): Asset[] {
 function docIcon(chip: string) {
   if (chip === "XLSX" || chip === "CSV") return Table2;
   if (chip === "PPTX") return PlayCircle;
+  if (chip === "MINDMAP") return Network;
   return FileText;
 }
 

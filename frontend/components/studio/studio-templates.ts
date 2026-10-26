@@ -160,13 +160,14 @@ export const VIDEO_TEMPLATES: StudioTemplate[] = [
 
 /* ── Documents ────────────────────────────────────────────────────── */
 
-export type DocFormat = "PDF" | "DOCX" | "PPTX" | "XLSX";
+export type DocFormat = "PDF" | "DOCX" | "PPTX" | "XLSX" | "MINDMAP";
 
 export const DOC_FORMAT_LABEL: Record<DocFormat, string> = {
   PDF: "PDF",
   DOCX: "Word",
   PPTX: "PowerPoint",
   XLSX: "Excel",
+  MINDMAP: "Mind Map",
 };
 
 /** The phrase the chat pipeline's document-intent detector recognises. */
@@ -175,6 +176,7 @@ export const DOC_FORMAT_NOUN: Record<DocFormat, string> = {
   DOCX: "Word document (.docx)",
   PPTX: "PowerPoint presentation (.pptx)",
   XLSX: "Excel workbook (.xlsx)",
+  MINDMAP: "mind map",
 };
 
 export const DOC_LENGTHS: Record<DocFormat, { value: string; label: string }[]> = {
@@ -196,6 +198,11 @@ export const DOC_LENGTHS: Record<DocFormat, { value: string; label: string }[]> 
   XLSX: [
     { value: "a single sheet", label: "1 sheet" },
     { value: "2-3 sheets", label: "2–3 sheets" },
+  ],
+  MINDMAP: [
+    { value: "4-5 main branches", label: "Compact" },
+    { value: "6-8 main branches", label: "Standard" },
+    { value: "8 main branches with extra detail", label: "Detailed" },
   ],
 };
 

@@ -11,11 +11,11 @@ import {
 /**
  * Decides whether a chat turn is a code-workspace turn.
  *
- *   0. Hard gate — only the Software Engineer assistant. Everything else is
+ *   0. Hard gate only the Software Engineer assistant. Everything else is
  *      NONE, even if a client sends chatType "CODE" directly.
- *   1. Forced — the "Code" pill. Still classified, but only to pick NEW vs
+ *   1. Forced the "Code" pill. Still classified, but only to pick NEW vs
  *      EDIT and a title; it can never come back NONE.
- *   2. Free regex gate — for chats without a project, skip the classifier
+ *   2. Free regex gate for chats without a project, skip the classifier
  *      unless the prompt looks like "build/create … app/site/component…".
  *   3. Cheap classifier (same model as document intent) → NEW/EDIT/ASK/NONE.
  *
@@ -47,10 +47,10 @@ Classify the user's message. Reply with JSON only:
 - NEW: the user wants a new runnable project, app, website, page, game or multi-file component built from scratch ("create a portfolio website using react", "build a todo app", "make a landing page for my bakery", "express api for a blog").
 - EDIT: a current project exists and the user wants it changed, extended, fixed or restyled ("make the hero dark", "add a contact form", "fix the navbar on mobile", "use typescript instead").
 - ASK: a current project exists and the user asks a question about it without asking for changes ("how does the routing work?", "explain App.jsx", "how do I deploy this?").
-- NONE: anything else — general programming questions, a single small snippet or function ("write a function to reverse a string"), concepts, debugging code pasted in chat, or non-coding talk.
+- NONE: anything else general programming questions, a single small snippet or function ("write a function to reverse a string"), concepts, debugging code pasted in chat, or non-coding talk.
 
 framework: what the project uses or should use. Web UI with no stated stack → "react". Plain HTML/CSS/JS → "static". Node/Express → "node". Python → "python".
-If no current project exists, EDIT and ASK are not possible — use NEW or NONE.
+If no current project exists, EDIT and ASK are not possible use NEW or NONE.
 title: for NEW, name the thing being built; otherwise repeat the current project's title.`;
 
 const schema = Joi.object({
@@ -98,7 +98,7 @@ async function classify(
   const userContent = [
     `Message: ${message.slice(0, 1500)}`,
     project
-      ? `\nCurrent project: "${project.title}" (${project.framework}) — files: ${project.paths.slice(0, 40).join(", ")}`
+      ? `\nCurrent project: "${project.title}" (${project.framework}) files: ${project.paths.slice(0, 40).join(", ")}`
       : `\n(No current project in this chat.)`,
   ].join("\n");
 
@@ -139,7 +139,7 @@ export async function detectCodeIntent(params: {
   const text = message.trim();
   if (!text) return NONE;
 
-  // Without a project the only possible code turn is NEW — don't pay for a
+  // Without a project the only possible code turn is NEW don't pay for a
   // classifier call on "what is a closure?".
   if (!forced && !project && !passesCodeGate(text)) return NONE;
   if (!forced && project && text.length < 4) return NONE;

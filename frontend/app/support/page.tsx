@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Loader2, LifeBuoy, Mail } from "lucide-react";
+import { Loader2, LifeBuoy, Mail } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/context/auth-context";
 import api from "@/lib/api";
@@ -74,7 +74,7 @@ function TicketForm() {
         subject,
         message,
       });
-      toast.success("Ticket submitted — our team will get back to you shortly.");
+      toast.success("Ticket submitted our team will get back to you shortly.");
       setSubject("");
       setMessage("");
       setCategory("");
@@ -173,7 +173,7 @@ function ContactForm() {
     setLoading(true);
     try {
       await api.post("/support/contact", { name, email, subject, message });
-      toast.success("Message sent — we'll respond to your message soon.");
+      toast.success("Message sent we'll respond to your message soon.");
       setSubject("");
       setMessage("");
     } catch (err) {
@@ -259,13 +259,6 @@ export default function SupportPage() {
             <Image src="/black.webp" alt="AI Colab" width={70} height={28} className="dark:hidden h-6 w-auto" priority />
             <Image src="/white.webp" alt="AI Colab" width={70} height={28} className="hidden dark:block h-6 w-auto" priority />
           </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to home
-          </Link>
         </div>
       </header>
 
@@ -273,7 +266,7 @@ export default function SupportPage() {
         <h1 className="text-3xl sm:text-4xl font-bold text-balance">Support &amp; Help</h1>
         <p className="text-muted-foreground text-sm mt-2">
           Raise a support ticket for account or product issues, or send us a general
-          message — we usually respond within 1–2 business days.
+          message we usually respond within 1–2 business days.
         </p>
 
         {/* Toggle */}

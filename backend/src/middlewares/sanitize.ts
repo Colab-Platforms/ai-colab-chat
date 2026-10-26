@@ -16,13 +16,13 @@ function sanitizeObject(obj: Record<string, any>): Record<string, any> {
 }
 
 /**
- * Source code must reach the code workspace byte-for-byte — xss() strips
+ * Source code must reach the code workspace byte-for-byte xss() strips
  * attributes like className/onClick and escapes unknown tags, which silently
  * corrupts JSX/HTML. Code is only ever rendered as editor text or run inside
  * the sandboxed (cross-origin) preview iframe, never injected as HTML.
  *
  * Exempted: the code-workspace REST API, and the prompt of a chat turn sent
- * with the "Code" pill (chatType CODE) — the user often pastes code there.
+ * with the "Code" pill (chatType CODE) the user often pastes code there.
  * Also the GitHub and Vercel integrations, which forward user input to those
  * APIs verbatim (repo descriptions, build commands, env var values).
  */

@@ -191,7 +191,7 @@ export default function ProjectsPage() {
         setEditInitial((prev) => ({ ...prev, brief: existing.memory || "" }));
       }
     } catch {
-      // the brief field just starts empty — not fatal
+      // the brief field just starts empty not fatal
     } finally {
       setEditBriefLoading(false);
     }

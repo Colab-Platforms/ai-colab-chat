@@ -6,7 +6,7 @@ import { VERCEL_API } from "./vercel.types.js";
 
 /**
  * Thin wrapper over api.vercel.com, shaped like github.api.ts. Every failure
- * becomes an ApiError with a message a user can act on — Vercel's raw error
+ * becomes an ApiError with a message a user can act on Vercel's raw error
  * bodies are never forwarded wholesale.
  *
  * Two things differ from GitHub:
@@ -18,7 +18,7 @@ import { VERCEL_API } from "./vercel.types.js";
 
 export interface VercelRequestOptions {
   token: string;
-  /** VercelConnection.teamId — appended as ?teamId= when set. */
+  /** VercelConnection.teamId appended as ?teamId= when set. */
   teamId?: string | null;
   /** When set, a revoked/disabled token flips this connection to inactive. */
   connectionId?: number;
@@ -63,7 +63,7 @@ export function parseVercelError(errorText: string): { code: string | null; mess
  * GitHub connection (or Vercel's GitHub App can't see the repo's owner).
  *
  * Vercel's error code for this is not stable, so match a code allowlist AND the
- * message. Keep this the only place that knows the wording — it is the one
+ * message. Keep this the only place that knows the wording it is the one
  * piece guaranteed to need maintenance.
  */
 export function isGitIntegrationMissing(status: number, errorText: string): boolean {
@@ -75,7 +75,7 @@ export function isGitIntegrationMissing(status: number, errorText: string): bool
   ) {
     return true;
   }
-  // "repository ... couldn't be found" is Vercel's answer when its GitHub App can't see the repo —
+  // "repository ... couldn't be found" is Vercel's answer when its GitHub App can't see the repo  
   // the same fix (give Vercel access to it), so it takes the same guided path.
   return /install the github integration|github integration first|not connected to github|link a github repository|connect your github account|login connection|repository .*couldn.?t be found|make sure there aren.?t any typos/i.test(
     message || errorText,
@@ -91,17 +91,17 @@ function friendlyMessage(status: number, path: string, errorText: string, header
   const { code, message } = parseVercelError(errorText);
 
   if (status === 402) {
-    // Plan or usage limits on the user's own account — surfaced, never gated by us.
-    return { message: message || "Your Vercel plan does not allow this — check your Vercel account", code: STATUS_CODES.BAD_REQUEST };
+    // Plan or usage limits on the user's own account surfaced, never gated by us.
+    return { message: message || "Your Vercel plan does not allow this check your Vercel account", code: STATUS_CODES.BAD_REQUEST };
   }
   if (status === 403) {
     return {
-      message: "Vercel denied this request — check the integration's permissions in your Vercel account",
+      message: "Vercel denied this request check the integration's permissions in your Vercel account",
       code: STATUS_CODES.FORBIDDEN,
     };
   }
   if (status === 404) {
-    return { message: "Not found on Vercel — it may have been deleted", code: STATUS_CODES.NOT_FOUND };
+    return { message: "Not found on Vercel it may have been deleted", code: STATUS_CODES.NOT_FOUND };
   }
   if (status === 409) {
     return { message: message || "That already exists on Vercel", code: STATUS_CODES.CONFLICT };
@@ -109,7 +109,7 @@ function friendlyMessage(status: number, path: string, errorText: string, header
   if (status === 429) {
     const retryAfter = headers.get("retry-after");
     return {
-      message: `Vercel rate limit reached — try again ${retryAfter ? `in ${retryAfter}s` : "in a few minutes"}`,
+      message: `Vercel rate limit reached try again ${retryAfter ? `in ${retryAfter}s` : "in a few minutes"}`,
       code: STATUS_CODES.CONFLICT,
     };
   }
@@ -130,7 +130,7 @@ export interface VercelRawResponse<T> {
 }
 
 /**
- * Never throws for HTTP errors — returns the status so callers can branch on it.
+ * Never throws for HTTP errors returns the status so callers can branch on it.
  * Still throws for network failures, timeouts, and a revoked token (which no
  * caller can recover from).
  */
@@ -155,7 +155,7 @@ export async function vercelRaw<T = unknown>(
   } catch (error: any) {
     const timedOut = error?.name === "TimeoutError" || error?.name === "AbortError";
     throw new ApiError(
-      timedOut ? "Vercel took too long to respond — try again" : "Could not reach Vercel — check your connection",
+      timedOut ? "Vercel took too long to respond try again" : "Could not reach Vercel check your connection",
       STATUS_CODES.BAD_REQUEST,
     );
   }
@@ -178,13 +178,13 @@ async function throwIfAuthLost(status: number, errorText: string, connectionId?:
   if (status === 403 && parseVercelError(errorText).code === "integration_configuration_disabled") {
     await markInactive(connectionId);
     throw Object.assign(
-      new ApiError("This app's access to your Vercel account was removed — reconnect Vercel", STATUS_CODES.CONFLICT),
+      new ApiError("This app's access to your Vercel account was removed reconnect Vercel", STATUS_CODES.CONFLICT),
       { code: "VERCEL_INTEGRATION_DISABLED", details: { reconnect: true } },
     );
   }
 }
 
-/** The user-facing error for a failed raw response — for callers that inspected it first. */
+/** The user-facing error for a failed raw response for callers that inspected it first. */
 export function vercelError(res: VercelRawResponse<unknown>, path: string): VercelHttpError {
   const { message, code } = friendlyMessage(res.status, path, res.errorText, res.headers);
   const parsed = parseVercelError(res.errorText);

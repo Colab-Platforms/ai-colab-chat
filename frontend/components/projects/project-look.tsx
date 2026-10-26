@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/** Icon keys are what's persisted on Folder.icon — keep them stable. */
+/** Icon keys are what's persisted on Folder.icon keep them stable. */
 export const PROJECT_ICONS: { key: string; icon: LucideIcon; label: string }[] = [
   { key: "folder", icon: Folder, label: "Folder" },
   { key: "pizza", icon: Pizza, label: "Food" },

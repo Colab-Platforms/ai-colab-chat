@@ -27,7 +27,7 @@ const dirPath = Joi.string()
   .default(null)
   .messages({ "string.pattern.base": "Directories must be relative to the project, without \"..\"" });
 
-// GitHub's own rules for owner/repo — keeps user input out of the API paths we build.
+// GitHub's own rules for owner/repo keeps user input out of the API paths we build.
 const slug = Joi.string().trim().pattern(/^[A-Za-z0-9._-]{1,100}$/);
 
 export const envVarsSchema = Joi.array()

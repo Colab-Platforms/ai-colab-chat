@@ -27,7 +27,7 @@ import {
 } from "./github.types.js";
 
 /* ------------------------------------------------------------------ *
- * OAuth state — a signed, 10-minute JWT (same approach as the Google
+ * OAuth state a signed, 10-minute JWT (same approach as the Google
  * sign-in in auth.service.ts). The callback arrives from GitHub with no
  * Bearer header, so the user id has to travel inside the state.
  * ------------------------------------------------------------------ */
@@ -69,7 +69,7 @@ function verifyState(state: string): GithubOauthState {
 }
 
 /* ------------------------------------------------------------------ *
- * Shared lookups (every one is scoped by userId — never trust the body)
+ * Shared lookups (every one is scoped by userId never trust the body)
  * ------------------------------------------------------------------ */
 
 async function requireConnection(userId: number) {
@@ -171,7 +171,7 @@ export async function getStatus(userId: number, projectId: number | null): Promi
  * `/apps/<slug>/installations/new`: that install URL only runs the
  * install+authorize flow while the app is *not yet installed*. Once it is,
  * GitHub silently sends the user to the installation's settings page instead,
- * which never redirects back here — so the user appears to connect, and nothing
+ * which never redirects back here so the user appears to connect, and nothing
  * is ever stored. `/login/oauth/authorize` works in both states: it prompts to
  * install when needed, and otherwise returns a `code` straight away.
  */
@@ -202,7 +202,7 @@ interface GithubInstallation {
 
 /**
  * GitHub redirects the popup here after the user installs (or reconfigures) the
- * app. Returns the frontend URL to send the popup to — success or a readable
+ * app. Returns the frontend URL to send the popup to success or a readable
  * error, never a raw exception page.
  */
 export async function handleCallback(query: {
@@ -228,7 +228,7 @@ export async function handleCallback(query: {
 
     if (!query.code) {
       throw new ApiError(
-        "GitHub did not return an authorization code — enable \"Request user authorization (OAuth) during installation\" on the GitHub App",
+        "GitHub did not return an authorization code enable \"Request user authorization (OAuth) during installation\" on the GitHub App",
         STATUS_CODES.BAD_REQUEST,
       );
     }
@@ -248,14 +248,14 @@ export async function handleCallback(query: {
     // Only installations this person may legitimately act through: their OWN
     // account's, or an organization's. A *personal* installation belonging to
     // someone else can show up in /user/installations too (shared access), but
-    // attaching it would let this user push through another person's account —
+    // attaching it would let this user push through another person's account  
     // and `POST /user/repos` would create repos under the wrong account and 403.
     const eligible = usable.filter(
       (i) => i.account!.type === "Organization" || i.account!.login.toLowerCase() === me.login.toLowerCase(),
     );
 
     // Authorizing does not install. Someone who authorized first (or whose only
-    // installation is someone else's) has a token and nothing to use — send them
+    // installation is someone else's) has a token and nothing to use send them
     // to the install page for their own account instead of a dead end.
     if (eligible.length === 0) {
       return installationSettingsUrl(null) + `?state=${encodeURIComponent(query.state)}`;
@@ -268,7 +268,7 @@ export async function handleCallback(query: {
       eligible.find((i) => i.account!.login.toLowerCase() === me.login.toLowerCase()) ??
       eligible[0];
     if (!chosen.account) {
-      throw new ApiError("Could not read your GitHub installation — try connecting again", STATUS_CODES.BAD_REQUEST);
+      throw new ApiError("Could not read your GitHub installation try connecting again", STATUS_CODES.BAD_REQUEST);
     }
 
     const fields = {
@@ -295,7 +295,7 @@ export async function handleCallback(query: {
 /**
  * Removes the connection and its links. Deliberately touches nothing else: no
  * CodeFile, no CodeProjectVersion, and the GitHub repos themselves stay.
- * The GitHub-side installation is left in place too — uninstalling is the
+ * The GitHub-side installation is left in place too uninstalling is the
  * user's call, and reconnecting later then needs no reinstall.
  */
 export async function disconnect(userId: number) {
@@ -360,7 +360,7 @@ export async function listRepos(userId: number, query: string) {
 
 /**
  * Builds the error for "GitHub refused to create a repository", including the
- * page where the user can fix it with one click — the Bolt-style "Authorize"
+ * page where the user can fix it with one click the Bolt-style "Authorize"
  * step, so the permission is requested at the moment it is needed:
  *
  *   - the installation has not accepted `administration: write` yet
@@ -392,7 +392,7 @@ async function repoCreationDenied(
       message = "GitHub could not confirm this account may create repositories. Authorize again to continue.";
     }
   } catch {
-    // Could not inspect — still offer the safe fix.
+    // Could not inspect still offer the safe fix.
     authorizeUrl = createAuthorizeUrl(userId, null).url;
   }
   return Object.assign(new ApiError(message, STATUS_CODES.FORBIDDEN), {
@@ -426,7 +426,7 @@ export async function createRepo(
   }
 
   // A repo made after installing is invisible to the app until it is added.
-  // An "All repositories" installation already covers it and answers 403/422 —
+  // An "All repositories" installation already covers it and answers 403/422  
   // both are fine; any real access problem surfaces on the first push instead.
   await githubRequest(`/user/installations/${connection.installationId}/repositories/${created.id}`, {
     token,
@@ -456,7 +456,7 @@ export async function linkProject(
   const connection = await requireConnection(userId);
   const project = await requireOwnProject(userId, projectId);
   if (project.status === "GENERATING") {
-    throw new ApiError("The AI is still writing this project — link a repository when it finishes", STATUS_CODES.CONFLICT);
+    throw new ApiError("The AI is still writing this project link a repository when it finishes", STATUS_CODES.CONFLICT);
   }
 
   // Verifies the installation can reach the repo, and learns its default branch.
@@ -464,14 +464,14 @@ export async function linkProject(
   const repo = await githubRaw<GithubRepoRaw>(`/repos/${input.owner}/${input.repo}`, { token: installationToken });
   if (!repo.ok || !repo.data) {
     throw new ApiError(
-      "The GitHub App cannot access that repository — add it under the app's repository access on GitHub",
+      "The GitHub App cannot access that repository add it under the app's repository access on GitHub",
       STATUS_CODES.NOT_FOUND,
     );
   }
 
   // The installation token reaches everything the installation covers, so on its
   // own it proves nothing about THIS user. Make sure the person linking can
-  // actually write to the repo — otherwise they could name any repo the
+  // actually write to the repo otherwise they could name any repo the
   // installation happens to see and push into it.
   const mine = await githubRaw<GithubRepoRaw>(`/repos/${input.owner}/${input.repo}`, { token: await getUserToken(connection) });
   const perms = mine.data?.permissions;
@@ -493,7 +493,7 @@ export async function linkProject(
     );
   }
   if (input.initial === "pull" && !hasCommits) {
-    throw new ApiError("This repository is empty — there is nothing to pull. Push the project instead.", STATUS_CODES.BAD_REQUEST);
+    throw new ApiError("This repository is empty there is nothing to pull. Push the project instead.", STATUS_CODES.BAD_REQUEST);
   }
 
   const data = {

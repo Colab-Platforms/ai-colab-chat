@@ -21,7 +21,7 @@ export interface GithubConfig {
   frontendCallbackUrl: string;
 }
 
-/** Signed into the OAuth `state` param — the callback has no Bearer header. */
+/** Signed into the OAuth `state` param the callback has no Bearer header. */
 export interface GithubOauthState {
   nonce: string;
   userId: number;
@@ -64,15 +64,15 @@ export interface GithubLinkDto {
   lastSyncedAt: string | null;
   syncState: GithubSyncState;
   lastError: string | null;
-  /** GitHub has commits the project lacks — the UI offers Pull or Force push. */
+  /** GitHub has commits the project lacks the UI offers Pull or Force push. */
   needsPull: boolean;
-  /** The project's current version — ahead of lastPushedVersion means unpushed work. */
+  /** The project's current version ahead of lastPushedVersion means unpushed work. */
   currentVersion: number;
   /** True when the editor has edits not yet in any version. */
   dirty: boolean;
 }
 
-/** GET /api/github/status — the single source of truth the header button reads. */
+/** GET /api/github/status the single source of truth the header button reads. */
 export interface GithubStatusDto {
   configured: boolean;
   connected: boolean;
@@ -106,7 +106,7 @@ export const MAX_INLINE_TREE_BYTES = 4_000_000;
 /** Concurrency when downloading blobs during a pull. */
 export const BLOB_FETCH_CONCURRENCY = 8;
 
-/** Not source code — never import these into the editor. */
+/** Not source code never import these into the editor. */
 export const BINARY_EXTENSIONS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "avif", "bmp", "tiff", "psd",
   "ico", "icns", "woff", "woff2", "ttf", "otf", "eot",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, Download, Loader2, Mail, Phone, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,7 @@ const formatDate = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 export default function DemoRequestsAdminPage() {
+  const router = useRouter();
   const [rows, setRows] = useState<DemoRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
@@ -241,7 +243,7 @@ export default function DemoRequestsAdminPage() {
                   <td className="px-4 py-3">{r.company}</td>
                   <td className="px-4 py-3 text-muted-foreground">{r.teamSize}</td>
                   <td className="max-w-[260px] px-4 py-3 text-xs text-muted-foreground">
-                    <div className="truncate">{r.features.join(", ") || "—"}</div>
+                    <div className="truncate">{r.features.join(", ") || " "}</div>
                     <div className="truncate text-faint">{r.models.join(", ")}</div>
                   </td>
                   <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -369,6 +371,22 @@ export default function DemoRequestsAdminPage() {
                   <Trash2 className="h-4 w-4" /> Delete
                 </Button>
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      router.push(
+                        `/admin/orgs?${new URLSearchParams({
+                          create: "1",
+                          demoRequestId: String(active.id),
+                          name: active.company,
+                          ownerEmail: active.email,
+                          billingEmail: active.email,
+                        }).toString()}`,
+                      )
+                    }
+                  >
+                    Create organization
+                  </Button>
                   <Button variant="outline" onClick={() => setActive(null)}>
                     Close
                   </Button>

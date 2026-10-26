@@ -223,7 +223,7 @@ export function UsageMeter() {
         if (!cancelled) setWallet(res.data?.data ?? null);
       })
       .catch(() => {
-        /* no wallet yet — render nothing */
+        /* no wallet yet render nothing */
       });
     return () => {
       cancelled = true;
@@ -367,9 +367,8 @@ function ImageTemplateCard({ t }: { t: StudioTemplate }) {
 }
 
 function VideoTemplateCard({ t }: { t: StudioTemplate }) {
-  const [hover, setHover] = useState(false);
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+    <div>
       <div
         className={`relative flex h-[157px] items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br ${
           t.previewUrl ? "from-black/5 to-black/5" : (t.gradient ?? FALLBACK_GRADIENT)
@@ -378,11 +377,20 @@ function VideoTemplateCard({ t }: { t: StudioTemplate }) {
         {t.previewUrl && (
           <img src={t.previewUrl} alt={t.title} loading="lazy" draggable={false} className="absolute inset-0 h-full w-full object-cover" />
         )}
-        {hover && t.previewVideoUrl && (
-          <video src={t.previewVideoUrl} autoPlay muted loop playsInline className="absolute inset-0 h-full w-full object-cover" />
+        {t.previewVideoUrl && (
+          <video
+            src={t.previewVideoUrl}
+            poster={t.previewUrl ?? undefined}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
         )}
-        {!t.previewUrl && <div className="absolute inset-x-[16%] inset-y-[16%] rounded-lg bg-white/55" />}
-        {!(hover && t.previewVideoUrl) && (
+        {!t.previewUrl && !t.previewVideoUrl && <div className="absolute inset-x-[16%] inset-y-[16%] rounded-lg bg-white/55" />}
+        {!t.previewVideoUrl && (
           <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white">
             <Play className="h-3.5 w-3.5 fill-current" />
           </div>

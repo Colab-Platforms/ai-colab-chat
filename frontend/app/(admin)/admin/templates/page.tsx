@@ -230,7 +230,7 @@ export default function StudioTemplatesAdminPage() {
                       <img src={r.previewUrl} alt="" className="h-12 w-12 rounded-lg border border-border object-cover" />
                       <div className="min-w-0">
                         <div className="truncate font-medium text-foreground">{r.title}</div>
-                        <div className="truncate text-xs text-muted-foreground">{r.category || "—"}</div>
+                        <div className="truncate text-xs text-muted-foreground">{r.category || " "}</div>
                       </div>
                     </div>
                   </td>

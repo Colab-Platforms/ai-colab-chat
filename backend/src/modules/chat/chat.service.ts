@@ -136,7 +136,7 @@ class ChatService {
     }
 
     // Voice chats live in their own tab (see voice.service.ts / /voice
-    // page) and shouldn't clutter the regular sidebar/chat list — only
+    // page) and shouldn't clutter the regular sidebar/chat list only
     // include them when explicitly requested via ?capability=VOICE.
     if (!query.capability) {
       where.capability = { not: "VOICE" };
@@ -192,7 +192,7 @@ class ChatService {
               include: {
                 model: { select: { id: true, name: true, externalId: true } },
                 // Generation outlives the SSE stream, so a document must come
-                // back with the chat — otherwise a refresh mid-generation
+                // back with the chat otherwise a refresh mid-generation
                 // loses the card entirely.
                 generatedDocuments: {
                   where: { isDeleted: false },

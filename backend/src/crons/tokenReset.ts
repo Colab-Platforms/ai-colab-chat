@@ -3,14 +3,19 @@ import prisma from "@root/prisma.js";
 import dayjs from "dayjs";
 import { createWalletTransaction, creditBundledCredits } from "@/utils/walletUtils.js";
 
-// Monthly token reset — runs at midnight on the 1st of every month
+// Monthly token reset runs at midnight on the 1st of every month
 const task = () => {
     cron.schedule("0 0 1 * *", async () => {
         console.log("🔄 Running monthly token reset...");
 
         try {
             const activeSubscriptions = await prisma.subscription.findMany({
-                where: { status: "ACTIVE" },
+                where: {
+                    status: "ACTIVE",
+                    // Yearly one-time plans get tokens ADDED on their own monthly
+                    // anniversary (yearlyTokenGrant cron) and never reset.
+                    NOT: { billingCycle: "YEARLY", autoRenew: false },
+                },
                 include: { plan: true },
             });
 
@@ -54,7 +59,7 @@ const task = () => {
                         meta: { reason: "MONTHLY_TOKEN_RESET_CREDIT", planId: sub.planId },
                     });
 
-                    // Bundled video credits reset (overwrite) alongside tokens —
+                    // Bundled video credits reset (overwrite) alongside tokens  
                     // topupCredits is untouched by creditBundledCredits.
                     await creditBundledCredits(tx, {
                         userId: sub.userId,

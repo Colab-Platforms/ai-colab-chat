@@ -10,14 +10,14 @@ import {
 /**
  * Two-stage detection for "the user wants a document out of this".
  *
- *   Stage 1 — a free regex gate with high recall and deliberately poor
+ *   Stage 1 a free regex gate with high recall and deliberately poor
  *             precision. It has NO authority to trigger generation; it only
  *             decides whether stage 2 is worth paying for. ~95% of messages
  *             stop here at zero cost.
  *
- *   Stage 2 — a cheap model call that judges actual intent. This is what
+ *   Stage 2 a cheap model call that judges actual intent. This is what
  *             separates "make me a PDF of that" from "how do I generate a PDF
- *             in Node?" — a distinction no keyword list can draw, and the
+ *             in Node?" a distinction no keyword list can draw, and the
  *             false positive that would most damage trust in the feature.
  *
  * Everything here fails open: any error, timeout or malformed reply resolves
@@ -25,12 +25,12 @@ import {
  * able to break the conversation.
  */
 
-// Read per call, not captured at module load — see the note in
+// Read per call, not captured at module load see the note in
 // document.spec.service.ts on why a const here would be a trap.
 const getIntentModel = () =>
   process.env.DOCUMENT_INTENT_MODEL ?? "google/gemini-2.5-flash";
 // Generous on purpose. Classification runs AFTER the answer has streamed, so
-// the user is not waiting on it — but a tight timeout makes the feature fail
+// the user is not waiting on it but a tight timeout makes the feature fail
 // intermittently, which reads as "sometimes it just doesn't work". Observed
 // Flash latency spans ~0.5-4s, so 4s produced random false negatives.
 const INTENT_TIMEOUT_MS = Number(
@@ -38,11 +38,23 @@ const INTENT_TIMEOUT_MS = Number(
 );
 const LAST_ANSWER_CHARS = 600;
 
-export type DocumentIntentMode = "REPLACE" | "AUGMENT" | "NONE";
+export type DocumentIntentMode = "REPLACE" | "AUGMENT" | "UPDATE" | "NONE";
+
+/**
+ * The document this chat most recently produced, if any. Its presence is what
+ * makes an otherwise format-less follow-up ("add some more use cases")
+ * interpretable as an edit to it.
+ */
+export interface ActiveDocument {
+  id: number;
+  format: DocumentFormat;
+  title: string;
+  theme: string;
+}
 
 export interface DocumentIntent {
   intent: DocumentIntentMode;
-  /** The format the user ASKED for — not necessarily one we can render yet. */
+  /** The format the user ASKED for not necessarily one we can render yet. */
   format: DocumentFormat;
   title: string;
   useLastAnswer: boolean;
@@ -60,31 +72,31 @@ const NONE: DocumentIntent = {
 };
 
 /* ------------------------------------------------------------------ *
- * Stage 1 — regex gate
+ * Stage 1 regex gate
  * ------------------------------------------------------------------ */
 
 // Bare "word", "deck" and "sheet" are included even though they are common
-// English words. The gate is deliberately high-recall and low-precision — it
+// English words. The gate is deliberately high-recall and low-precision it
 // only decides whether stage 2 is worth paying for, and a missed phrasing
 // ("convert this to word") fails *silently*, producing no document and no
 // explanation, which is far worse than an occasional wasted classifier call.
 const FORMAT_NOUN =
-  /\b(pdf|document|doc|docx|word|report|write[- ]?up|summary sheet|excel|spreadsheet|xlsx|sheet|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck)\b/i;
+  /\b(pdf|document|doc|docx|word|report|write[- ]?up|summary sheet|excel|spreadsheet|xlsx|sheet|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck|mind[- ]?map|mindmap|concept map)\b/i;
 
 const PRODUCTION_VERB =
   /\b(generate|create|make|build|produce|export|prepare|draft|compile|give me|send me|download|save (?:it |this |that )?as|convert (?:it |this |that )?(?:in)?to|turn (?:it|this|that) into|put (?:it|this|that) in(?:to)?|banao|bana do|bana do)\b/i;
 
-/** "as a pdf", "in word format", "into a deck" — verb-free but unambiguous. */
+/** "as a pdf", "in word format", "into a deck" verb-free but unambiguous. */
 const REFERENTIAL_FORM =
-  /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:pdf|document|report|word|docx|excel|spreadsheet|xlsx|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck)\b|\b(?:pdf|word|docx|excel|xlsx|csv|ppt|pptx)\s+format\b/i;
+  /\b(?:as|in|into|to)\s+(?:an?\s+)?(?:pdf|document|report|word|docx|excel|spreadsheet|xlsx|csv|ppt|pptx|powerpoint|presentation|slide deck|slides|deck|mind[- ]?map|mindmap|concept map)\b|\b(?:pdf|word|docx|excel|xlsx|csv|ppt|pptx)\s+format\b/i;
 
 /**
- * "same data", "above content", "that information" — an unambiguous back
+ * "same data", "above content", "that information" an unambiguous back
  * reference to material that already exists in the conversation. Checked as a
  * deterministic override rather than left entirely to the classifier: this
  * phrasing is common in exactly the "now also make it a docx" follow-up that
  * chains off a prior document turn, and a classifier miss here is worse than
- * for other fields — it makes the answering model believe there is no
+ * for other fields it makes the answering model believe there is no
  * existing material, so it invents new content instead of reusing the real
  * data (observed failure: "make a docx of the same data" produced a
  * hallucinated document ABOUT the request instead of the actual content).
@@ -95,7 +107,7 @@ const REFERS_TO_EXISTING_DATA =
 // Intent lives in the instruction, which sits at the very start ("generate a
 // pdf of the following: <10k of pasted data>") or occasionally at the very end
 // ("...turn that into a report"). Scanning only those windows keeps the regex
-// cheap on huge messages WITHOUT rejecting them — an earlier length cap here
+// cheap on huge messages WITHOUT rejecting them an earlier length cap here
 // silently killed the most common real case, pasting content to convert.
 const HEAD_SCAN_CHARS = 800;
 const TAIL_SCAN_CHARS = 400;
@@ -105,15 +117,29 @@ const scanWindow = (message: string): string => {
   return `${message.slice(0, HEAD_SCAN_CHARS)}\n${message.slice(-TAIL_SCAN_CHARS)}`;
 };
 
-export const passesDocumentGate = (message: string): boolean => {
+/**
+ * Words that signal "change the thing we just made". Only consulted when the
+ * chat already has a document, and like the rest of the gate it is high-recall
+ * on purpose: it just decides whether the classifier is worth paying for, and
+ * the classifier is what actually separates "add more use cases" (an edit)
+ * from "what else is AI used for?" (a question).
+ */
+const EDIT_FOLLOWUP =
+  /\b(add|adding|more|extra|additional|another|also|include|including|insert|append|update|upgrade|improve|enhance|refine|expand|extend|elaborate|detail|detailed|deeper|remove|delete|drop|replace|change|edit|modify|rewrite|rephrase|fix|rename|reorder|shorten|shorter|longer|simplify|redo|regenerate|instead|make (?:it|this|that)|jodo|badhao|hatao)\b/i;
+
+export const passesDocumentGate = (
+  message: string,
+  hasActiveDocument = false,
+): boolean => {
   if (!message) return false;
   const window = scanWindow(message);
+  if (hasActiveDocument && EDIT_FOLLOWUP.test(window)) return true;
   if (!FORMAT_NOUN.test(window)) return false;
   return PRODUCTION_VERB.test(window) || REFERENTIAL_FORM.test(window);
 };
 
 /* ------------------------------------------------------------------ *
- * Stage 2 — intent classifier
+ * Stage 2 intent classifier
  * ------------------------------------------------------------------ */
 
 const SYSTEM_PROMPT = `You decide whether a chat message is asking the assistant to PRODUCE a downloadable document file.
@@ -125,18 +151,19 @@ Reply with ONLY this JSON object:
   "title": string,               // short document title, "" when intent is NONE
   "useLastAnswer": boolean,      // true if the document should be built from the previous assistant answer
   "confidence": number,          // 0.0 - 1.0
-  "requiresCurrentData": boolean // see below — "" / false when intent is NONE
+  "requiresCurrentData": boolean // see below "" / false when intent is NONE
 }
 
-Choosing "format" — report what the user ASKED FOR, never what you think is best:
-- "PDF"  — "pdf", or any request for a document/report/write-up with no format named. This is the default.
-- "DOCX" — "word", "word file", "doc file", "docx", "editable document".
-- "PPTX" — "ppt", "powerpoint", "pptx", "presentation", "slide deck", "slides".
-- "XLSX" — "excel", "spreadsheet", "xlsx", "sheet".
-- "CSV"  — "csv", "comma separated", "comma-separated values". Do NOT use XLSX for these — they are different files.
+Choosing "format" report what the user ASKED FOR, never what you think is best:
+- "PDF"  "pdf", or any request for a document/report/write-up with no format named. This is the default.
+- "DOCX" "word", "word file", "doc file", "docx", "editable document".
+- "PPTX" "ppt", "powerpoint", "pptx", "presentation", "slide deck", "slides".
+- "XLSX" "excel", "spreadsheet", "xlsx", "sheet".
+- "CSV"  "csv", "comma separated", "comma-separated values". Do NOT use XLSX for these they are different files.
+- "MINDMAP"  "mind map", "mindmap", "concept map", "brainstorm map", "flow diagram of topics". A branching diagram of a topic, not a document.
 When no format is named at all, answer "PDF".
 
-Choosing "requiresCurrentData" — set true when accurately answering the request needs facts that are current, recent, or change over time, which you cannot verify with certainty: this month's or this year's statistics, best-sellers or rankings "right now", live prices, sports scores, ongoing events, recent news. Set false for facts that are stable regardless of when they are answered (how something works, historical events, established concepts). This is judged independently of intent and format.
+Choosing "requiresCurrentData" set true when accurately answering the request needs facts that are current, recent, or change over time, which you cannot verify with certainty: this month's or this year's statistics, best-sellers or rankings "right now", live prices, sports scores, ongoing events, recent news. Set false for facts that are stable regardless of when they are answered (how something works, historical events, established concepts). This is judged independently of intent and format.
 
 Meaning of each intent:
 - "REPLACE": the message ONLY asks for a file. Nothing else is being asked.
@@ -154,8 +181,23 @@ Critical distinctions:
 - "useLastAnswer" is true when the message refers to earlier content ("that", "this", "the above", "your answer") rather than naming a fresh topic.
 - Be conservative. When genuinely unsure, answer NONE with low confidence.`;
 
+/**
+ * Appended to the system prompt only when the chat already has a document, so
+ * the extra intent cannot be chosen in a chat where there is nothing to edit.
+ */
+const UPDATE_PROMPT_ADDENDUM = `
+
+This chat already contains a generated document (named on the "Existing document" line below). That adds a fourth intent:
+- "UPDATE": the message asks to CHANGE, EXTEND, SHORTEN, RESTRUCTURE or FIX that existing document, without asking for a new file or a different format.
+    "add some more use cases", "make the second section shorter", "remove the pricing part", "update it with 2025 data", "add a branch for security"
+  For UPDATE, echo the existing document's own format in "format".
+Rules for UPDATE:
+- If the user names a DIFFERENT format ("now make this a PDF", "turn it into slides"), that is REPLACE or AUGMENT, not UPDATE.
+- A general question that merely relates to the topic ("what else is AI used for?", "explain the first point") is NONE, not UPDATE. UPDATE requires that the user wants the document itself to change.
+- When genuinely unsure between UPDATE and NONE, answer NONE.`;
+
 const intentSchema = Joi.object({
-  intent: Joi.string().valid("REPLACE", "AUGMENT", "NONE").required(),
+  intent: Joi.string().valid("REPLACE", "AUGMENT", "UPDATE", "NONE").required(),
   // Defaulted rather than required: an older/weaker model that omits the field
   // should still produce a working PDF instead of failing the whole turn.
   format: Joi.string()
@@ -177,20 +219,21 @@ const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
 
 /**
  * Resolves what (if anything) the user wants generated.
- * Always resolves — never rejects.
+ * Always resolves never rejects.
  */
 export const detectDocumentIntent = async (
   message: string,
   lastAssistantAnswer?: string | null,
+  activeDocument?: ActiveDocument | null,
 ): Promise<DocumentIntent> => {
-  const gated = passesDocumentGate(message);
+  const gated = passesDocumentGate(message, Boolean(activeDocument));
   dlog(
     "intent:gate",
-    `${gated ? "PASS" : "STOP"} — "${message.slice(0, 120)}"${gated ? " → calling classifier" : " (no model call, free)"}`,
+    `${gated ? "PASS" : "STOP"} "${message.slice(0, 120)}"${gated ? " → calling classifier" : " (no model call, free)"}`,
   );
   if (!gated) return NONE;
 
-  // The classifier judges intent, not content — sending a 10k-char paste would
+  // The classifier judges intent, not content sending a 10k-char paste would
   // cost tokens and latency for nothing, so it sees the same head/tail window
   // the gate used.
   const messageForClassifier =
@@ -203,7 +246,13 @@ export const detectDocumentIntent = async (
     lastAssistantAnswer
       ? `\nPrevious assistant answer (for resolving "that"/"this"):\n${lastAssistantAnswer.slice(0, LAST_ANSWER_CHARS)}`
       : `\n(No previous assistant answer in this conversation.)`,
+    activeDocument
+      ? `\nExisting document: ${DOCUMENT_FORMAT_META[activeDocument.format].label} titled "${activeDocument.title}"`
+      : "",
   ].join("\n");
+  const systemPrompt = activeDocument
+    ? SYSTEM_PROMPT + UPDATE_PROMPT_ADDENDUM
+    : SYSTEM_PROMPT;
 
   const model = getIntentModel();
   const started = Date.now();
@@ -213,14 +262,14 @@ export const detectDocumentIntent = async (
       model,
       temperature: 0,
       max_tokens: 200,
-      systemPrompt: `${SYSTEM_PROMPT.slice(0, 200)}… [${SYSTEM_PROMPT.length} chars]`,
+      systemPrompt: `${systemPrompt.slice(0, 200)}… [${systemPrompt.length} chars]`,
       userContent,
     });
 
     const completion = await withTimeout(
       createOpenRouterJsonCompletion({
         model,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt,
         userContent,
         max_tokens: 200,
         temperature: 0,
@@ -236,14 +285,14 @@ export const detectDocumentIntent = async (
     });
 
     if (!raw) {
-      dlog("intent:result", "NONE — empty content from model");
+      dlog("intent:result", "NONE empty content from model");
       return NONE;
     }
 
     const start = raw.indexOf("{");
     const end = raw.lastIndexOf("}");
     if (start === -1 || end <= start) {
-      dlog("intent:result", "NONE — no JSON object found in reply");
+      dlog("intent:result", "NONE no JSON object found in reply");
       return NONE;
     }
 
@@ -252,16 +301,31 @@ export const detectDocumentIntent = async (
       { stripUnknown: true },
     );
     if (error) {
-      dlogError("intent:result", "NONE — schema rejected reply", error);
+      dlogError("intent:result", "NONE schema rejected reply", error);
       return NONE;
     }
 
     const intent = value as DocumentIntent;
 
+    if (intent.intent === "UPDATE") {
+      // An UPDATE is only meaningful against a real document, and it always
+      // targets that document's own format; whatever format the classifier
+      // echoed is discarded so a slip there cannot change the file type.
+      if (!activeDocument) {
+        dlog("intent:result", "NONE classifier said UPDATE but the chat has no document");
+        return NONE;
+      }
+      intent.format = activeDocument.format;
+      intent.title = activeDocument.title;
+      intent.useLastAnswer = false;
+      dlogBlock("intent:result", "decided UPDATE", intent);
+      return intent;
+    }
+
     if (!intent.useLastAnswer && REFERS_TO_EXISTING_DATA.test(message)) {
       dlog(
         "intent:result",
-        `overriding useLastAnswer → true — message references existing data the classifier missed`,
+        `overriding useLastAnswer → true message references existing data the classifier missed`,
       );
       intent.useLastAnswer = true;
     }
@@ -269,7 +333,7 @@ export const detectDocumentIntent = async (
     dlogBlock("intent:result", `decided ${intent.intent}`, intent);
     return intent;
   } catch (error: any) {
-    // Message only — a full stack per message would flood the chat logs, and
+    // Message only a full stack per message would flood the chat logs, and
     // the outcome is always the same: fall through to a normal chat turn.
     console.error(
       `[document-intent] classification failed, treating as NONE: ${error?.message ?? error}`,
@@ -279,7 +343,7 @@ export const detectDocumentIntent = async (
 };
 
 /* ------------------------------------------------------------------ *
- * Stage 3 — telling the answering model what is about to happen
+ * Stage 3 telling the answering model what is about to happen
  * ------------------------------------------------------------------ */
 
 /**
@@ -287,7 +351,7 @@ export const detectDocumentIntent = async (
  *
  * Without this the answering model has no idea the platform can produce
  * files, so it refuses ("I can generate a PDF, but I need the full text
- * first") while the pipeline silently renders the document anyway — the
+ * first") while the pipeline silently renders the document anyway the
  * reply and the download card end up contradicting each other.
  *
  * The instructions differ per intent because the *source* of the document
@@ -298,16 +362,29 @@ export const buildDocumentSystemNote = (
   intent: DocumentIntent,
   opts: {
     sourceAlreadyExists: boolean;
-    /** The format actually being rendered — differs when we can't do the ask. */
+    /** The format actually being rendered differs when we can't do the ask. */
     effectiveFormat: DocumentFormat;
   },
 ): string => {
   const named = intent.title ? `titled "${intent.title}" ` : "";
   const effectiveLabel = DOCUMENT_FORMAT_META[opts.effectiveFormat].label;
+
+  // An edit to the document already in this chat. The pipeline revises the
+  // stored document itself, so the reply must not re-list the content (that
+  // would bill the user twice and, worse, read as if the chat text WERE the
+  // update, which is the exact confusion this intent exists to fix).
+  if (intent.intent === "UPDATE") {
+    return [
+      `The user's existing ${effectiveLabel} ${named}is being UPDATED with this request. The revised version will appear as a new download card directly beneath your reply. This is a real capability of this platform, not a hypothetical one.`,
+      `Never tell the user you cannot edit or regenerate it, and never ask them to paste it again the pipeline already has the full current document.`,
+      `Do NOT write out the new or changed content in your reply, and do not restate the existing document the pipeline applies the change to the stored document itself.`,
+      `Reply with one or two short sentences saying what you changed or added (for example "I've added more use cases and updated the ${effectiveLabel.toLowerCase()}."), and nothing else.`,
+    ].join("\n");
+  }
   const lines = [
     `A downloadable ${effectiveLabel} ${named}is being generated from this turn and will appear as a download card directly beneath your reply. This is a real capability of this platform, not a hypothetical one.`,
-    "Never tell the user you cannot create files, and never ask them to paste their content again or upload it elsewhere — the document pipeline already has the full, untruncated message.",
-    `Do not describe the ${effectiveLabel}, its layout, fonts or formatting, and do not offer to generate it — it is already being generated.`,
+    "Never tell the user you cannot create files, and never ask them to paste their content again or upload it elsewhere the document pipeline already has the full, untruncated message.",
+    `Do not describe the ${effectiveLabel}, its layout, fonts or formatting, and do not offer to generate it it is already being generated.`,
   ];
 
   // Substitution must be disclosed. Handing over a PDF while the user believes
@@ -316,7 +393,7 @@ export const buildDocumentSystemNote = (
   if (opts.effectiveFormat !== intent.format) {
     const requestedLabel = DOCUMENT_FORMAT_META[intent.format].label;
     lines.push(
-      `IMPORTANT: the user asked for a ${requestedLabel}, which this platform cannot generate yet. A ${effectiveLabel} is being produced instead. State this plainly in one sentence — do not pretend the ${requestedLabel} was created, and do not apologise at length.`,
+      `IMPORTANT: the user asked for a ${requestedLabel}, which this platform cannot generate yet. A ${effectiveLabel} is being produced instead. State this plainly in one sentence do not pretend the ${requestedLabel} was created, and do not apologise at length.`,
     );
   }
 
@@ -324,9 +401,9 @@ export const buildDocumentSystemNote = (
     const isSpreadsheet =
       opts.effectiveFormat === "XLSX" || opts.effectiveFormat === "CSV";
     lines.push(
-      "This topic depends on current, recent or time-sensitive facts you cannot verify with certainty (up-to-date figures, rankings, prices, or ongoing events). Do not state specific numbers, rankings or statistics as verified fact unless you are certain they are current and correct — say plainly that a figure is an estimate, or that you do not have verified current data for it, rather than presenting an invented number with false confidence." +
+      "This topic depends on current, recent or time-sensitive facts you cannot verify with certainty (up-to-date figures, rankings, prices, or ongoing events). Do not state specific numbers, rankings or statistics as verified fact unless you are certain they are current and correct say plainly that a figure is an estimate, or that you do not have verified current data for it, rather than presenting an invented number with false confidence." +
         (isSpreadsheet
-          ? " This matters more than usual here: your answer becomes spreadsheet cells with real number formatting and totals, which makes an uncertain figure look authoritative. Prefer a clearly-labelled estimate — or omitting the number — over a precise-looking invented one."
+          ? " This matters more than usual here: your answer becomes spreadsheet cells with real number formatting and totals, which makes an uncertain figure look authoritative. Prefer a clearly-labelled estimate or omitting the number over a precise-looking invented one."
           : ""),
     );
   }
@@ -334,19 +411,19 @@ export const buildDocumentSystemNote = (
   if (!opts.sourceAlreadyExists) {
     // The answer IS the document. Write it out in full.
     lines.push(
-      "The document is built from the answer you are about to write, so write the full content the user asked for as normal prose — that text becomes the document.",
+      "The document is built from the answer you are about to write, so write the full content the user asked for as normal prose that text becomes the document.",
     );
   } else if (intent.intent === "REPLACE") {
     // The material already exists (the user pasted it, or it is the previous
     // answer) AND nothing else was asked. Restating it here would bill the
-    // user twice for the same content — once to stream it, once to render it.
+    // user twice for the same content once to stream it, once to render it.
     lines.push(
-      "The document is built from material that ALREADY EXISTS — the user's own pasted text, or your previous answer. The pipeline has it in full. Restating it would bill the user twice for the same content, once to stream it and once to render it.",
+      "The document is built from material that ALREADY EXISTS the user's own pasted text, or your previous answer. The pipeline has it in full. Restating it would bill the user twice for the same content, once to stream it and once to render it.",
       "Reply with a single short sentence confirming the document is being prepared, and nothing else. Do not summarise, restructure, preview or comment on the material.",
     );
   } else {
     // AUGMENT: a real question was asked alongside the file request, so the
-    // answer still has to happen — it just must not parrot the source back.
+    // answer still has to happen it just must not parrot the source back.
     lines.push(
       "The document is built from material that already exists (the user's pasted text or your previous answer), so do not reproduce that material in your reply. Answer only the additional question the user actually asked.",
     );

@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { sendResponse } from "@/utils/responseUtils.js";
 import STATUS_CODES from "@/utils/statusCodes.js";
 import ChatService from "./chat.service.js";
+import prisma from "@root/prisma.js";
+import { GUEST_LIMITS, GUEST_RESTRICTED_CODE } from "@/modules/guest/guest.config.js";
 import {
   validateCreateChatSchema,
   validateUpdateChatSchema,
@@ -21,7 +23,23 @@ export const createChat = async (
       sendResponse(res, false, error, error.message, STATUS_CODES.BAD_REQUEST);
       return;
     }
-    const result = await chatService.create(req.user!.id, value);
+    let body = value;
+    if (req.user!.role === "GUEST") {
+      // Trial chats are plain text chats: no projects, personas or capabilities.
+      const chatCount = await prisma.chat.count({
+        where: { userId: req.user!.id, isDeleted: false },
+      });
+      if (chatCount >= GUEST_LIMITS.maxChats) {
+        res.status(STATUS_CODES.FORBIDDEN).json({
+          status: false,
+          code: GUEST_RESTRICTED_CODE,
+          message: "Sign up to start more chats.",
+        });
+        return;
+      }
+      body = { title: value.title, modelIds: value.modelIds };
+    }
+    const result = await chatService.create(req.user!.id, body);
     sendResponse(
       res,
       true,

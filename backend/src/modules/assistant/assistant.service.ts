@@ -51,6 +51,7 @@ const assistantSelectWithModel = {
   slug: true,
   description: true,
   icon: true,
+  kind: true,
   bgFrom: true,
   bgVia: true,
   bgTo: true,
@@ -102,6 +103,7 @@ class AssistantService {
           slug: createInternalSlug(data.name),
           description: data.description ?? null,
           icon: data.icon ?? "Bot",
+          kind: data.kind ?? "SPECIALIST",
           ...(canPersistGradient
             ? {
                 bgFrom: data.bgFrom ?? null,
@@ -127,6 +129,7 @@ class AssistantService {
           slug: createInternalSlug(data.name),
           description: data.description ?? null,
           icon: data.icon ?? "Bot",
+          kind: data.kind ?? "SPECIALIST",
           systemPrompt: data.systemPrompt,
           defaultModelId: data.defaultModelId ?? null,
           temperature: data.temperature ?? 0.7,
@@ -145,7 +148,10 @@ class AssistantService {
     const { where, orderBy } = buildPrismaQuery({
       query,
       searchFields: [{ field: "name" }, { field: "description" }],
-      filterFields: [{ key: "isActive", field: "isActive", type: "boolean" }],
+      filterFields: [
+        { key: "isActive", field: "isActive", type: "boolean" },
+        { key: "kind", field: "kind", type: "enum", enumValues: ["SPECIALIST", "AGENT"] },
+      ],
       sortFields: [
         { key: "createdAt", field: "createdAt" },
         { key: "name", field: "name" },
@@ -209,10 +215,20 @@ class AssistantService {
   async update(assistantId: number, data: UpdateAssistantBody) {
     const assistant = await prisma.assistant.findFirst({
       where: { id: assistantId, isDeleted: false },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
     if (!assistant) {
       throw new ApiError("Assistant not found", STATUS_CODES.NOT_FOUND);
+    }
+    if (
+      assistant.slug === CODE_ASSISTANT_SLUG &&
+      data.kind !== undefined &&
+      data.kind !== "AGENT"
+    ) {
+      throw new ApiError(
+        "Software Engineer must stay an agent",
+        STATUS_CODES.BAD_REQUEST,
+      );
     }
 
     if (data.defaultModelId) {
@@ -230,6 +246,7 @@ class AssistantService {
     if (data.description !== undefined)
       updateData.description = data.description;
     if (data.icon !== undefined) updateData.icon = data.icon;
+    if (data.kind !== undefined) updateData.kind = data.kind;
     if (canPersistGradient && data.bgFrom !== undefined)
       updateData.bgFrom = data.bgFrom;
     if (canPersistGradient && data.bgVia !== undefined)

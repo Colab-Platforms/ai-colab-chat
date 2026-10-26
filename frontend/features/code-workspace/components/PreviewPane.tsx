@@ -89,7 +89,7 @@ export function PreviewPane({
               // in place, and can leave the iframe pointed at an ephemeral
               // preview URL the VM already tore down ("page might be down").
               // The header's "Reload preview" (CodePanelHeader) does a full
-              // SandpackProvider remount instead — slower, but it always gets a
+              // SandpackProvider remount instead slower, but it always gets a
               // consistent fresh VM + URL, so that's the only reload path we expose.
               showRefreshButton={false}
               showRestartButton={false}
@@ -106,7 +106,7 @@ export function PreviewPane({
               <button
                 type="button"
                 className="ml-auto shrink-0 underline-offset-2 hover:text-foreground hover:underline"
-                title="Runs the project's real Vite dev server in the browser — slower to start, but exactly like running it locally"
+                title="Runs the project's real Vite dev server in the browser slower to start, but exactly like running it locally"
                 onClick={() => onForceViteChange(true)}
               >
                 Looks wrong? Run with Vite

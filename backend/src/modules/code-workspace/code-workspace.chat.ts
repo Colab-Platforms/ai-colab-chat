@@ -27,13 +27,13 @@ import {
  * Bridge between the chat stream (chat.stream.ts) and the code workspace.
  * The chat stream calls, in order:
  *
- *   1. resolveCodeChatType()  — turn the "CODE" pill into a flag
- *   2. prepareCodeTurn()      — before the token budget: intent + prompt blocks
+ *   1. resolveCodeChatType()  turn the "CODE" pill into a flag
+ *   2. prepareCodeTurn()      before the token budget: intent + prompt blocks
  *   3. injectCodeTurnMessages()
- *   4. CodeSession.start()    — after SSE headers are sent: project row + code_project event
- *   5. session.push(delta)    — for every model delta (instead of a `token` event)
- *   6. session.closeStream()  — stream over; visible text for the chat bubble
- *   7. session.complete()     — after the ModelResponse row exists: version snapshot + code_done
+ *   4. CodeSession.start()    after SSE headers are sent: project row + code_project event
+ *   5. session.push(delta)    for every model delta (instead of a `token` event)
+ *   6. session.closeStream()  stream over; visible text for the chat bubble
+ *   7. session.complete()     after the ModelResponse row exists: version snapshot + code_done
  *
  * Billing, wallet checks and message rows stay entirely in chat.stream.ts.
  */
@@ -57,7 +57,7 @@ export interface CodeTurn {
   intent: CodeIntent;
   /** Existing project for EDIT/ASK; null for NEW. */
   projectId: number | null;
-  /** The stable protocol prompt — null for ASK turns, which answer in plain chat. */
+  /** The stable protocol prompt null for ASK turns, which answer in plain chat. */
   protocolPrompt: string | null;
   /**
    * Design brief for chats started from a website template — null otherwise,
@@ -69,7 +69,7 @@ export interface CodeTurn {
 }
 
 /**
- * Never throws — any failure leaves the turn as a normal chat turn.
+ * Never throws any failure leaves the turn as a normal chat turn.
  * Returns null for non-code turns (and always for non Software Engineer chats).
  */
 export async function prepareCodeTurn(params: {
@@ -167,7 +167,7 @@ export class CodeSession {
 
   /**
    * Creates (NEW) or reopens (EDIT) the project and tells the client to open
-   * the panel. Returns null for ASK turns — those stream as normal chat.
+   * the panel. Returns null for ASK turns those stream as normal chat.
    * Must run after the SSE headers are sent.
    */
   static async start(params: { res: Response; turn: CodeTurn; userId: number; chatId: number }): Promise<CodeSession | null> {
@@ -235,7 +235,7 @@ export class CodeSession {
 
   /**
    * Stream finished (or was stopped). Flushes the parser and returns the text
-   * that belongs in the chat bubble — never the raw tagged output.
+   * that belongs in the chat bubble never the raw tagged output.
    */
   async closeStream(): Promise<string> {
     if (!this.closed) {
@@ -245,7 +245,7 @@ export class CodeSession {
       if (!this.parser.visibleText) {
         const count = this.parser.writtenPaths.length;
         this.fallbackText = count
-          ? `${this.isNew ? "Created" : "Updated"} **${this.title}** — ${count} file${count === 1 ? "" : "s"} ${this.isNew ? "written" : "changed"}.`
+          ? `${this.isNew ? "Created" : "Updated"} **${this.title}** ${count} file${count === 1 ? "" : "s"} ${this.isNew ? "written" : "changed"}.`
           : this.deletedPaths.size
             ? `Removed ${this.deletedPaths.size} file${this.deletedPaths.size === 1 ? "" : "s"} from **${this.title}**.`
             : "";

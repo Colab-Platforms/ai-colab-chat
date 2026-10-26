@@ -20,7 +20,7 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ models, selected, onChange, maxModels }: ModelSelectorProps) {
-  const { restrictToFreeModels } = usePlanCapabilities();
+  const { isModelLocked } = usePlanCapabilities();
   const isSingle = maxModels === 1;
 
   const toggle = (modelId: number) => {
@@ -45,7 +45,7 @@ export function ModelSelector({ models, selected, onChange, maxModels }: ModelSe
       <div className="flex gap-1.5 overflow-x-auto scrollbar-none py-1">
         {models.map((model) => {
           const isSelected = selected.includes(model.id);
-          const isLocked = restrictToFreeModels && !model.isFreeModel;
+          const isLocked = isModelLocked(model);
           const button = (
             <button
               key={model.id}

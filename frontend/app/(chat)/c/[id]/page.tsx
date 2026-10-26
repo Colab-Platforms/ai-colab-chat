@@ -22,6 +22,7 @@ import {
 } from "@/features/code-workspace";
 import * as LucideIcons from "lucide-react";
 import { Bot, Sparkles, MessageSquare } from "lucide-react";
+import { flushMindmapEdits } from "@/components/chat/mindmap/mindmap-autosave-registry";
 
 const SUGGESTED_PROMPTS = [
   { text: "Brainstorm ideas for...", value: "Brainstorm ideas for ", icon: Sparkles, className: "w-3.5 h-3.5 inline mr-2" },
@@ -131,7 +132,7 @@ export default function ChatPage() {
         if (!cancelled && res.data?.data?.items) setVideos(res.data.data.items);
       })
       .catch(() => {
-        /* no videos yet, or a transient failure — either way, start empty */
+        /* no videos yet, or a transient failure either way, start empty */
       });
     return () => {
       cancelled = true;
@@ -260,7 +261,11 @@ export default function ChatPage() {
         return incoming.map((bm: Message) => {
           const existing = cleanPrev.find((pm) => pm.id === bm.id);
           if (existing) {
-            return { ...existing, ...bm };
+            const merged = { ...existing, ...bm };
+            if (existing.modelResponses?.length && !bm.modelResponses?.length) {
+              merged.modelResponses = existing.modelResponses;
+            }
+            return merged;
           }
           return bm;
         });
@@ -344,62 +349,70 @@ export default function ChatPage() {
       setModels(activeModels);
       modelsRef.current = activeModels;
       
-      // Only apply default model logic if:
-      // 1. Models haven't been restored from DB yet (for new chats)
-      // 2. OR we have no selections yet AND we are sure we are not waiting for fetchChat
-      if (activeModels.length > 0 && selectedModelsRef.current.length === 0 && !modelsRestoredRef.current) {
+      // Default model for a chat that has none yet. Pure (no state writes) so
+      // the pending first message below can use it however the race with
+      // fetchChat resolves.
+      const pickDefaultModelIds = (): number[] => {
         const storedModelId = localStorage.getItem("preferredModelId");
         const parsedId = storedModelId ? Number(storedModelId) : null;
-        
-        let resolvedModelIds: number[];
-        if (parsedId && activeModels.find((m: any) => m.id === parsedId)) {
-          resolvedModelIds = [parsedId];
-        } else {
-          const defaultModels = activeModels.filter((m: any) => m.defaultForCapabilities?.includes("STANDARD"));
-          resolvedModelIds = defaultModels.length > 0
-            ? defaultModels.map((m: any) => m.id)
-            : [activeModels[0].id];
-        }
-        setSelectedModels(resolvedModelIds);
+        if (parsedId && activeModels.find((m: any) => m.id === parsedId)) return [parsedId];
+        const defaultModels = activeModels.filter((m: any) => m.defaultForCapabilities?.includes("STANDARD"));
+        return defaultModels.length > 0 ? defaultModels.map((m: any) => m.id) : [activeModels[0].id];
+      };
 
-        if (!firstMessageSent.current) {
-          const raw = sessionStorage.getItem(`pending_chat_${chatId}`);
-          if (raw) {
-            firstMessageSent.current = true;
-            sessionStorage.removeItem(`pending_chat_${chatId}`);
-            try {
-              const { content, modelIds, chatType, attachmentIds, attachmentObjects, documentFormat, documentTheme } = JSON.parse(raw);
-              documentOptionsRef.current = documentFormat
-                ? { documentFormat, ...(documentTheme ? { documentTheme } : {}) }
-                : null;
-              const targetIds = Array.isArray(modelIds) && modelIds.length > 0 ? modelIds : resolvedModelIds;
-              setSelectedModels(targetIds);
-              void (async () => {
-                const pendingCtx = localStorage.getItem("pending_new_chat_context_ids");
-                if (pendingCtx) {
-                  try {
-                    const parsed = JSON.parse(pendingCtx);
-                    if (Array.isArray(parsed) && parsed.length > 0) {
-                      const contextIds = parsed
-                        .map((id: unknown) => Number(id))
-                        .filter((id: number) => !Number.isNaN(id));
-                      if (contextIds.length > 0) {
-                        try {
-                          await chatService.replaceContexts(chatId, contextIds);
-                          localStorage.removeItem("pending_new_chat_context_ids");
-                        } catch {
-                          /* still send; stream may apply default contexts */
-                        }
+      // Only apply default model logic if models haven't been restored from the
+      // DB yet and nothing is selected.
+      let resolvedModelIds: number[] | null = null;
+      if (activeModels.length > 0 && selectedModelsRef.current.length === 0 && !modelsRestoredRef.current) {
+        resolvedModelIds = pickDefaultModelIds();
+        setSelectedModels(resolvedModelIds);
+      }
+
+      // The first message handed over from /documents, /image-studio or the new
+      // chat page must be sent whenever models are available. It used to live
+      // inside the default-model branch above, so if fetchChat finished first
+      // (it sets modelsRestoredRef) the branch was skipped and the message was
+      // never sent: the user saw their own message and no reply.
+      if (activeModels.length > 0 && !firstMessageSent.current) {
+        const raw = sessionStorage.getItem(`pending_chat_${chatId}`);
+        if (raw) {
+          firstMessageSent.current = true;
+          sessionStorage.removeItem(`pending_chat_${chatId}`);
+          try {
+            const { content, modelIds, chatType, attachmentIds, attachmentObjects, documentFormat, documentTheme } = JSON.parse(raw);
+            documentOptionsRef.current = documentFormat
+              ? { documentFormat, ...(documentTheme ? { documentTheme } : {}) }
+              : null;
+            const fallbackIds =
+              resolvedModelIds ??
+              (selectedModelsRef.current.length > 0 ? selectedModelsRef.current : pickDefaultModelIds());
+            const targetIds = Array.isArray(modelIds) && modelIds.length > 0 ? modelIds : fallbackIds;
+            setSelectedModels(targetIds);
+            void (async () => {
+              const pendingCtx = localStorage.getItem("pending_new_chat_context_ids");
+              if (pendingCtx) {
+                try {
+                  const parsed = JSON.parse(pendingCtx);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    const contextIds = parsed
+                      .map((id: unknown) => Number(id))
+                      .filter((id: number) => !Number.isNaN(id));
+                    if (contextIds.length > 0) {
+                      try {
+                        await chatService.replaceContexts(chatId, contextIds);
+                        localStorage.removeItem("pending_new_chat_context_ids");
+                      } catch {
+                        /* still send; stream may apply default contexts */
                       }
                     }
-                  } catch {
-                    /* ignore malformed localStorage */
                   }
+                } catch {
+                  /* ignore malformed localStorage */
                 }
-                sendMessage(content, attachmentIds, targetIds, chatType, attachmentObjects);
-              })();
-            } catch { /* ignore */ }
-          }
+              }
+              sendMessage(content, attachmentIds, targetIds, chatType, attachmentObjects);
+            })();
+          } catch { /* ignore */ }
         }
       }
     } catch { /* ignore */ }
@@ -607,7 +620,7 @@ export default function ChatPage() {
                 );
               } else if (parsed.type === "document_started") {
                 // Generation outlives this SSE connection, so we only attach a
-                // PENDING placeholder here — DocumentCard polls it to completion
+                // PENDING placeholder here DocumentCard polls it to completion
                 // on its own, leaving the user free to keep chatting.
                 setMessages((prev) =>
                   prev.map((msg) =>
@@ -790,7 +803,7 @@ export default function ChatPage() {
     try {
       const controller = createStreamAbortController();
       if (isUnpersisted) {
-        // Nothing was ever saved for this turn — resend fresh, reusing the
+        // Nothing was ever saved for this turn resend fresh, reusing the
         // same local bubble ids so the UI doesn't jump.
         await streamSingleModel(
           newModelId,
@@ -879,6 +892,9 @@ export default function ChatPage() {
 
   const sendMessage = async (content: string, attachmentIds?: number[], modelIds?: number[], chatType?: string, attachmentObjects?: any[]) => {
     if (isSending) return;
+    // A follow-up like "add more use cases" revises the STORED mind map on the
+    // server, so edits still waiting on the autosave debounce must land first.
+    await flushMindmapEdits();
     stopRequestedRef.current = false;
     clearStreamAbortControllers();
     setIsSending(true);
@@ -891,7 +907,7 @@ export default function ChatPage() {
       setIsStreaming(false);
       return;
     }
-    // "CODE" (code-workspace pill) is sent for this turn only — it is not a
+    // "CODE" (code-workspace pill) is sent for this turn only it is not a
     // capability and must not be saved on the chat.
     const capability = chatType === "CODE" ? "STANDARD" : chatType;
     if (capability) {
@@ -1035,7 +1051,7 @@ export default function ChatPage() {
         syncChatAfterStop();
       } else if (err.code === "INSUFFICIENT_BALANCE" || err.code === "PLAN_RESTRICTED") {
         // Nothing was persisted server-side yet (the balance check runs
-        // before the turn's messages are created) — keep the local bubble
+        // before the turn's messages are created) keep the local bubble
         // so the user can still choose to switch to a free model or upgrade.
         setMessages((prev) =>
           prev.map((msg) =>
@@ -1694,7 +1710,7 @@ export default function ChatPage() {
         onGenerateVideoClick={() => setVideoDialogOpen(true)}
         onEnhancePrompt={handleEnhancePrompt}
         // Also "sending" while the server is still generating a reply this page
-        // did not start (came back after leaving) — so the Stop button shows.
+        // did not start (came back after leaving) so the Stop button shows.
         isSending={isSending || awaitingServerResult}
         onStopStreaming={stopStreaming}
         initialPrompt={initialPrompt}

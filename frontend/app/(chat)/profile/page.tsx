@@ -44,7 +44,7 @@ export default function DashboardPage() {
         setChartDays(data?.chartDays ?? 30);
         setDailyByModel(Array.isArray(data?.dailyByModel) ? data.dailyByModel : []);
       } catch {
-        // silently swallow — UI shows zeros
+        // silently swallow UI shows zeros
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
   const chartDescription = wallet?.currentPeriodStart
     ? "Total tokens per day by model since your current plan renewed (UTC)."
-    : `Total tokens per day by model — last ${chartDays} days (UTC).`;
+    : `Total tokens per day by model last ${chartDays} days (UTC).`;
 
   return (
     <div>
@@ -169,14 +169,14 @@ export default function DashboardPage() {
         </SettingsCard>
       )}
 
-      {/* Graph 1 — the original per-model line chart, unchanged */}
+      {/* Graph 1 the original per-model line chart, unchanged */}
       <SettingsCard className="mt-4 p-5">
         <h2 className="text-sm font-semibold">Usage by model</h2>
         <p className="mb-4 mt-0.5 text-xs text-muted-foreground">{chartDescription}</p>
         <ModelUsageLineChart rows={dailyByModel} days={chartDays} />
       </SettingsCard>
 
-      {/* Graphs 2 and 3 — daily totals and each model's share */}
+      {/* Graphs 2 and 3 daily totals and each model's share */}
       <div className="mt-4 space-y-4">
         <SettingsCard className="p-5">
           <h2 className="text-sm font-semibold">Daily tokens</h2>

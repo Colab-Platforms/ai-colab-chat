@@ -79,7 +79,7 @@ export const getInstallUrl = handle("install url", async (req) => ({
   message: "Install URL created",
 }));
 
-/** PUBLIC — Vercel redirects the popup here with no Bearer token. Always redirects, never renders JSON. */
+/** PUBLIC Vercel redirects the popup here with no Bearer token. Always redirects, never renders JSON. */
 export async function callback(req: Request, res: Response): Promise<void> {
   // helmet() defaults COOP to same-origin, which can sever window.opener on the
   // way back to our landing page. popupChannel's BroadcastChannel covers that,
@@ -154,7 +154,7 @@ async function streamStarted(res: Response, start: () => Promise<vercelService.S
   }
 }
 
-/** POST /projects/:projectId/deploy — creates the deployment, then streams its build. */
+/** POST /projects/:projectId/deploy creates the deployment, then streams its build. */
 export async function deploy(req: Request, res: Response): Promise<void> {
   await streamStarted(
     res,
@@ -166,7 +166,7 @@ export async function deploy(req: Request, res: Response): Promise<void> {
   );
 }
 
-/** POST /projects/:projectId/redeploy — same settings as last time. */
+/** POST /projects/:projectId/redeploy same settings as last time. */
 export async function redeploy(req: Request, res: Response): Promise<void> {
   await streamStarted(
     res,
@@ -178,7 +178,7 @@ export async function redeploy(req: Request, res: Response): Promise<void> {
   );
 }
 
-/** POST /projects/:projectId/deploy/:deploymentId/logs — re-attach to a deploy (refresh, second tab, View logs). */
+/** POST /projects/:projectId/deploy/:deploymentId/logs re-attach to a deploy (refresh, second tab, View logs). */
 export async function logs(req: Request, res: Response): Promise<void> {
   let attach: Awaited<ReturnType<typeof vercelService.prepareAttach>>;
   try {

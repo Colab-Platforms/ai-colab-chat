@@ -8,7 +8,7 @@ import { VERCEL_API, VERCEL_WEB, type VercelConfig } from "./vercel.types.js";
  *
  * Much smaller than github.app.ts: a Vercel Integration hands out one
  * long-lived Bearer token per installation. There is no app JWT, no
- * installation token and no refresh flow — a token Vercel rejects means the
+ * installation token and no refresh flow a token Vercel rejects means the
  * user has to reconnect.
  *
  * Nothing here runs at module load: the server must boot fine before the
@@ -27,7 +27,7 @@ function missingEnv(): string[] {
   return REQUIRED_ENV.filter((key) => !process.env[key]?.trim());
 }
 
-/** Cheap, never throws — drives `configured` in the status endpoint. */
+/** Cheap, never throws drives `configured` in the status endpoint. */
 export function isVercelConfigured(): boolean {
   return missingEnv().length === 0 && isEncryptionConfigured();
 }
@@ -83,7 +83,7 @@ export async function exchangeCodeForToken(code: string): Promise<VercelTokenRes
       signal: AbortSignal.timeout(30_000),
     });
   } catch {
-    throw new ApiError("Could not reach Vercel — try connecting again", STATUS_CODES.BAD_REQUEST);
+    throw new ApiError("Could not reach Vercel try connecting again", STATUS_CODES.BAD_REQUEST);
   }
 
   const body = (await response.json().catch(() => ({}))) as Partial<VercelTokenResponse> & {
@@ -108,7 +108,7 @@ export async function exchangeCodeForToken(code: string): Promise<VercelTokenRes
 }
 
 /** The error every "the user must reconnect Vercel" path throws. */
-export function reauthError(message = "Your Vercel authorization is no longer valid — reconnect Vercel") {
+export function reauthError(message = "Your Vercel authorization is no longer valid reconnect Vercel") {
   // 409, never 401: a 401 from our API logs the user out of the whole app
   // (frontend/lib/api.ts), and a dead Vercel token is not a dead app session.
   return Object.assign(new ApiError(message, STATUS_CODES.CONFLICT), {
@@ -123,12 +123,12 @@ export function encryptToken(token: string): string {
 
 /** The decrypted token. Throws VERCEL_REAUTH when it is missing or unreadable. */
 export function getAccessToken(connection: { accessTokenEnc: string | null }): string {
-  if (!connection.accessTokenEnc) throw reauthError("Your Vercel authorization is missing — reconnect Vercel");
+  if (!connection.accessTokenEnc) throw reauthError("Your Vercel authorization is missing reconnect Vercel");
   try {
     return decrypt(connection.accessTokenEnc);
   } catch {
     // decrypt() throws a 401 ApiError (key changed or ciphertext tampered); remap it
     // so it can't log the user out of the app.
-    throw reauthError("Your stored Vercel authorization could not be read — reconnect Vercel");
+    throw reauthError("Your stored Vercel authorization could not be read reconnect Vercel");
   }
 }

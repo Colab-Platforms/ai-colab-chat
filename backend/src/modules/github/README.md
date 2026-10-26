@@ -2,7 +2,7 @@
 
 Mirrors a `CodeProject` to a GitHub repository. **One `CodeProjectVersion` == one commit**, so the in-app version history and the repo's git history line up 1:1.
 
-Publishing a project to a live URL is a separate module — see `../vercel/README.md`, which can deploy either from a repo linked here or straight from the `CodeFile` rows.
+Publishing a project to a live URL is a separate module see `../vercel/README.md`, which can deploy either from a repo linked here or straight from the `CodeFile` rows.
 
 GitHub is a *mirror, never the source of truth*: `CodeFile` rows stay authoritative, and the whole feature is optional. A server without credentials, a user without a connection, and a project without a link all behave exactly as they did before this module existed.
 
@@ -20,8 +20,8 @@ Filling the vars in later switches the feature on with no code change.
 ## Setup
 
 1. Create a GitHub App at **Settings → Developer settings → GitHub Apps → New**.
-2. Repository permissions: **Contents: Read & write**, **Metadata: Read**. To let the "Create new" tab make repositories, also grant **Repository creation** (preferred — narrow) or **Administration: Read & write** (broader: it also allows changing/deleting repo settings). Without it `POST /user/repos` answers `403 Resource not accessible by integration` and only "Select existing" works. After changing permissions, each installation must accept the update at `github.com/settings/installations/<id>`.
-3. Check **"Request user authorization (OAuth) during installation"** — required, or the callback gets no `code` and creating repositories is impossible.
+2. Repository permissions: **Contents: Read & write**, **Metadata: Read**. To let the "Create new" tab make repositories, also grant **Repository creation** (preferred narrow) or **Administration: Read & write** (broader: it also allows changing/deleting repo settings). Without it `POST /user/repos` answers `403 Resource not accessible by integration` and only "Select existing" works. After changing permissions, each installation must accept the update at `github.com/settings/installations/<id>`.
+3. Check **"Request user authorization (OAuth) during installation"** required, or the callback gets no `code` and creating repositories is impossible.
 4. Callback URL **and** Setup URL → `GITHUB_CALLBACK_URL`.
 5. Subscribe to the `installation` and `installation_repositories` events, webhook URL `…/api/github/webhook`.
 6. Generate a private key, then fill `backend/.env`:
@@ -48,7 +48,7 @@ For local development the callback must be reachable from GitHub, so point it at
 | Installation (`ghs_`) | `POST /app/installations/{id}/access_tokens` | 1 h, cached in-process, re-minted | all git data ops |
 | User-to-server (`ghu_`) | `code` → `POST /login/oauth/access_token` | 8 h + refresh, or permanent | `GET /user/installations`, listing and **creating** repos |
 
-Creating a repo on a user account is impossible with an installation token — hence the user token. Both user tokens are AES-256-GCM encrypted at rest (`utils/crypto.ts`) and never leave the server.
+Creating a repo on a user account is impossible with an installation token hence the user token. Both user tokens are AES-256-GCM encrypted at rest (`utils/crypto.ts`) and never leave the server.
 
 ## Push (`github.sync.ts`)
 
@@ -71,7 +71,7 @@ Local state is never lost: `snapshotUserEditsIfDirty()` runs first, then files a
 
 ## Auto-commit
 
-`CodeSession.complete()` (`code-workspace.chat.ts`) calls `pushAfterAiTurn()` **after** the `code_done` SSE and without awaiting it — a slow or failing GitHub call must never delay or break the chat stream. Failures land on `GithubRepoLink.syncState` / `lastError`, which the header button polls.
+`CodeSession.complete()` (`code-workspace.chat.ts`) calls `pushAfterAiTurn()` **after** the `code_done` SSE and without awaiting it a slow or failing GitHub call must never delay or break the chat stream. Failures land on `GithubRepoLink.syncState` / `lastError`, which the header button polls.
 
 Manual editor edits do **not** auto-commit; the Push button snapshots them as a `USER` version and commits that.
 

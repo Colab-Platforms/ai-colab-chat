@@ -4,8 +4,8 @@
  * `window.opener.postMessage` alone is not reliable: once the popup has been to
  * github.com, browsers may sever the opener link (cross-origin-opener-policy,
  * site isolation, privacy settings), leaving `window.opener === null` on the way
- * back. A BroadcastChannel needs no opener — any same-origin window can receive
- * it — so it is the primary path, with `postMessage` kept as a fallback.
+ * back. A BroadcastChannel needs no opener any same-origin window can receive
+ * it so it is the primary path, with `postMessage` kept as a fallback.
  * Messages carry an id so a result delivered on both paths is handled once.
  */
 
@@ -32,14 +32,14 @@ export function postPopupResult(result: GithubPopupResult): void {
     channel.postMessage(message);
     channel.close();
   } catch {
-    // BroadcastChannel unavailable — the opener path below may still work.
+    // BroadcastChannel unavailable the opener path below may still work.
   }
 
   try {
     const opener = window.opener as Window | null;
     if (opener && !opener.closed) opener.postMessage(message, window.location.origin);
   } catch {
-    // Opener was severed or is cross-origin — nothing more to try.
+    // Opener was severed or is cross-origin nothing more to try.
   }
 }
 

@@ -28,9 +28,13 @@ import studioTemplateRoutes from "@/modules/studio-template/studio-template.rout
 import websiteTemplateRoutes from "@/modules/website-template/website-template.route.js";
 import voiceRoutes from "@/modules/voice/voice.route.js";
 import adminRoutes from "@/modules/admin/admin.route.js";
+import orgAdminRoutes from "@/modules/org/org.admin.route.js";
+import orgRoutes from "@/modules/org/org.route.js";
 import codeWorkspaceRoutes from "@/modules/code-workspace/code-workspace.route.js";
 import githubRoutes from "@/modules/github/github.route.js";
 import vercelRoutes from "@/modules/vercel/vercel.route.js";
+import guestRoutes from "@/modules/guest/guest.route.js";
+import promptSuggestionRoutes from "@/modules/prompt-suggestion/prompt-suggestion.route.js";
 
 
 
@@ -74,8 +78,12 @@ router.use("/videos", videoRoutes);
 router.use("/images", imageRoutes);
 router.use("/voice", voiceRoutes);
 router.use("/admin", adminRoutes);
+router.use("/admin/orgs", orgAdminRoutes);
+router.use("/org", orgRoutes);
 router.use("/code-projects", codeWorkspaceRoutes);
 router.use("/github", githubRoutes);
 router.use("/vercel", vercelRoutes);
+router.use("/guest", guestRoutes);
+router.use("/prompt-suggestions", promptSuggestionRoutes);
 
 export default router;

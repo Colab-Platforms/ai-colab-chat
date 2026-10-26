@@ -21,7 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Plus, Search, Star, AudioLines, FolderArchive, Folder, SquarePen, FileText, ImageIcon, Clapperboard, type LucideIcon } from "lucide-react";
+import { Plus, Search, Star, AudioLines, FolderArchive, Folder, SquarePen, FileText, ImageIcon, Clapperboard, Bot, Headset, type LucideIcon } from "lucide-react";
 import { chatService, folderService } from "@/lib/services";
 import { getRouteUiSnapshot, subscribeRouteUi, useIsStarredRoute, useIsVoiceRoute, useIsAssetsRoute, useIsProjectsRoute, useActiveStudio } from "@/lib/route-ui-store";
 import { toast } from "@/lib/toast";
@@ -129,7 +129,8 @@ function SidebarInner({
   const activeStudio = useActiveStudio();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState(searchQuery);
-  const [assistantsExpanded, setAssistantsExpanded] = useState(false);
+  const [specialistsExpanded, setSpecialistsExpanded] = useState(false);
+  const [agentsExpanded, setAgentsExpanded] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -141,9 +142,11 @@ function SidebarInner({
     try {
       const raw = localStorage.getItem(TOP_ACCORDION_STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<{ assistantsExpanded: boolean }>;
+      const parsed = JSON.parse(raw) as Partial<{ assistantsExpanded: boolean; specialistsExpanded: boolean; agentsExpanded: boolean }>;
 
-      if (typeof parsed.assistantsExpanded === "boolean") setAssistantsExpanded(parsed.assistantsExpanded);
+      const specialists = parsed.specialistsExpanded ?? parsed.assistantsExpanded;
+      if (typeof specialists === "boolean") setSpecialistsExpanded(specialists);
+      if (typeof parsed.agentsExpanded === "boolean") setAgentsExpanded(parsed.agentsExpanded);
     } catch {
       // ignore invalid localStorage payload
     } finally {
@@ -156,12 +159,12 @@ function SidebarInner({
     try {
       localStorage.setItem(
         TOP_ACCORDION_STORAGE_KEY,
-        JSON.stringify({ assistantsExpanded }),
+        JSON.stringify({ specialistsExpanded, agentsExpanded }),
       );
     } catch {
       // ignore quota / private browsing errors
     }
-  }, [hasHydratedTopAccordion, assistantsExpanded]);
+  }, [hasHydratedTopAccordion, specialistsExpanded, agentsExpanded]);
 
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
@@ -170,6 +173,9 @@ function SidebarInner({
   const [pendingMoveNewFolderId, setPendingMoveNewFolderId] = useState<number | null>(null);
   const sidebarRenderCountRef = useRef(0);
   const chatFolderByIdRef = useRef<Map<number, number | null>>(new Map());
+
+  const specialists = useMemo(() => assistants.filter((a) => a.kind !== "AGENT"), [assistants]);
+  const agents = useMemo(() => assistants.filter((a) => a.kind === "AGENT"), [assistants]);
 
   const safeFolders = useMemo(() => (Array.isArray(folders) ? folders : []), [folders]);
   const [localFolders, setLocalFolders] = useState<FolderItem[]>(safeFolders);
@@ -191,7 +197,7 @@ function SidebarInner({
         setTimeout(() => searchInputRef.current?.focus(), 0);
       }
     };
-    const onOpenAssistants = () => setAssistantsExpanded(true);
+    const onOpenAssistants = () => setSpecialistsExpanded(true);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("ai-colab:open-assistants", onOpenAssistants);
     return () => {
@@ -557,11 +563,23 @@ function SidebarInner({
           <NavRow icon={Folder} label="Projects" active={isProjectsRoute} onClick={() => { onMobileClose(); router.push("/projects"); }} />
 
           <AssistantsSection
-            assistants={assistants}
-            assistantsExpanded={assistantsExpanded}
-            setAssistantsExpanded={setAssistantsExpanded}
+            title="Specialists"
+            icon={Headset}
+            guideId="assistants"
+            assistants={specialists}
+            assistantsExpanded={specialistsExpanded}
+            setAssistantsExpanded={setSpecialistsExpanded}
             assistantsHasMore={assistantsHasMore}
             onLoadMoreAssistants={onLoadMoreAssistants}
+            onAssistantSelected={handleAssistantSelected}
+          />
+          <AssistantsSection
+            title="Agents"
+            icon={Bot}
+            guideId="agents"
+            assistants={agents}
+            assistantsExpanded={agentsExpanded}
+            setAssistantsExpanded={setAgentsExpanded}
             onAssistantSelected={handleAssistantSelected}
           />
 

@@ -3,7 +3,7 @@
  *
  * A generation used to be aborted whenever the browser connection dropped,
  * which made "the user pressed Stop" indistinguishable from "the user
- * navigated away / switched tab / lost network" — so leaving the page killed
+ * navigated away / switched tab / lost network" so leaving the page killed
  * a half-finished image. Now a dropped connection does NOT stop the job; only
  * an explicit stop request (`POST /chats/:chatId/stop`) aborts it, through this
  * registry. The finished answer is saved to the chat either way and is there

@@ -16,6 +16,7 @@ import {
   StudioHero,
   StudioTabs,
   TemplatesComingSoon,
+  TemplateStrip,
   type StudioTemplate,
 } from "@/components/studio/studio-parts";
 import {
@@ -108,6 +109,8 @@ export default function VideoStudioPage() {
       });
   }, []);
 
+  const pickTemplate = (t: StudioTemplate) => setActiveTemplate(t);
+
   const clearAudio = () => {
     draft.clearAudio();
     setAudioPlaying(false);
@@ -162,8 +165,8 @@ export default function VideoStudioPage() {
     } catch (err: any) {
       const response = err?.response?.data;
       const message: string = response?.message ?? err?.message ?? "Failed to start video generation";
-      if (response?.code === "PLAN_RESTRICTED") toast.error(`${message} — upgrade your plan to unlock this.`);
-      else if (message.toLowerCase().includes("insufficient")) toast.error(`${message} — top up your video credits.`);
+      if (response?.code === "PLAN_RESTRICTED") toast.error(`${message} upgrade your plan to unlock this.`);
+      else if (message.toLowerCase().includes("insufficient")) toast.error(`${message} top up your video credits.`);
       else toast.error(message);
       setBusy(false);
     }
@@ -387,11 +390,11 @@ export default function VideoStudioPage() {
           onChange={setTab}
         />
 
-        {/* Templates are hidden for now — restore the LinkAction + TemplateStrip when they launch. */}
+        {/* Always a grid (not the scrolling strip): the cards autoplay their clips, so keep few on screen. */}
         {tab === "templates" ? (
-          <TemplatesComingSoon variant="video" />
+          <TemplateStrip templates={templates} expanded variant="video" onPick={pickTemplate} />
         ) : mine.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">No videos yet — describe a shot above to make one.</p>
+          <p className="py-10 text-center text-sm text-muted-foreground">No videos yet describe a shot above to make one.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {mine.map((v) => (
@@ -433,7 +436,7 @@ export default function VideoStudioPage() {
         kind="video"
         busy={busy}
         photoDisabledReason={
-          model && !supportsImageToVideo ? `${model.name} can't start from a photo — choose another video model.` : null
+          model && !supportsImageToVideo ? `${model.name} can't start from a photo choose another video model.` : null
         }
         onOpenChange={(open) => !open && !busy && setActiveTemplate(null)}
         onSubmit={handleTemplateSubmit}

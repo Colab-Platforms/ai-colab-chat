@@ -3,7 +3,7 @@ import { auth } from "@/middlewares/authMiddleware.js";
 import * as controller from "./code-workspace.controller.js";
 
 // Mounted at /api/code-projects. Bodies here are exempt from the global xss
-// sanitizer (see middlewares/sanitize.ts) — they carry source code, which is
+// sanitizer (see middlewares/sanitize.ts) they carry source code, which is
 // only ever shown as editor text or run inside the sandboxed preview iframe.
 const router = Router();
 const authed = auth("USER", "ADMIN", "SUPERADMIN");

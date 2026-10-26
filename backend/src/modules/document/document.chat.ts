@@ -2,6 +2,7 @@ import prisma from "@root/prisma.js";
 import {
   buildDocumentSystemNote,
   detectDocumentIntent,
+  type ActiveDocument,
   type DocumentIntent,
 } from "./document.intent.js";
 import { runPendingDocumentJobs } from "./document.generation.service.js";
@@ -9,10 +10,12 @@ import { dlog, dlogBlock, dlogError } from "./document.logger.js";
 import { resolveRenderableFormat } from "./document.renderers.js";
 import {
   DOCUMENT_FORMATS,
-  DOCUMENT_THEMES,
+  DOCUMENT_THEMES_BY_FORMAT,
   MAX_SOURCE_TEXT_CHARS,
   MAX_TITLE_CHARS,
+  MINDMAP_THEMES,
   PPTX_TEMPLATES,
+  defaultThemeFor,
   type DocumentFormat,
 } from "./document.types.js";
 
@@ -33,13 +36,42 @@ export function parseRequestedDocumentOptions(
   const upper = format.toUpperCase() as DocumentFormat;
   if (!DOCUMENT_FORMATS.includes(upper)) return null;
   // `theme` names a PPTX template for decks and a document theme for the
-  // rest — an unknown or mismatched value is dropped, never passed on.
+  // rest an unknown or mismatched value is dropped, never passed on.
   const allowed: readonly string[] =
-    upper === "PPTX" ? PPTX_TEMPLATES : DOCUMENT_THEMES;
+    upper === "PPTX"
+      ? PPTX_TEMPLATES
+      : upper === "MINDMAP"
+        ? MINDMAP_THEMES
+        : DOCUMENT_THEMES_BY_FORMAT[upper as "PDF" | "DOCX" | "XLSX"] ?? DOCUMENT_THEMES_BY_FORMAT.PDF;
   return {
     format: upper,
     theme: typeof theme === "string" && allowed.includes(theme) ? theme : undefined,
   };
+}
+
+/**
+ * The latest finished document in this chat, i.e. what a follow-up like "add
+ * more use cases" would be editing.
+ *
+ * Only COMPLETED rows count: one still generating has no spec to revise, so a
+ * follow-up sent mid-generation falls back to a normal chat turn rather than
+ * queueing a revision of nothing. When several documents exist the newest wins,
+ * which also makes consecutive edits cumulative (each builds on the last).
+ */
+async function findActiveDocument(chatId: number): Promise<ActiveDocument | null> {
+  const row = await prisma.generatedDocument.findFirst({
+    where: { chatId, isDeleted: false, status: "COMPLETED" },
+    orderBy: { id: "desc" },
+    select: { id: true, format: true, title: true, theme: true },
+  });
+  return row
+    ? {
+        id: row.id,
+        format: row.format as DocumentFormat,
+        title: row.title,
+        theme: row.theme,
+      }
+    : null;
 }
 
 // Above this, a user message is carrying pasted material rather than just an
@@ -66,24 +98,30 @@ export const usesPastedSource = (userPrompt: string): boolean =>
  * The resolved intent is handed back to `maybeGenerateDocumentFromChat` after
  * the stream so the turn never pays for classification twice.
  *
- * Never throws — a failure here must leave the chat turn completely unchanged.
+ * Never throws a failure here must leave the chat turn completely unchanged.
  */
 export async function prepareDocumentTurn(params: {
   chatId: number;
   userPrompt: string;
   lastAssistantAnswer?: string | null;
-  /** The user chose a format explicitly — it overrides what the classifier infers. */
   requested?: RequestedDocumentOptions | null;
+  attachmentText?: string;
 }): Promise<{
   intent: DocumentIntent;
-  /** What will actually be rendered — may differ from `intent.format`. */
+  /** What will actually be rendered may differ from `intent.format`. */
   effectiveFormat: DocumentFormat;
   systemNote: string;
 } | null> {
   try {
+    // An explicit format pick means "make a new one", so it never edits.
+    const activeDocument = params.requested
+      ? null
+      : await findActiveDocument(params.chatId);
+
     let intent = await detectDocumentIntent(
       params.userPrompt,
       params.lastAssistantAnswer,
+      activeDocument,
     );
     if (params.requested) {
       // An explicit pick always yields a document, even when the wording of the
@@ -104,8 +142,12 @@ export async function prepareDocumentTurn(params: {
 
     // Length is the same signal the enqueue uses, so the note and the source
     // selection always agree about where the document's content comes from.
+    // An UPDATE's material is the existing document, which always exists.
     const sourceAlreadyExists =
-      intent.useLastAnswer || usesPastedSource(params.userPrompt);
+      intent.intent === "UPDATE" ||
+      intent.useLastAnswer ||
+      usesPastedSource(params.userPrompt) ||
+      Boolean(params.attachmentText?.trim());
 
     const { format: effectiveFormat, substituted } = resolveRenderableFormat(
       intent.format,
@@ -138,7 +180,7 @@ export async function prepareDocumentTurn(params: {
  * Bridges a finished chat turn into the document pipeline.
  *
  * The enqueue still runs AFTER the assistant answer is complete, because for
- * most requests the answer itself is the document's source material — "turn
+ * most requests the answer itself is the document's source material "turn
  * that into a PDF" has nothing to work from until the answer exists. Only the
  * *decision* moved earlier, into `prepareDocumentTurn`.
  *
@@ -152,6 +194,12 @@ export async function maybeGenerateDocumentFromChat(params: {
   modelResponseId?: number | null;
   userPrompt: string;
   assistantAnswer: string;
+  /**
+   * Text extracted from files attached to this turn. When present it IS the
+   * document's source: a user who attaches a PDF and asks for a mind map of it
+   * means the PDF, not the chat answer about it.
+   */
+  attachmentText?: string;
   theme?: string;
   /**
    * Intent already resolved by `prepareDocumentTurn` before the stream.
@@ -177,11 +225,11 @@ export async function maybeGenerateDocumentFromChat(params: {
   try {
     dlog(
       "chat:hook",
-      `turn complete chat=${chatId} message=${messageId} response=${modelResponseId ?? "-"} — checking document intent`,
+      `turn complete chat=${chatId} message=${messageId} response=${modelResponseId ?? "-"} checking document intent`,
     );
 
     if (params.intent === null) {
-      dlog("chat:hook", "pre-stream pass found no document intent — skipping");
+      dlog("chat:hook", "pre-stream pass found no document intent skipping");
       return null;
     }
 
@@ -189,17 +237,17 @@ export async function maybeGenerateDocumentFromChat(params: {
       params.intent ??
       (await detectDocumentIntent(userPrompt, assistantAnswer));
     if (intent.intent === "NONE") {
-      dlog("chat:hook", "no document requested — chat turn ends normally");
+      dlog("chat:hook", "no document requested chat turn ends normally");
       return null;
     }
     if (params.intent) {
       dlog(
         "chat:hook",
-        `reusing pre-stream intent ${intent.intent} — no second classifier call`,
+        `reusing pre-stream intent ${intent.intent} no second classifier call`,
       );
     }
 
-    // Guard against a duplicate document for the same model response — the
+    // Guard against a duplicate document for the same model response the
     // regenerate/edit paths can re-run over an assistant turn that already
     // produced one.
     if (modelResponseId) {
@@ -210,10 +258,57 @@ export async function maybeGenerateDocumentFromChat(params: {
       if (existing) {
         dlog(
           "chat:hook",
-          `skipped — document ${existing.id} already exists for response ${modelResponseId}`,
+          `skipped document ${existing.id} already exists for response ${modelResponseId}`,
         );
         return null;
       }
+    }
+
+    // A revision of the chat's current document: same format and theme, the
+    // worker revises its stored spec instead of generating from scratch. Done
+    // before the source-selection logic below, which is for NEW documents.
+    if (intent.intent === "UPDATE") {
+      const base = await findActiveDocument(chatId);
+      if (!base) {
+        dlog("chat:hook", "UPDATE intent but no completed document to revise skipping");
+        return null;
+      }
+
+      const revision = await prisma.generatedDocument.create({
+        data: {
+          userId,
+          chatId,
+          messageId,
+          modelResponseId: modelResponseId ?? null,
+          baseDocumentId: base.id,
+          format: base.format,
+          status: "PENDING",
+          title: base.title,
+          prompt: userPrompt.slice(0, 4000),
+          sourceText: null,
+          theme: base.theme,
+        },
+        select: { id: true, title: true, format: true },
+      });
+
+      dlogBlock("chat:enqueue", `revision ${revision.id} queued (of document ${base.id})`, {
+        documentId: revision.id,
+        baseDocumentId: base.id,
+        format: base.format,
+        theme: base.theme,
+        chatId,
+        messageId,
+        modelResponseId: modelResponseId ?? null,
+        promptChars: userPrompt.length,
+      });
+
+      void runPendingDocumentJobs();
+
+      return {
+        documentId: revision.id,
+        title: revision.title,
+        format: revision.format as DocumentFormat,
+      };
     }
 
     const effectiveFormat =
@@ -227,19 +322,31 @@ export async function maybeGenerateDocumentFromChat(params: {
     //  1. The user pasted the content themselves ("generate a pdf of the
     //     following data: …"). Their message IS the material.
     //  2. The user referred back ("make a pdf of the above summary"). The
-    //     document must come from the PREVIOUS answer — the current turn may
+    //     document must come from the PREVIOUS answer the current turn may
     //     be nothing more than "Sure, generating that now!".
     //  3. Otherwise the answer just produced is the richest material.
     let sourceText = assistantAnswer?.trim() || "";
     let sourceKind = "current-answer";
 
-    if (usesPastedSource(userPrompt)) {
+    const attachmentText = params.attachmentText?.trim() ?? "";
+
+    if (attachmentText) {
+      // Attached files first. Anything the user also pasted goes after them,
+      // so a long attachment cannot crowd the pasted instructions out of the
+      // character cap below.
+      sourceText = usesPastedSource(userPrompt)
+        ? `${userPrompt}
+
+${attachmentText}`
+        : attachmentText;
+      sourceKind = "attached-files";
+    } else if (usesPastedSource(userPrompt)) {
       sourceText = userPrompt;
       sourceKind = "user-pasted";
     } else if (intent.useLastAnswer) {
       // A prior document-generation turn deliberately leaves a content-free
-      // chat reply ("Your PDF is being prepared.") — see the REPLACE branch of
-      // buildDocumentSystemNote — so the real material for "now make a docx of
+      // chat reply ("Your PDF is being prepared.") see the REPLACE branch of
+      // buildDocumentSystemNote so the real material for "now make a docx of
       // the same data" lives in that document's own stored `sourceText`, not
       // in the chat message. Check that FIRST, or a same-format-again request
       // silently downgrades to a near-empty source.
@@ -297,7 +404,7 @@ export async function maybeGenerateDocumentFromChat(params: {
         title,
         prompt: userPrompt.slice(0, 4000),
         sourceText: sourceText || null,
-        theme: params.theme ?? "professional",
+        theme: params.theme ?? defaultThemeFor(effectiveFormat),
       },
       select: { id: true, title: true, format: true },
     });
@@ -312,12 +419,12 @@ export async function maybeGenerateDocumentFromChat(params: {
       chatId,
       messageId,
       modelResponseId: modelResponseId ?? null,
-      theme: params.theme ?? "professional",
+      theme: params.theme ?? defaultThemeFor(effectiveFormat),
       promptChars: userPrompt.length,
       sourceTextChars: sourceText.length,
     });
 
-    // Kick the worker rather than waiting for the cron tick — the user is
+    // Kick the worker rather than waiting for the cron tick the user is
     // watching a card in the chat.
     void runPendingDocumentJobs();
 

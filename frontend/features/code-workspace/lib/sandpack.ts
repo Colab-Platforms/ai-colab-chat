@@ -5,7 +5,7 @@ import type { SandpackFiles, SandpackPredefinedTemplate } from "@codesandbox/san
  *  - "fast": Sandpack's in-browser bundler. No VM, no `npm install` (packages
  *    come from CodeSandbox's CDN and are browser-cached), so it's up in a
  *    second or two instead of ~15 s.
- *  - "vite": Nodebox — a Node VM in the browser running the project's own
+ *  - "vite": Nodebox a Node VM in the browser running the project's own
  *    Vite. Slow to boot but faithful; used whenever "fast" can't run the
  *    project as-is (see `fastReactSetup`), or when the user asks for it.
  *  - "static": plain HTML/CSS/JS, no bundling needed.
@@ -16,7 +16,7 @@ export interface SandpackSetup {
   template: SandpackPredefinedTemplate;
   files: SandpackFiles;
   engine: PreviewEngine;
-  /** A React project the fast engine can run — i.e. the user can switch engines. */
+  /** A React project the fast engine can run i.e. the user can switch engines. */
   fastCapable: boolean;
   /** Scripts/stylesheets loaded before the bundle runs (fast engine only). */
   externalResources?: string[];
@@ -41,14 +41,14 @@ function parsePackageJson(content: string | undefined): PackageJson | null {
 /**
  * Sandpack's browser-side Node runtime ("Nodebox") can't run real esbuild
  * (it needs a native binary), so Vite only works there through a WASM build
- * of esbuild that Nodebox resolves specially — and only for the exact Vite
+ * of esbuild that Nodebox resolves specially and only for the exact Vite
  * version its own default templates ship, `4.1.4`. A model writing a newer
  * Vite (5.x/6.x, whatever it knows as "current") resolves fine on the user's
  * own machine but fails inside Sandpack with
  * `Cannot find module 'esbuild-wasm' from '.../vite@5.x.x/...'`.
  *
  * These exact versions are copied from `@codesandbox/sandpack-react`'s own
- * VITE_REACT_TEMPLATE / VITE_VUE_TEMPLATE — the versions Nodebox is actually
+ * VITE_REACT_TEMPLATE / VITE_VUE_TEMPLATE the versions Nodebox is actually
  * built and tested against.
  */
 const NODEBOX_VITE_DEPS: Record<"vite-react" | "vite-vue", Record<string, string>> = {
@@ -62,7 +62,7 @@ const NODEBOX_VITE_DEPS: Record<"vite-react" | "vite-vue", Record<string, string
  * templates run it as-is; the template's own default files only fill gaps.
  *
  * package.json is patched *for the preview only* (never saved, never in the
- * ZIP) — whatever Vite/plugin version the model wrote is overridden with the
+ * ZIP) whatever Vite/plugin version the model wrote is overridden with the
  * Nodebox-compatible pins above so the preview can actually build, while the
  * saved files and the downloaded ZIP keep the model's real choice, which
  * works fine on the user's own Node.js.
@@ -155,18 +155,18 @@ function importedPackages(sources: string[]): Set<string> {
 /**
  * Rewrites a Vite React project so Sandpack's bundler (create-react-app
  * preset) can run it. Returns null when the project relies on something only
- * the real Vite does — then the caller falls back to Nodebox.
+ * the real Vite does then the caller falls back to Nodebox.
  *
  * The bundler sets the page body with innerHTML (scripts in it never run) and
  * takes its entry from package.json `main`, so index.html is taken apart:
  *  - remote <script src> / <link rel=stylesheet> → `externalResources`
- *    (loaded, in order, before the bundle runs — this is how the Tailwind
+ *    (loaded, in order, before the bundle runs this is how the Tailwind
  *    Play CDN keeps working);
  *  - inline <script>/<style> and local ones → modules imported, in page
  *    order, by a generated entry file, which imports the page's own module
  *    entry (src/main.jsx) last, as the browser would;
  *  - the remaining markup → /public/index.html.
- * The saved files are never changed — this is only what the preview runs.
+ * The saved files are never changed this is only what the preview runs.
  */
 function fastReactSetup(byPath: Map<string, string>, pkg: PackageJson | null): SandpackSetup | null {
   const html = byPath.get("index.html");
@@ -224,14 +224,14 @@ function fastReactSetup(byPath: Map<string, string>, pkg: PackageJson | null): S
         externalResources.push(a.src);
       } else if (byPath.has(localPath(a.src))) {
         if (isModule) {
-          if (moduleEntry) return null; // several module entries — unusual, let Vite handle it
+          if (moduleEntry) return null; // several module entries unusual, let Vite handle it
           moduleEntry = localPath(a.src);
         } else {
           entryImports.push(`../${localPath(a.src)}`);
         }
       }
     } else if (m[2].trim()) {
-      if (isModule) return null; // inline module code with imports — Vite territory
+      if (isModule) return null; // inline module code with imports Vite territory
       if (!a.type || /javascript/i.test(a.type)) addInline("js", m[2]);
     }
   }

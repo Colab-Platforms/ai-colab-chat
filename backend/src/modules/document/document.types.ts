@@ -1,28 +1,72 @@
 /**
  * The document spec is the contract between the model and the renderer.
  *
- * The model only ever describes *what the document says* — semantic blocks and
+ * The model only ever describes *what the document says* semantic blocks and
  * their text. It never emits HTML, CSS, colours or layout. The renderer owns
  * all presentation, which keeps output visually consistent and means model
  * output is escaped data rather than markup we have to trust.
  */
 
-export type DocumentTheme = "professional" | "minimal" | "report";
+export type BaseDocumentTheme = "professional" | "minimal" | "report";
 
-export const DOCUMENT_THEMES: DocumentTheme[] = [
+/** The three general-purpose themes, offered for PDF, Word and Excel alike. */
+export const DOCUMENT_THEMES: BaseDocumentTheme[] = [
   "professional",
   "minimal",
   "report",
 ];
 
 /**
- * PPTX-only visual templates. Kept out of `DocumentTheme` — a deck earns a
+ * Word and Excel templates, derived from the designs in frontend/Templates.
+ * Each is the same flat token set as a base theme (document.theme.ts), so the
+ * renderers need no changes. Keys are unique across every
+ * format because they all land in the one `theme` column.
+ */
+export const DOCX_TEMPLATES = [
+  "business-plan",
+  "client-proposal",
+  "cover-letter",
+  "lesson-plan",
+  "meeting-minutes",
+  "service-agreement",
+] as const;
+
+export const XLSX_TEMPLATES = [
+  "financial-model",
+  "inventory-tracker",
+  "monthly-budget",
+  "project-tracker",
+  "sales-tracker",
+  "timesheet",
+] as const;
+
+export type DocumentTheme =
+  | BaseDocumentTheme
+  | (typeof DOCX_TEMPLATES)[number]
+  | (typeof XLSX_TEMPLATES)[number];
+
+/** Every theme key that is valid for the token-based (non-deck, non-map) formats. */
+export const ALL_DOCUMENT_THEMES: DocumentTheme[] = [
+  ...DOCUMENT_THEMES,
+  ...DOCX_TEMPLATES,
+  ...XLSX_TEMPLATES,
+];
+
+/** The themes a given format offers: the base set plus its own templates. */
+export const DOCUMENT_THEMES_BY_FORMAT: Record<"PDF" | "DOCX" | "XLSX", DocumentTheme[]> = {
+  PDF: [...DOCUMENT_THEMES],
+  DOCX: [...DOCUMENT_THEMES, ...DOCX_TEMPLATES],
+  XLSX: [...DOCUMENT_THEMES, ...XLSX_TEMPLATES],
+};
+
+/**
+ * PPTX-only visual templates. Kept out of `DocumentTheme` a deck earns a
  * richer set of design decisions (fonts, decorative layout, photo placement)
  * than the flat PDF/DOCX theme tokens express, so it gets its own type rather
  * than stretching `ThemeTokens` to cover both.
  *
  * These values live in the same `theme` column/field as `DocumentTheme` (see
- * document.pptxTemplates.ts) — a document's format is what disambiguates
+ * document.pptxTemplates.ts) a document's format is what disambiguates
  * which table a given theme string is looked up in.
  */
 export type PptxTemplate =
@@ -30,7 +74,13 @@ export type PptxTemplate =
   | "aurora"
   | "sunset"
   | "emerald"
-  | "mono";
+  | "mono"
+  | "marketing-plan"
+  | "pitch-deck"
+  | "project-kickoff"
+  | "quarterly-review"
+  | "sales-proposal"
+  | "training-deck";
 
 export const PPTX_TEMPLATES: PptxTemplate[] = [
   "corporate",
@@ -38,13 +88,40 @@ export const PPTX_TEMPLATES: PptxTemplate[] = [
   "sunset",
   "emerald",
   "mono",
+  "marketing-plan",
+  "pitch-deck",
+  "project-kickoff",
+  "quarterly-review",
+  "sales-proposal",
+  "training-deck",
+];
+
+/**
+ * Mind-map-only palettes. Like `PptxTemplate`, these share the `theme` column
+ * and are disambiguated by the document's format. Names are deliberately
+ * distinct from the PPTX template keys so a stray value can never be mistaken
+ * for the other set.
+ */
+export type MindmapTheme = "vibrant" | "ocean" | "autumn" | "midnight";
+
+export const MINDMAP_THEMES: MindmapTheme[] = [
+  "vibrant",
+  "ocean",
+  "autumn",
+  "midnight",
 ];
 
 /** Whatever a `theme` field/column may hold, across every document format. */
-export type AnyTheme = DocumentTheme | PptxTemplate;
+export type AnyTheme = DocumentTheme | PptxTemplate | MindmapTheme;
 
 /** Mirrors `GeneratedDocumentFormat` in schema.prisma. */
-export type DocumentFormat = "PDF" | "DOCX" | "PPTX" | "XLSX" | "CSV";
+export type DocumentFormat =
+  | "PDF"
+  | "DOCX"
+  | "PPTX"
+  | "XLSX"
+  | "CSV"
+  | "MINDMAP";
 
 export const DOCUMENT_FORMATS: DocumentFormat[] = [
   "PDF",
@@ -52,6 +129,7 @@ export const DOCUMENT_FORMATS: DocumentFormat[] = [
   "PPTX",
   "XLSX",
   "CSV",
+  "MINDMAP",
 ];
 
 export interface DocumentFormatMeta {
@@ -66,7 +144,7 @@ export interface DocumentFormatMeta {
  * Everything that differs between formats *outside* the renderer itself.
  *
  * Kept as one table rather than scattered conditionals so adding a format is a
- * single entry plus a renderer, and nothing can be half-added — the old code
+ * single entry plus a renderer, and nothing can be half-added the old code
  * hardcoded "pdf" in the upload call and ".pdf" in the filename, which is
  * exactly the kind of thing a second format silently inherits.
  */
@@ -98,6 +176,14 @@ export const DOCUMENT_FORMAT_META: Record<DocumentFormat, DocumentFormatMeta> = 
     label: "CSV file",
     extension: "csv",
     mimeType: "text/csv",
+  },
+  // The interactive map is drawn client-side from the stored spec; the file
+  // is a standalone SVG of the same layout, so the card has something to
+  // open and download like every other format.
+  MINDMAP: {
+    label: "Mind map",
+    extension: "svg",
+    mimeType: "image/svg+xml",
   },
 };
 
@@ -139,7 +225,7 @@ export interface DocumentSpec {
  *
  * A deck is not a paginated document: a slide is a bounded container, so the
  * model has to decide what goes on each one. That decision cannot be made
- * after the fact by a renderer splitting a flat block list — it needs the
+ * after the fact by a renderer splitting a flat block list it needs the
  * meaning of the content. Hence a second spec shape rather than pagination.
  *
  * Slide bodies deliberately reuse `DocumentBlock`, so the block vocabulary,
@@ -171,12 +257,18 @@ export interface SlideSpec {
   title: string;
   subtitle?: string;
   blocks: SlideBlock[];
-  /** Speaker notes — the one thing a deck has that a document does not. */
+  /** Speaker notes the one thing a deck has that a document does not. */
   notes?: string;
+  /**
+   * Set only on decks generated for a designed template file (see
+   * document.deckFile.ts): which slide of that file this is and its values.
+   * `title`/`blocks` above are derived from it for previews.
+   */
+  fill?: { slide: string; fields: Record<string, unknown> };
   /**
    * A topic-relevant stock photo, already re-hosted on Cloudinary.
    *
-   * Populated by document.pptxImages.ts *after* the spec is validated — the
+   * Populated by document.pptxImages.ts *after* the spec is validated the
    * model never sees or sets this field, since it is forbidden from
    * inventing image URLs. Absent whenever the lookup found nothing or the
    * template's layout has no place for one; renderers must treat it as
@@ -199,7 +291,7 @@ export interface PresentationSpec {
  *
  * The one spec that shares nothing with `DocumentBlock`, because blocks are
  * prose-shaped: every value in them is a string. A spreadsheet cell has a
- * TYPE, and that type is the whole point — a number written as text is
+ * TYPE, and that type is the whole point a number written as text is
  * left-aligned, uncountable, and makes SUM() return 0.
  *
  * Formulas are declarative (`total: "sum"`) rather than authored by the model.
@@ -253,7 +345,43 @@ export interface WorkbookSpec {
   sheets: SheetSpec[];
 }
 
-export type AnySpec = DocumentSpec | PresentationSpec | WorkbookSpec;
+/* ------------------------------------------------------------------ *
+ * Mind maps
+ *
+ * A tree of short phrases. The model decides only WHAT the branches are; the
+ * layout (which side a branch sits on, spacing, curves) and every colour are
+ * the renderer's, exactly as for the other formats. Branch colours are keyed
+ * off the top-level branch index, so the spec carries none.
+ *
+ * `id`s are assigned by the validator, never by the model: they are stable
+ * path ids ("1", "1.2") that the client uses for collapse state and, later,
+ * for editing individual nodes.
+ * ------------------------------------------------------------------ */
+
+export interface MindmapNode {
+  id: string;
+  text: string;
+  /** A longer explanation shown on hover; never drawn on the map itself. */
+  note?: string;
+  children: MindmapNode[];
+}
+
+export interface MindmapSpec {
+  title: string;
+  root: MindmapNode;
+}
+
+export const MAX_MINDMAP_DEPTH = 5;
+export const MAX_MINDMAP_NODES = 250;
+export const MAX_MINDMAP_CHILDREN = 12;
+export const MAX_MINDMAP_NODE_CHARS = 120;
+export const MAX_MINDMAP_NOTE_CHARS = 600;
+
+export type AnySpec =
+  | DocumentSpec
+  | PresentationSpec
+  | WorkbookSpec
+  | MindmapSpec;
 
 /**
  * Excel's own limits, not ours: a sheet name over 31 characters or containing
@@ -269,21 +397,30 @@ export const MAX_SHEET_COLUMNS = 30;
 /**
  * Which spec shape a format's model call produces and its renderer consumes.
  *
- * Adding a format means deciding this first — it determines the system prompt,
+ * Adding a format means deciding this first it determines the system prompt,
  * the validator and the renderer signature, so it is the real fork in the
  * pipeline. XLSX will need a third kind; PDF and DOCX share the first.
  */
-export type SpecKind = "document" | "presentation" | "workbook";
+export type SpecKind = "document" | "presentation" | "workbook" | "mindmap";
 
 export const FORMAT_SPEC_KIND: Record<DocumentFormat, SpecKind> = {
   PDF: "document",
   DOCX: "document",
   PPTX: "presentation",
   XLSX: "workbook",
-  // CSV shares the workbook spec — a CSV is just one flat sheet of it,
+  // CSV shares the workbook spec a CSV is just one flat sheet of it,
   // rendered by a format-specific renderer rather than a different spec.
   CSV: "workbook",
+  MINDMAP: "mindmap",
 };
+
+/** The theme a new document of this format starts with. */
+export const defaultThemeFor = (format: DocumentFormat): string =>
+  format === "PPTX"
+    ? "corporate"
+    : format === "MINDMAP"
+      ? "vibrant"
+      : "professional";
 
 export const isPresentationSpec = (spec: AnySpec): spec is PresentationSpec =>
   Array.isArray((spec as PresentationSpec).slides);
@@ -291,12 +428,19 @@ export const isPresentationSpec = (spec: AnySpec): spec is PresentationSpec =>
 export const isWorkbookSpec = (spec: AnySpec): spec is WorkbookSpec =>
   Array.isArray((spec as WorkbookSpec).sheets);
 
+export const isMindmapSpec = (spec: AnySpec): spec is MindmapSpec => {
+  const root = (spec as MindmapSpec).root;
+  return Boolean(root) && typeof root === "object" && !Array.isArray(root);
+};
+
 export const specKindOf = (spec: AnySpec): SpecKind =>
   isPresentationSpec(spec)
     ? "presentation"
     : isWorkbookSpec(spec)
       ? "workbook"
-      : "document";
+      : isMindmapSpec(spec)
+        ? "mindmap"
+        : "document";
 
 export const MAX_SLIDES = 60;
 export const MAX_BLOCKS_PER_SLIDE = 8;

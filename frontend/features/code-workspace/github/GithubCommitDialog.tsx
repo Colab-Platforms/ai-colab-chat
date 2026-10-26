@@ -38,14 +38,14 @@ function describePending(link: GithubLinkDto): string {
 
 /**
  * Manual commit: the user writes the message and commits when they choose.
- * Independent of auto-commit — that toggle only decides whether AI turns also
+ * Independent of auto-commit that toggle only decides whether AI turns also
  * commit on their own. Everything not yet on GitHub goes into this one commit.
  */
 export function GithubCommitDialog({ open, onOpenChange, projectId, link, onCommitted }: Props) {
   const [message, setMessage] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** GitHub has commits this project lacks — committing now would overwrite them. */
+  /** GitHub has commits this project lacks committing now would overwrite them. */
   const [remoteAhead, setRemoteAhead] = useState(false);
 
   useEffect(() => {

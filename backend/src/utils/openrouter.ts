@@ -20,7 +20,7 @@ export interface OpenRouterJsonCompletionOptions {
 
 /**
  * Non-streaming JSON-object completion for internal/background calls
- * (e.g. context distillation) — the streaming helper below is for
+ * (e.g. context distillation) the streaming helper below is for
  * user-facing chat only and isn't a fit for a single-shot batch job.
  */
 export const createOpenRouterJsonCompletion = async (
@@ -96,7 +96,7 @@ export const createOpenRouterStream = async (
       stream: true,
       stream_options: { include_usage: true },
       // OpenRouter-specific (not part of the OpenAI SDK's types, hence the
-      // `as any` cast on the whole call) — adds `usage.cost` (real $ charged
+      // `as any` cast on the whole call) adds `usage.cost` (real $ charged
       // by OpenRouter for this request) to the final usage chunk, on top of
       // the standard token counts stream_options.include_usage already gives.
       usage: { include: true },
@@ -107,4 +107,30 @@ export const createOpenRouterStream = async (
   )) as unknown as AsyncIterable<any>;
 
   return stream;
+};
+
+export interface OpenRouterChatCompletionOptions {
+  model: string;
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+/**
+ * Non-streaming plain-text completion over an explicit message list, for
+ * internal single-shot calls that need a conversation (e.g. answering a
+ * question about a mind map). The JSON helper above takes one system and one
+ * user message only, and forces a JSON object reply.
+ */
+export const createOpenRouterChatCompletion = async (
+  options: OpenRouterChatCompletionOptions,
+) => {
+  const { model, messages, max_tokens, temperature } = options;
+
+  return getOpenRouterClient().chat.completions.create({
+    model,
+    messages,
+    max_tokens: max_tokens ?? 800,
+    temperature: temperature ?? 0.3,
+  } as any);
 };

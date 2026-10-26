@@ -2,7 +2,7 @@
 
 Publishes a `CodeProject` to the **user's own Vercel account**, either straight from the `CodeFile` rows or from a linked GitHub repository.
 
-Vercel is a *destination, never a source of truth*: nothing is ever pulled back, `CodeFile` stays authoritative, and the whole feature is optional. The deploy runs on the user's own plan — there is no billing gate and no credit deduction on our side.
+Vercel is a *destination, never a source of truth*: nothing is ever pulled back, `CodeFile` stays authoritative, and the whole feature is optional. The deploy runs on the user's own plan there is no billing gate and no credit deduction on our side.
 
 The frontend half lives in `frontend/features/code-workspace/vercel/`.
 
@@ -12,7 +12,7 @@ Nothing here reads env vars at module load. `isVercelConfigured()` is a cheap bo
 
 - the server boots normally with zero `VERCEL_*` vars,
 - `GET /api/vercel/status` answers `{ configured: false }` without touching the database, and the frontend hides the Publish button entirely,
-- no AI turn is affected — unlike GitHub, there is no auto-deploy hook anywhere.
+- no AI turn is affected unlike GitHub, there is no auto-deploy hook anywhere.
 
 Filling the vars in later switches the feature on with no code change.
 
@@ -21,7 +21,7 @@ Filling the vars in later switches the feature on with no code change.
 1. Vercel dashboard → **Integrations → Create** (the Integration Console). Set a name and a URL slug.
 2. **Redirect URL** → `VERCEL_CALLBACK_URL`. A `localhost` URL is fine for development: Vercel only redirects the *user's browser* there, so unlike the GitHub App (whose webhooks are server-to-server) no tunnel is needed.
 3. **API Scopes**: `user` Read · `team` Read · `project` Read/Write · `deployment` Read/Write · `project-env-vars` Read/Write · `integration-configuration` Read/Write (the last one is only used to revoke the install on disconnect).
-4. Leave it **Unlisted** — an unlisted "community" integration is installable by direct link, so no marketplace review is needed.
+4. Leave it **Unlisted** an unlisted "community" integration is installable by direct link, so no marketplace review is needed.
 5. Fill `backend/.env`:
 
 ```
@@ -30,7 +30,7 @@ VERCEL_CLIENT_SECRET=
 VERCEL_INTEGRATION_SLUG=        # the URL slug: vercel.com/integrations/<slug>
 VERCEL_CALLBACK_URL=            # https://api.example.com/api/vercel/callback  (= the Redirect URL above)
 FRONTEND_VERCEL_CALLBACK_URL=   # https://app.example.com/vercel/callback
-TOKEN_ENCRYPTION_KEY=           # openssl rand -hex 32 — shared with the GitHub module
+TOKEN_ENCRYPTION_KEY=           # openssl rand -hex 32 shared with the GitHub module
 ```
 
 `JWT_SECRET` (signs the OAuth state) and `DATABASE_URL` are reused.
@@ -43,7 +43,7 @@ TOKEN_ENCRYPTION_KEY=           # openssl rand -hex 32 — shared with the GitHu
 |---|---|---|---|
 | Integration access token | `code` → `POST /v2/oauth/access_token` | long-lived, **no refresh flow** | every Vercel API call |
 
-Much simpler than GitHub's three-token dance: one Bearer per installation, AES-256-GCM encrypted at rest (`utils/crypto.ts`), never leaving the server. Because there is no refresh, a token Vercel rejects is terminal — `vercel.api.ts` flips `VercelConnection.isActive` to false and the UI asks for a reconnect.
+Much simpler than GitHub's three-token dance: one Bearer per installation, AES-256-GCM encrypted at rest (`utils/crypto.ts`), never leaving the server. Because there is no refresh, a token Vercel rejects is terminal `vercel.api.ts` flips `VercelConnection.isActive` to false and the UI asks for a reconnect.
 
 Two rules the rest of the module depends on:
 
@@ -55,7 +55,7 @@ Two rules the rest of the module depends on:
 `readFiles()` → inline `files` on `POST /v13/deployments`.
 
 1. Editor edits are snapshotted as a `USER` version first (`snapshotUserEditsIfDirty`), exactly as the GitHub Push button does, so "what's live" maps to exactly one `CodeProjectVersion`.
-2. Every path goes through the code workspace's own `normalizeCodePath()` — a `..` segment would be a write outside the build root. Content is base64 so JSX, emoji and odd bytes survive the JSON round trip.
+2. Every path goes through the code workspace's own `normalizeCodePath()` a `..` segment would be a write outside the build root. Content is base64 so JSX, emoji and odd bytes survive the JSON round trip.
 3. Above `MAX_DEPLOY_BYTES` (8 MB of base64) the deploy is refused with `PROJECT_TOO_LARGE` and the user is pointed at the GitHub path. Projects are text-only and capped at 80 files, so real ones are ~100 KB; the `POST /v2/files` blob flow is deliberately out of scope.
 4. The Vercel project is created/updated *before* the deployment, because env vars have to exist before the first build.
 
@@ -71,11 +71,11 @@ The payoff is that the Vercel project is *genuinely* git-linked: later pushes re
 
 Vercel can only build a repo if the **user's Vercel account** is linked to GitHub and Vercel's own GitHub App can see that repo. When it isn't, Vercel answers 400/403 with wording like *"To link a GitHub repository, you need to install the GitHub integration first."*
 
-`isGitIntegrationMissing()` detects that (a code allowlist **and** a message regex, since Vercel's code for it is not stable) and the module throws `VERCEL_GIT_NOT_CONNECTED` with both pages the user needs. The dialog then shows a three-step panel and a manual **"I've done this — Deploy again"**.
+`isGitIntegrationMissing()` detects that (a code allowlist **and** a message regex, since Vercel's code for it is not stable) and the module throws `VERCEL_GIT_NOT_CONNECTED` with both pages the user needs. The dialog then shows a three-step panel and a manual **"I've done this Deploy again"**.
 
 The retry is manual on purpose: neither Vercel's authentication settings nor GitHub's app-install page calls back to us, so auto-retrying on popup close would just fail twice. Nothing is persisted on this failure, so the retry is clean.
 
-**This is the single most likely path to regress** — Vercel changes the wording, and `isGitIntegrationMissing()` is the one function to fix.
+**This is the single most likely path to regress** Vercel changes the wording, and `isGitIntegrationMissing()` is the one function to fix.
 
 ## Logs (`vercel.logs.ts`)
 
@@ -83,17 +83,17 @@ Two upstream sources, on purpose:
 
 | Source | What it gives | Why not alone |
 |---|---|---|
-| `GET /v3/deployments/{id}/events?follow=1` | newline-delimited JSON log lines | covers the *build*, and can stay open after it — not a reliable "done" |
+| `GET /v3/deployments/{id}/events?follow=1` | newline-delimited JSON log lines | covers the *build*, and can stay open after it not a reliable "done" |
 | `GET /v13/deployments/{id}` every 3 s | `readyState` | the authority on when a deploy finished |
 
-The response of the follow stream is **ndjson, not SSE** — it is read with `fetch` + a byte reader, split on `\n`, with ANSI escapes stripped. `vercelStream()` is separate from `vercelRaw()` precisely so it does not inherit the 30 s request timeout that would kill it mid-build.
+The response of the follow stream is **ndjson, not SSE** it is read with `fetch` + a byte reader, split on `\n`, with ANSI escapes stripped. `vercelStream()` is separate from `vercelRaw()` precisely so it does not inherit the 30 s request timeout that would kill it mid-build.
 
 SSE events we emit: `deploy_created`, `state`, `log`, `env_warning`, `ping`, then one terminal `ready` / `error` / `canceled`, then `[DONE]`.
 
 ### A deploy never depends on who is watching
 
 - Log lines are flushed to `VercelDeployment.logTail` every ~2 s (capped at 32 KB, trimmed from the front), so a browser refresh **replays** what happened and then keeps streaming.
-- When the browser goes away, the log reader stops but `finishDeploymentDetached()` keeps polling until Vercel reports a terminal state, so the DB — and the header dot — learn the outcome anyway. Same spirit as `pushAfterAiTurn()` being deliberately un-awaited.
+- When the browser goes away, the log reader stops but `finishDeploymentDetached()` keeps polling until Vercel reports a terminal state, so the DB and the header dot learn the outcome anyway. Same spirit as `pushAfterAiTurn()` being deliberately un-awaited.
 - After a server restart, `getStatus()` re-arms a watcher for any row still in flight, so nothing spins forever.
 - A detached poller that keeps failing backs off exponentially, and after `MAX_DETACHED_FAILURES` attempts marks the row `ERROR` and stops. Without that, `getStatus()` re-arming a watcher every 2 s would turn a token Vercel refuses into a request loop, and the header would spin forever.
 - `recordTerminal()` is idempotent and only the link's *latest* deploy may move its status, so a stream and a detached poller racing on one deploy is harmless and a slow older deploy can't overwrite a newer one.
@@ -104,7 +104,7 @@ Unlike `GithubRepoLink.autoPush`, **nothing here deploys on an AI turn.** There 
 
 ## Streaming routes are POSTs
 
-`deploy`, `redeploy` and `logs` are POSTs read with `fetch` + `getReader()`, not `EventSource` GETs — `EventSource` cannot send an `Authorization` header. Two consequences worth knowing:
+`deploy`, `redeploy` and `logs` are POSTs read with `fetch` + `getReader()`, not `EventSource` GETs `EventSource` cannot send an `Authorization` header. Two consequences worth knowing:
 
 - The client **must** send `Accept: text/event-stream`, or `index.ts`'s `compression()` filter buffers the log output.
 - Client disconnect is detected with `res.on("close")`, not `req.on("close")`: for a POST, Node fires the latter as soon as the request body has been read.
@@ -114,12 +114,12 @@ Everything that can fail with a code the UI branches on happens in `startDeploy(
 ## Data model (`schema.prisma`)
 
 - **`VercelConnection`**: one per user. `teamId` non-null means a Team install. `isActive` is cleared (not deleted) when Vercel revokes access.
-- **`VercelProjectLink`**: one per `CodeProject`. Holds the Vercel project id and the build settings last used, so Redeploy and the dropdown need no extra API call. The hot row — the header polls it every 2 s.
+- **`VercelProjectLink`**: one per `CodeProject`. Holds the Vercel project id and the build settings last used, so Redeploy and the dropdown need no extra API call. The hot row the header polls it every 2 s.
 - **`VercelDeployment`**: one row per attempt, with its own `readyState`, `logTail` and error. Separate from the link because the log stream must be re-attachable by a stable id, because the duplicate-deploy guard is a one-query lookup over non-terminal rows, and because per-attempt errors must survive the next attempt.
 
 ## Env vars are write-through
 
-Values are sent to Vercel and **never stored on our side** — no second encrypted column, no second source of truth. The visible consequence: the dialog can list existing *keys* but cannot pre-fill their values on a redeploy.
+Values are sent to Vercel and **never stored on our side** no second encrypted column, no second source of truth. The visible consequence: the dialog can list existing *keys* but cannot pre-fill their values on a redeploy.
 
 ## Disconnecting
 
@@ -129,17 +129,17 @@ Values are sent to Vercel and **never stored on our side** — no second encrypt
 
 ## Known gaps
 
-- **No webhook**, by choice rather than necessity. Deployment state is polled (`GET /v13/deployments/{id}`), and opening the header dropdown reconciles against `GET /v6/deployments` — so a deploy Vercel started from a git push shows up when someone looks, not the instant it happens.
+- **No webhook**, by choice rather than necessity. Deployment state is polled (`GET /v13/deployments/{id}`), and opening the header dropdown reconciles against `GET /v6/deployments` so a deploy Vercel started from a git push shows up when someone looks, not the instant it happens.
 
-  Adding one is straightforward if that latency matters: `req.rawBody` is already populated globally by the `express.json({ verify })` hook in `src/index.ts`, which is exactly what `github.webhook.ts` verifies its HMAC against. A Vercel webhook would subscribe to `deployment.succeeded` / `.error` / `.canceled` and `integration-configuration.removed`, verify `x-vercel-signature` the same way, and need a **publicly reachable URL — a tunnel, since webhooks are server-to-server and localhost is unreachable from Vercel.** That is the only part of this module that would need one; everything else is either outbound or a browser redirect.
+  Adding one is straightforward if that latency matters: `req.rawBody` is already populated globally by the `express.json({ verify })` hook in `src/index.ts`, which is exactly what `github.webhook.ts` verifies its HMAC against. A Vercel webhook would subscribe to `deployment.succeeded` / `.error` / `.canceled` and `integration-configuration.removed`, verify `x-vercel-signature` the same way, and need a **publicly reachable URL a tunnel, since webhooks are server-to-server and localhost is unreachable from Vercel.** That is the only part of this module that would need one; everything else is either outbound or a browser redirect.
 - **No branch list**: the GitHub module has no branches endpoint, so the branch is a free-text field.
-- **`node` / `python` projects can't be published.** Vercel wants serverless functions, and reshaping a generated Express app into `api/` handlers is a separate feature. A project that ships its own `vercel.json` is allowed through — that is the escape hatch for an advanced user.
+- **`node` / `python` projects can't be published.** Vercel wants serverless functions, and reshaping a generated Express app into `api/` handlers is a separate feature. A project that ships its own `vercel.json` is allowed through that is the escape hatch for an advanced user.
 - **Preview deployments** are out of scope: everything targets production.
 - Vercel's error codes and framework presets are not contractually stable. The framework allowlist is in `vercel.types.ts` (adding one is a one-line change) and the error wording lives only in `isGitIntegrationMissing()`.
 
 ## Checking the detector
 
-`vercel.detect.ts` is pure — no network, no Prisma. The repo has no test runner, so it has a runnable self-check in the same style as `code-workspace.parser.check.ts`:
+`vercel.detect.ts` is pure no network, no Prisma. The repo has no test runner, so it has a runnable self-check in the same style as `code-workspace.parser.check.ts`:
 
 ```
 npx tsx src/modules/vercel/vercel.detect.check.ts

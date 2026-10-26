@@ -12,7 +12,7 @@ const AFTER_ACTION_POLL_MS = 8_000;
 /**
  * Mirrors ../github/useGithubStatus.ts, minus the post-AI-turn polling: nothing
  * deploys on an AI turn, so there is nothing to catch afterwards. Polls while a
- * deployment is in flight — including one the user walked away from.
+ * deployment is in flight including one the user walked away from.
  */
 export function useVercelStatus() {
   const projectId = useCodeWorkspace((s) => s.project?.id ?? null);

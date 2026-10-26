@@ -1,5 +1,5 @@
 // No "use client": app/layout.tsx (a server component) imports the string
-// below directly — importing it through the feature's index.ts would turn it
+// below directly importing it through the feature's index.ts would turn it
 // into a client reference instead of plain text.
 
 /**
@@ -7,14 +7,14 @@
  *
  * Why it exists: when the Sandpack preview's Vite server starts, Vite writes
  * `vite.config.js.timestamp-<n>.mjs`, loads it and deletes it straight away
- * (normal Vite behaviour). Nodebox — Sandpack's in-browser Node runtime, which
- * runs in *this* page's JS context — stats that path a moment later, the stat
+ * (normal Vite behaviour). Nodebox Sandpack's in-browser Node runtime, which
+ * runs in *this* page's JS context stats that path a moment later, the stat
  * rejects, and `@codesandbox/nodebox` never catches it. The result is a global
  * unhandled rejection: harmless (the preview keeps working), but Next.js's dev
  * overlay shows every such rejection as a full-screen "Runtime Error".
  *
  * React error boundaries can't catch it (it's async, outside render), and the
- * listener has to run before Next's own overlay listener — hence an inline
+ * listener has to run before Next's own overlay listener hence an inline
  * script in <head> that runs before hydration, on the capture phase.
  *
  * Deliberately narrow: only this exact stat-a-Vite-temp-file failure is

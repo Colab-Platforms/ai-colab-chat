@@ -3,7 +3,7 @@ import prisma from "@root/prisma.js";
 export const getOverview = async () => {
   const [totalUsers, activeSubscriptions, openTickets, revenueAgg, tokensAgg] =
     await Promise.all([
-      prisma.user.count({ where: { isDeleted: false } }),
+      prisma.user.count({ where: { isDeleted: false, isGuest: false } }),
       prisma.subscription.count({ where: { status: "ACTIVE" } }),
       prisma.supportRequest.count({
         where: { type: "TICKET", status: "OPEN" },
