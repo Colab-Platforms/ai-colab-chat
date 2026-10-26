@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { notFound, useParams } from "next/navigation";
+import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { chatService, modelService, messageService, assistantService, folderService } from "@/lib/services";
 import { MessageList } from "@/components/chat/message-list";
+import type { MessageTemplate } from "@/components/chat/message-bubble";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ProjectBanner } from "@/components/chat/project-banner";
@@ -62,6 +63,8 @@ interface Message {
 export default function ChatPage() {
   const params = useParams();
   const chatId = Number(params.id);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [shouldForceScrollFromStarred, setShouldForceScrollFromStarred] = useState(false);
 
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -79,6 +82,18 @@ export default function ChatPage() {
       }];
     } catch {
       return [];
+    }
+  });
+  // The website template this chat started from. Seeded from the pending first
+  // message so the card shows while the first build streams, then confirmed by
+  // fetchChat (the Chat row is the source of truth).
+  const [websiteTemplate, setWebsiteTemplate] = useState<MessageTemplate | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(`pending_chat_${chatId}`);
+      return raw ? (JSON.parse(raw).websiteTemplate ?? null) : null;
+    } catch {
+      return null;
     }
   });
   const [models, setModels] = useState<Model[]>([]);
@@ -135,6 +150,22 @@ export default function ChatPage() {
   const handleVideoDeleted = useCallback((id: number) => {
     setVideos((prev) => prev.filter((v) => v.id !== id));
   }, []);
+
+  // Deep link from the "Your projects" gallery: /c/[id]?project=<projectId>
+  // opens the code panel straight on that project, then drops the param so
+  // a refresh doesn't keep re-triggering it.
+  useEffect(() => {
+    const projectParam = searchParams.get("project");
+    const projectId = projectParam ? Number(projectParam) : NaN;
+    if (!Number.isInteger(projectId) || projectId <= 0) return;
+    void codeWorkspace.open(projectId);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("project");
+    const query = next.toString();
+    router.replace(`/c/${chatId}${query ? `?${query}` : ""}`, { scroll: false });
+    // Only ever acts on the param present when this chat mounted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
   const [maxModels, setMaxModels] = useState<number>(1); // 1 = single mode (default)
 
   useEffect(() => {
@@ -194,6 +225,7 @@ export default function ChatPage() {
       const res = await chatService.getById(chatId);
       const chat = res.data.data;
       setChatTitle(chat.title || "");
+      setWebsiteTemplate(chat.websiteTemplate ?? null);
 
       if (chat.assistantId) {
         try {
@@ -1659,6 +1691,7 @@ export default function ChatPage() {
         scrollContainerId="chat-scroll-container"
         videos={videos}
         onVideoDeleted={handleVideoDeleted}
+        websiteTemplate={websiteTemplate}
       />
       <VideoGenerateDialog
         open={videoDialogOpen}

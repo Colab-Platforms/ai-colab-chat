@@ -1,10 +1,13 @@
 import api from "@/lib/api";
-import type { CodeProjectDto, CodeVersionDto } from "./types";
+import type { CodeProjectDto, CodeProjectSummaryDto, CodeVersionDto } from "./types";
 
 // REST calls for backend/src/modules/code-workspace (mounted at /api/code-projects).
 // All responses use the app-wide { status, data, message } envelope.
 
 export const codeWorkspaceApi = {
+  listProjects: () =>
+    api.get<{ data: CodeProjectSummaryDto[] }>("/code-projects").then((r) => r.data.data),
+
   getProject: (id: number) =>
     api.get<{ data: CodeProjectDto }>(`/code-projects/${id}`).then((r) => r.data.data),
 

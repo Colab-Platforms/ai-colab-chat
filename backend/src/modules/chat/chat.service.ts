@@ -69,6 +69,17 @@ class ChatService {
         );
     }
 
+    // A template the admin has since hidden or deleted must not stick to a new
+    // chat — drop it rather than failing the chat creation.
+    let websiteTemplateId: number | null = null;
+    if (data.websiteTemplateId) {
+      const template = await prisma.websiteTemplate.findFirst({
+        where: { id: data.websiteTemplateId, isActive: true, isDeleted: false },
+        select: { id: true },
+      });
+      websiteTemplateId = template?.id ?? null;
+    }
+
     const chat = await prisma.chat.create({
       data: {
         title: data.title,
@@ -77,6 +88,7 @@ class ChatService {
         assistantId: data.assistantId ?? null,
         modelIds: data.modelIds ?? [],
         capability: (data.capability as any) ?? "STANDARD",
+        websiteTemplateId,
       },
     });
 
@@ -151,6 +163,11 @@ class ChatService {
     const chat = await prisma.chat.findFirst({
       where: { id: chatId, userId, isDeleted: false },
       include: {
+        // Shown on the first user message: the design this chat was built from.
+        // Kept even if the admin later hides the template — it is history.
+        websiteTemplate: {
+          select: { id: true, name: true, thumbnailUrl: true, previewUrl: true },
+        },
         generatedDocuments: {
           where: { isDeleted: false },
           select: {

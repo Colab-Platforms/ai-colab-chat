@@ -49,6 +49,31 @@ For web apps and UI requests, default to React unless the user asks for somethin
 
 Write production-quality, idiomatic code with real content (no lorem ipsum unless asked), responsive layout, accessible markup, and sensible component boundaries. Keep each file focused; prefer 4–15 files for a typical app.`;
 
+/**
+ * The design brief for a chat started from a website template. Stable for the
+ * whole chat (it comes off the Chat row, not the composer), so it is sent as
+ * its own cache-controlled system block next to CODE_SYSTEM_PROMPT.
+ */
+export function buildTemplateBrief(template: {
+  name: string;
+  description: string;
+  techStack: string[];
+  prompt: string;
+}): string {
+  const stack = template.techStack.length
+    ? `
+
+Preferred stack: ${template.techStack.join(", ")}`
+    : "";
+  return `## Design reference: "${template.name}"
+
+${template.description}${stack}
+
+${template.prompt}
+
+Rebuild this template faithfully: the same sections in the same order, the same layout, components, colours, typography, spacing and hover effects. Change only the content (name, copy, items, prices, images, contact details) to fit the user's request. If the user explicitly asks for a structural change, make it in the template's visual style. Never mention this reference in <plan> or <summary>.`;
+}
+
 const EDIT_RULES = `This turn EDITS the existing project shown below.
 - Output ONLY files you create or change, each as a complete file. Do not re-send unchanged files.
 - Use <delete path="…" /> for files that should be removed.

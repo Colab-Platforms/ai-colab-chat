@@ -3,12 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { motion, type Variants } from "framer-motion";
-import { chatService, messageService, modelService, assistantService, folderService, videoService, promptSuggestionService } from "@/lib/services";
+import { chatService, messageService, modelService, assistantService, folderService, videoService, promptSuggestionService, websiteTemplateService } from "@/lib/services";
 import * as LucideIcons from "lucide-react";
 import { ChatInput } from "@/components/chat/chat-input";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
 import { Sparkles, Folder, Columns2, Globe, Film, ArrowUpRight, type LucideIcon } from "lucide-react";
 import { AssistantHero, lift } from "@/components/chat/assistant-hero";
+import { WebsiteTemplateGallery } from "@/components/chat/website-template-gallery";
+import type { WebsiteTemplate } from "@/components/chat/website-template";
 import { getAssistantLook } from "@/components/chat/assistant-theme";
 import { useTheme } from "@/context/theme-context";
 import { useAuth } from "@/context/auth-context";
@@ -69,6 +71,9 @@ export function NewChatPage() {
       cancelled = true;
     };
   }, []);
+
+  // The website template this chat will be built from, if any.
+  const [template, setTemplate] = useState<WebsiteTemplate | null>(null);
 
   const [assistant, setAssistant] = useState<any | null>(null);
   const [activeFolder, setActiveFolder] = useState<{ name: string; description?: string | null } | null>(null);
@@ -237,6 +242,9 @@ export function NewChatPage() {
       if (assistant?.id) {
         payload.assistantId = assistant.id;
       }
+      if (template) {
+        payload.websiteTemplateId = template.id;
+      }
       const chatRes = await chatService.create(payload);
       const chatId = chatRes.data.data.id;
       const createdInFolder = Boolean(validPendingFolderId);
@@ -251,7 +259,17 @@ export function NewChatPage() {
       // Store pending first message in sessionStorage never in URL params
       sessionStorage.setItem(
         `pending_chat_${chatId}`,
-        JSON.stringify({ content, modelIds: selectedModels, chatType: chatType || "STANDARD", attachmentIds, attachmentObjects })
+        JSON.stringify({
+          content,
+          modelIds: selectedModels,
+          chatType: chatType || "STANDARD",
+          attachmentIds,
+          attachmentObjects,
+          // Lets the chat page show the template card before its first fetch lands.
+          websiteTemplate: template
+            ? { id: template.id, name: template.name, thumbnailUrl: template.thumbnailUrl, previewUrl: template.previewUrl }
+            : null,
+        })
       );
       router.push(`/c/${chatId}`);
     } catch {
@@ -399,13 +417,23 @@ export function NewChatPage() {
                   }
                 : undefined
             }
+            templateChip={
+              template
+                ? {
+                    name: template.name,
+                    thumbnailUrl: template.thumbnailUrl,
+                    onClear: () => setTemplate(null),
+                  }
+                : undefined
+            }
             onAssistantsClick={assistant ? undefined : () => window.dispatchEvent(new Event("ai-colab:open-assistants"))}
             initialPrompt={initialPrompt}
             onPromptClear={() => setInitialPrompt(undefined)}
             draftStorageKey="chat_draft_new"
           />
 
-          {suggestions.length > 0 && (
+          {/* The template gallery below takes over this role for the code assistant. */}
+          {suggestions.length > 0 && !assistant?.supportsCodeMode && (
             <motion.ul
               initial="hidden"
               animate="visible"
@@ -429,6 +457,18 @@ export function NewChatPage() {
                 );
               })}
             </motion.ul>
+          )}
+
+          {assistant?.supportsCodeMode && (
+            <WebsiteTemplateGallery
+              onUse={(picked) => {
+                setTemplate(picked);
+                // Popularity signal only — never block attaching on it.
+                void websiteTemplateService.recordUse(picked.id).catch(() => {});
+                // The admin picked the model this design builds best with.
+                if (picked.modelId) handleModelChange([picked.modelId]);
+              }}
+            />
           )}
         </div>
       </div>

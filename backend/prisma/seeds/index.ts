@@ -8,6 +8,7 @@ import { seedAssistants } from "./assistants.seed.js";
 import { backfillCreditWallets } from "./backfillCreditWallets.seed.js";
 import { seedStudioTemplates } from "./studioTemplates.seed.js";
 import { seedVideoTemplates } from "./videoTemplates.seed.js";
+import { seedWebsiteTemplates } from "./websiteTemplates.seed.js";
 
 const seedRegistry = {
   roles: seedRoles,
@@ -18,6 +19,7 @@ const seedRegistry = {
   assistants: seedAssistants,
   studioTemplates: seedStudioTemplates,
   videoTemplates: seedVideoTemplates,
+  websiteTemplates: seedWebsiteTemplates,
   backfillCreditWallets,
 } as const;
 

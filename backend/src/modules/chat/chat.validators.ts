@@ -4,6 +4,7 @@ export const createChatSchema = Joi.object({
   title: Joi.string().trim().allow(null, "").optional(),
   folderId: Joi.number().integer().positive().allow(null).optional(),
   assistantId: Joi.number().integer().positive().allow(null).optional(),
+  websiteTemplateId: Joi.number().integer().positive().allow(null).optional(),
   modelIds: Joi.array().items(Joi.number().integer().positive()).optional(),
   capability: Joi.string()
     .valid(

@@ -6,7 +6,7 @@ import {
   Copy, ThumbsUp, ThumbsDown, Share2, RefreshCw,
   ChevronLeft, ChevronRight, Check, Loader2, Pencil, X,
   FileText, File, Image as ImageIcon, Star, FileSpreadsheet,
-  Columns2, Focus, CornerUpLeft
+  Columns2, Focus, CornerUpLeft, LayoutTemplate
 } from "lucide-react";
 import { ModelAvatar } from "./model-avatar";
 import { useResponseLatency } from "./use-response-latency";
@@ -192,8 +192,18 @@ interface Message {
   chatType?: string;
 }
 
+/** The website template a code chat was started from (see Chat.websiteTemplateId). */
+export interface MessageTemplate {
+  id: number;
+  name: string;
+  thumbnailUrl: string;
+  previewUrl?: string;
+}
+
 interface MessageBubbleProps {
   message: Message;
+  /** Only passed to the first user message of a chat started from a template. */
+  template?: MessageTemplate | null;
   activeModelTab?: number;
   onModelTabChange?: (modelId: number) => void;
   onRegenerate?: (messageId: number, modelId: number) => void;
@@ -216,7 +226,7 @@ export const MessageBubble = React.memo(function MessageBubble({
   message, activeModelTab, onModelTabChange, onRegenerate, onFeedback,
   onEditMessage, editVersions, editVersionIndex, onEditVersionChange,
   isLastMessage, onFollowUpClick, sharedView = false, onToggleStar, onContinue, onRetryAssistantResponse,
-  onSwitchToFreeModel
+  onSwitchToFreeModel, template
 }: MessageBubbleProps) {
   const isUser = message.role === "USER";
   const responses = message.modelResponses || [];
@@ -334,6 +344,7 @@ export const MessageBubble = React.memo(function MessageBubble({
     return (
       <div className={`mx-auto w-full max-w-3xl px-4 py-3 ${!isMounted ? "animate-in fade-in-0 slide-in-from-bottom-2 duration-300" : ""} sm:-mb-3 ${showEdit ? "flex" : "flex justify-end"}`}>
         <div className={showEdit ? "w-full" : "max-w-[95%] sm:max-w-[85%]"}>
+          {template && <TemplateCard template={template} />}
           <Attachments message={message} isUser={true} />
           {showEdit ? (
             // Edit mode
@@ -662,6 +673,7 @@ export const MessageBubble = React.memo(function MessageBubble({
   if (prev.isLastMessage !== next.isLastMessage) return false;
   if (prev.editVersionIndex !== next.editVersionIndex) return false;
   if (prev.sharedView !== next.sharedView) return false;
+  if (prev.template?.id !== next.template?.id) return false;
   
   const pMsg = prev.message;
   const nMsg = next.message;
@@ -913,6 +925,42 @@ function CardActions({
 }
 
 // ── Attachments ──────────────────────────────────────────────────────────────
+
+/** The template chip above a user message — mirrors the one in the composer. */
+function TemplateCard({ template }: { template: MessageTemplate }) {
+  const body = (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={template.thumbnailUrl} alt="" className="h-9 w-12 shrink-0 rounded-md object-cover" />
+      <div className="min-w-0 text-left">
+        <div className="flex items-center gap-1 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+          <LayoutTemplate className="h-3 w-3" />
+          Website template
+        </div>
+        <div className="truncate text-[13px] font-semibold text-foreground">{template.name}</div>
+      </div>
+    </>
+  );
+  const className =
+    "inline-flex max-w-full items-center gap-2.5 rounded-xl border border-border bg-surface p-1.5 pr-3.5 shadow-sm";
+  return (
+    <div className="mb-2 flex justify-end">
+      {template.previewUrl ? (
+        <a
+          href={template.previewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open the template preview"
+          className={`${className} transition-colors hover:bg-sidebar-accent`}
+        >
+          {body}
+        </a>
+      ) : (
+        <div className={className}>{body}</div>
+      )}
+    </div>
+  );
+}
 
 function Attachments({ message, isUser }: { message: Message; isUser?: boolean }) {
   if (!message.attachments?.length) return null;
