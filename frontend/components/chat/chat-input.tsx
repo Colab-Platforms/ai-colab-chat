@@ -125,6 +125,12 @@ interface ChatInputProps {
   supportsCodeMode?: boolean;
   /** Overrides the textarea placeholder (e.g. while the code panel is open). */
   placeholder?: string;
+  /**
+   * Typed out one at a time in the empty composer as an animated
+   * placeholder; Tab fills the current one into the textarea. Ignored once
+   * `placeholder` is set or the user has typed anything.
+   */
+  typingSuggestions?: string[];
   /** When set, the capability row ends with an "Assistants →" button that calls this. */
   onAssistantsClick?: () => void;
   /**
@@ -387,6 +393,7 @@ export function ChatInput({
   onGenerateVideoClick,
   supportsCodeMode = false,
   placeholder,
+  typingSuggestions,
   onAssistantsClick,
   compact = false,
   footerNote,
@@ -408,6 +415,56 @@ export function ChatInput({
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const dragCounterRef = useRef(0);
   const { imageGenEnabled, videoGenEnabled } = usePlanCapabilities();
+
+  // Typed-out placeholder: cycles through typingSuggestions one character at
+  // a time while the composer is empty and idle. Tab fills the full phrase.
+  const [animatedPlaceholder, setAnimatedPlaceholder] = useState("");
+  const typingIndexRef = useRef(0); // which suggestion we're on
+
+  useEffect(() => {
+    if (!typingSuggestions || typingSuggestions.length === 0 || content) {
+      setAnimatedPlaceholder("");
+      return;
+    }
+
+    let charIndex = 0;
+    let phase: "typing" | "pausing" | "deleting" = "typing";
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const tick = () => {
+      const current =
+        typingSuggestions[typingIndexRef.current % typingSuggestions.length];
+
+      if (phase === "typing") {
+        charIndex += 1;
+        setAnimatedPlaceholder(current.slice(0, charIndex));
+        if (charIndex >= current.length) {
+          phase = "pausing";
+          timeoutId = setTimeout(tick, 1600);
+        } else {
+          timeoutId = setTimeout(tick, 35);
+        }
+      } else if (phase === "pausing") {
+        phase = "deleting";
+        timeoutId = setTimeout(tick, 20);
+      } else {
+        charIndex -= 1;
+        setAnimatedPlaceholder(current.slice(0, charIndex));
+        if (charIndex <= 0) {
+          typingIndexRef.current += 1;
+          phase = "typing";
+          timeoutId = setTimeout(tick, 400);
+        } else {
+          timeoutId = setTimeout(tick, 15);
+        }
+      }
+    };
+
+    timeoutId = setTimeout(tick, 35);
+    return () => clearTimeout(timeoutId);
+    // Only restart the whole cycle when the suggestion list or empty/non-empty state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typingSuggestions, Boolean(content)]);
 
   // Speech-to-text: track the text that existed before mic was started
   const preExistingTextRef = useRef("");
@@ -746,6 +803,18 @@ export function ChatInput({
       if (isMobile) return;
       e.preventDefault();
       handleSubmit();
+      return;
+    }
+    if (
+      e.key === "Tab" &&
+      !content &&
+      typingSuggestions &&
+      typingSuggestions.length > 0
+    ) {
+      e.preventDefault();
+      const current =
+        typingSuggestions[typingIndexRef.current % typingSuggestions.length];
+      setContent(current);
     }
   };
 
@@ -1201,7 +1270,11 @@ export function ChatInput({
                   onPaste={handlePaste}
                   placeholder={
                     placeholder ??
-                    (codeModeActive ? "Describe the app or change you want…" : "Ask anything…")
+                    (typingSuggestions && typingSuggestions.length > 0
+                      ? animatedPlaceholder
+                      : codeModeActive
+                        ? "Describe the app or change you want…"
+                        : "Ask anything…")
                   }
                   maxLength={50000}
                   rows={1}
