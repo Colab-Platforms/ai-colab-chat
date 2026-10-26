@@ -30,7 +30,9 @@ import {
   DocPagePreview,
   MindmapPreview,
   SheetPreview,
+  TemplateImage,
   TemplateThumb,
+  templateImageSrc,
   type TemplateInfo,
 } from "@/components/studio/template-previews";
 
@@ -66,6 +68,16 @@ interface SourceFile {
 /** Large preview of one template, drawn from its real tokens. */
 function TemplatePreviewBody({ format, template }: { format: DocFormat; template: TemplateInfo }) {
   const t = template.tokens;
+  if (templateImageSrc(format, template.key)) {
+    return (
+      <TemplateImage
+        format={format}
+        templateKey={template.key}
+        alt={template.label}
+        className="mx-auto max-h-[70vh] max-w-full rounded-lg object-contain shadow-md"
+      />
+    );
+  }
   if (format === "PPTX") {
     return (
       <div className="flex flex-col items-center gap-3">
@@ -346,7 +358,7 @@ export default function DocumentsPage() {
                             <Check className="w-3 h-3" />
                           </span>
                         )}
-                        <TemplateThumb format={browseFormat} tokens={t.tokens} />
+                        <TemplateThumb format={browseFormat} tokens={t.tokens} templateKey={t.key} label={t.label} />
                       </div>
                       <div className="mt-2 px-0.5">
                         <div className="text-[13.5px] font-medium text-foreground">{t.label}</div>

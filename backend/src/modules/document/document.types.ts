@@ -7,13 +7,57 @@
  * output is escaped data rather than markup we have to trust.
  */
 
-export type DocumentTheme = "professional" | "minimal" | "report";
+export type BaseDocumentTheme = "professional" | "minimal" | "report";
 
-export const DOCUMENT_THEMES: DocumentTheme[] = [
+/** The three general-purpose themes, offered for PDF, Word and Excel alike. */
+export const DOCUMENT_THEMES: BaseDocumentTheme[] = [
   "professional",
   "minimal",
   "report",
 ];
+
+/**
+ * Word and Excel templates, derived from the designs in frontend/Templates.
+ * Each is the same flat token set as a base theme (document.theme.ts), so the
+ * renderers need no changes. Keys are unique across every
+ * format because they all land in the one `theme` column.
+ */
+export const DOCX_TEMPLATES = [
+  "business-plan",
+  "client-proposal",
+  "cover-letter",
+  "lesson-plan",
+  "meeting-minutes",
+  "service-agreement",
+] as const;
+
+export const XLSX_TEMPLATES = [
+  "financial-model",
+  "inventory-tracker",
+  "monthly-budget",
+  "project-tracker",
+  "sales-tracker",
+  "timesheet",
+] as const;
+
+export type DocumentTheme =
+  | BaseDocumentTheme
+  | (typeof DOCX_TEMPLATES)[number]
+  | (typeof XLSX_TEMPLATES)[number];
+
+/** Every theme key that is valid for the token-based (non-deck, non-map) formats. */
+export const ALL_DOCUMENT_THEMES: DocumentTheme[] = [
+  ...DOCUMENT_THEMES,
+  ...DOCX_TEMPLATES,
+  ...XLSX_TEMPLATES,
+];
+
+/** The themes a given format offers: the base set plus its own templates. */
+export const DOCUMENT_THEMES_BY_FORMAT: Record<"PDF" | "DOCX" | "XLSX", DocumentTheme[]> = {
+  PDF: [...DOCUMENT_THEMES],
+  DOCX: [...DOCUMENT_THEMES, ...DOCX_TEMPLATES],
+  XLSX: [...DOCUMENT_THEMES, ...XLSX_TEMPLATES],
+};
 
 /**
  * PPTX-only visual templates. Kept out of `DocumentTheme` a deck earns a
@@ -30,7 +74,13 @@ export type PptxTemplate =
   | "aurora"
   | "sunset"
   | "emerald"
-  | "mono";
+  | "mono"
+  | "marketing-plan"
+  | "pitch-deck"
+  | "project-kickoff"
+  | "quarterly-review"
+  | "sales-proposal"
+  | "training-deck";
 
 export const PPTX_TEMPLATES: PptxTemplate[] = [
   "corporate",
@@ -38,6 +88,12 @@ export const PPTX_TEMPLATES: PptxTemplate[] = [
   "sunset",
   "emerald",
   "mono",
+  "marketing-plan",
+  "pitch-deck",
+  "project-kickoff",
+  "quarterly-review",
+  "sales-proposal",
+  "training-deck",
 ];
 
 /**
@@ -203,6 +259,12 @@ export interface SlideSpec {
   blocks: SlideBlock[];
   /** Speaker notes the one thing a deck has that a document does not. */
   notes?: string;
+  /**
+   * Set only on decks generated for a designed template file (see
+   * document.deckFile.ts): which slide of that file this is and its values.
+   * `title`/`blocks` above are derived from it for previews.
+   */
+  fill?: { slide: string; fields: Record<string, unknown> };
   /**
    * A topic-relevant stock photo, already re-hosted on Cloudinary.
    *

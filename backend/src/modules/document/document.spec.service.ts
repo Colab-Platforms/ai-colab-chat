@@ -23,6 +23,7 @@ import {
   type AnySpec,
   type SpecKind,
 } from "./document.types.js";
+import { generateDeckFileSpec, getDeckFileTemplate } from "./document.deckFile.js";
 
 // Pinned independently of the chat model the client selected: document
 // structure quality should not swing based on which model the user picked for
@@ -323,7 +324,17 @@ export const generateSpec = async (
   prompt: string,
   sourceText?: string | null,
   revision?: SpecRevision | null,
+  theme?: string | null,
 ): Promise<GeneratedSpecResult> => {
+  // A theme backed by a real designed .pptx is filled, not drawn: the model
+  // writes into that file's own slide designs.
+  if (kind === "presentation") {
+    const deckTemplate = getDeckFileTemplate(theme);
+    if (deckTemplate) {
+      return generateDeckFileSpec(deckTemplate, prompt, sourceText, revision);
+    }
+  }
+
   // Fixed for the whole call: a retry re-sends the SAME request plus the
   // validator's error, so a revision must keep revising rather than fall back
   // to generating from the bare instruction.
