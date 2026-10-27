@@ -79,6 +79,18 @@ const MODEL_CONSTRAINTS: Record<
     resolutions: ["720p", "1080p"],
     aspectRatios: ["16:9", "9:16"],
   },
+  // Only the 720p price is known, so only 720p is offered.
+  "google/veo-3.1": {
+    durations: [4, 6, 8],
+    resolutions: ["720p"],
+    aspectRatios: ["16:9", "9:16"],
+  },
+  // 1080p is the only priced tier; OpenRouter's playground offers 6s and 10s at it.
+  "minimax/hailuo-2.3": {
+    durations: [6, 10],
+    resolutions: ["1080p"],
+    aspectRatios: ["16:9"],
+  },
 };
 
 const DEFAULT_CONSTRAINTS = {
@@ -97,7 +109,12 @@ export const IMAGE_TO_VIDEO_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
   "google/veo-3.1-lite",
+  "google/veo-3.1",
+  "minimax/hailuo-2.3",
 ]);
+
+/** Models that only take a first frame. Mirrors SINGLE_FRAME_MODELS in backend video.types.ts. */
+const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3"]);
 
 /**
  * Models that take a 3+ image sequence (sent as ordered reference images).
@@ -113,6 +130,7 @@ export const MAX_FRAME_PAIR_IMAGES = 2;
 /** How many images the model can actually use (0 = text-to-video only). */
 export const maxImagesFor = (model: VideoModelOption | undefined) => {
   if (!model || !IMAGE_TO_VIDEO_MODELS.has(model.externalId)) return 0;
+  if (SINGLE_FRAME_MODELS.has(model.externalId)) return 1;
   return MULTI_IMAGE_MODELS.has(model.externalId) ? MAX_STUDIO_IMAGES : MAX_FRAME_PAIR_IMAGES;
 };
 

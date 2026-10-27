@@ -71,6 +71,9 @@ export const MULTI_IMAGE_MODELS = new Set([
 /** Models limited to a first/last frame pair. */
 export const MAX_FRAME_PAIR_IMAGES = 2;
 
+/** Models that only take a first frame (no last frame). */
+export const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3"]);
+
 /**
  * Longest reference audio accepted. Seedance's own reference-to-video caps
  * the combined audio input at ~16s on the providers that document it.

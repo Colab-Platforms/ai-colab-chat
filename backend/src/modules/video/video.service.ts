@@ -13,6 +13,7 @@ import {
   MAX_PROMPT_CHARS,
   MAX_REFERENCE_AUDIO_SECONDS,
   MULTI_IMAGE_MODELS,
+  SINGLE_FRAME_MODELS,
   type CreateVideoInput,
   type ListVideosQuery,
 } from "./video.types.js";
@@ -154,6 +155,8 @@ class VideoService {
     "bytedance/seedance-2.0": { "480p": 0.06728, "720p": 0.1512, "1080p": 0.37422, "4k": 0.7776 },
     "bytedance/seedance-2.0-mini": { "480p": 0.03364, "720p": 0.0756 },
     "google/veo-3.1-lite": { "720p": 0.05, "1080p": 0.08 },
+    "google/veo-3.1": { "720p": 0.4 },
+    "minimax/hailuo-2.3": { "1080p": 0.0817 },
   };
 
 
@@ -276,6 +279,13 @@ class VideoService {
       vlog("create", `user=${userId} ${images.length} images rejected — ${model.externalId} only takes a first/last frame`);
       throw new ApiError(
         `${model.name} can only use up to ${MAX_FRAME_PAIR_IMAGES} images (first and last frame). Pick a Seedance model or remove some images.`,
+        STATUS_CODES.BAD_REQUEST,
+      );
+    }
+    if (images.length > 1 && SINGLE_FRAME_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} ${images.length} images rejected — ${model.externalId} only takes a first frame`);
+      throw new ApiError(
+        `${model.name} only takes a first frame image. Remove the extra images.`,
         STATUS_CODES.BAD_REQUEST,
       );
     }

@@ -484,6 +484,44 @@ export async function seedModels() {
         "1080p": 2.6667,
       },
     },
+    {
+      name: "Veo 3.1",
+      externalId: "google/veo-3.1",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "Google's flagship video model 720p with native audio, 4/6/8s clips, 16:9/9:16",
+      isActive: true,
+      // OpenRouter lists "from $0.40/sec"; the playground's 6s clip cost $2.40,
+      // so that's the 720p rate. Higher tiers aren't priced here yet.
+      //   720p: $0.40/sec → 38,016 tokens/sec → 13.3333 credits/sec ($0.03/credit)
+      // Same price for image-to-video (no distinct input tier).
+      videoCostPerSecond: 38016,
+      videoCostPerSecondByResolution: {
+        "720p": 38016,
+      },
+      creditCostPerSecond: 13.3333,
+      creditCostPerSecondByResolution: {
+        "720p": 13.3333,
+      },
+    },
+    {
+      name: "Hailuo 2.3",
+      externalId: "minimax/hailuo-2.3",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "MiniMax's cinematic video model 1080p, 6s clips, text and first-frame image input",
+      isActive: true,
+      // Flat $0.0817/sec; the playground's 6s 1920x1080 clip cost $0.4902.
+      //   1080p: $0.0817/sec → 7,765 tokens/sec → 2.7233 credits/sec ($0.03/credit)
+      videoCostPerSecond: 7765,
+      videoCostPerSecondByResolution: {
+        "1080p": 7765,
+      },
+      creditCostPerSecond: 2.7233,
+      creditCostPerSecondByResolution: {
+        "1080p": 2.7233,
+      },
+    },
   ];
 
   for (const model of MODELS) {
