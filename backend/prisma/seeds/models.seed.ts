@@ -399,12 +399,13 @@ export async function seedModels() {
         "1080p": 12.474,
         "4K": 25.92,
       },
-      //   480p: 1.3777  720p: 3.096  1080p: 7.614  4K: 15.552 credits/sec
+      // Billed at the full rate (VideoService.EXACT_USD_PER_SECOND) even with
+      // an image input, so the estimate uses the full rate too.
       creditCostPerSecondByResolutionImageInput: {
-        "480p": 1.3777,
-        "720p": 3.096,
-        "1080p": 7.614,
-        "4K": 15.552,
+        "480p": 2.2427,
+        "720p": 5.04,
+        "1080p": 12.474,
+        "4K": 25.92,
       },
     },
     {
@@ -439,10 +440,12 @@ export async function seedModels() {
         "480p": 1.1213,
         "720p": 2.52,
       },
-      // $0.02018/sec and $0.04536/sec above ÷ $0.03/credit:
+      // The discounted rate above is for *video* input. Image-to-video is billed
+      // at the full rate (VideoService.EXACT_USD_PER_SECOND), so the estimate
+      // must be the full rate too.
       creditCostPerSecondByResolutionImageInput: {
-        "480p": 0.6727,
-        "720p": 1.512,
+        "480p": 1.1213,
+        "720p": 2.52,
       },
     },
     {
