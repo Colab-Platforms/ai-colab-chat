@@ -8,7 +8,7 @@ export type VideoStatus =
   | "CANCELLED"
   | "EXPIRED";
 
-export const MAX_PROMPT_CHARS = 2000;
+export const MAX_PROMPT_CHARS = 60000;
 export const MAX_TITLE_CHARS = 200;
 
 export const SUPPORTED_ASPECT_RATIOS = [
@@ -73,9 +73,9 @@ export const MAX_FRAME_PAIR_IMAGES = 2;
 
 /**
  * Longest reference audio accepted. Seedance's own reference-to-video caps
- * the combined audio input at ~15s on the providers that document it.
+ * the combined audio input at ~16s on the providers that document it.
  */
-export const MAX_REFERENCE_AUDIO_SECONDS = 15;
+export const MAX_REFERENCE_AUDIO_SECONDS = 16;
 
 /**
  * Models that actually honour an `audio_url` input reference on OpenRouter

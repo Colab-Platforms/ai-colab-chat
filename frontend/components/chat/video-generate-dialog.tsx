@@ -124,7 +124,7 @@ export const AUDIO_REFERENCE_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
 ]);
-export const MAX_REFERENCE_AUDIO_SECONDS = 15;
+export const MAX_REFERENCE_AUDIO_SECONDS = 16;
 
 export interface VideoGenerateParams {
   prompt: string;
@@ -304,7 +304,7 @@ export function VideoGenerateDialog({
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder="A slow cinematic push-in on a neon sign in the rain..."
-          maxLength={2000}
+          maxLength={60000}
           className="min-h-24"
         />
 

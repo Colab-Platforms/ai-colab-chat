@@ -234,7 +234,7 @@ export default function VideoStudioPage() {
           value={prompt}
           onChange={draft.setPrompt}
           placeholder="Describe the shot: subject, setting, camera movement, light…"
-          maxLength={2000}
+          maxLength={60000}
           onSubmit={handleSubmit}
           canSubmit={canSubmit}
           busy={busy}

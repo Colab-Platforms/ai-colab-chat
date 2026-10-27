@@ -10,8 +10,8 @@ import { vlog, vlogBlock, vlogError } from "./video.logger.js";
 import {
   AUDIO_REFERENCE_MODELS,
   MAX_FRAME_PAIR_IMAGES,
+  MAX_PROMPT_CHARS,
   MAX_REFERENCE_AUDIO_SECONDS,
-  MAX_TITLE_CHARS,
   MULTI_IMAGE_MODELS,
   type CreateVideoInput,
   type ListVideosQuery,
@@ -130,8 +130,19 @@ class VideoService {
       const unlockPlan = allowedForPlan
         ? null
         : allPlans.find((p) => p.allowedVideoModels.some((v) => v.modelId === model.id));
+      // The charge is resolved from EXACT_USD_PER_SECOND (see
+      // resolveExactCreditsPerSecond), so the rates sent to the client must
+      // come from it too, otherwise the UI estimate drifts from the real charge.
+      const exact = VideoService.EXACT_USD_PER_SECOND[model.externalId];
+      const exactCredits = exact
+        ? Object.fromEntries(Object.entries(exact).map(([res, usd]) => [res, usd / USD_PER_CREDIT]))
+        : null;
       return {
         ...model,
+        ...(exactCredits && {
+          creditCostPerSecondByResolution: exactCredits,
+          creditCostPerSecondByResolutionImageInput: exactCredits,
+        }),
         allowedForPlan,
         unlockPlanName: unlockPlan?.name ?? null,
       };
@@ -337,7 +348,7 @@ class VideoService {
           messageId: input.messageId ?? null,
           modelId: model.id,
           status: "PENDING",
-          prompt: prompt.slice(0, MAX_TITLE_CHARS * 10),
+          prompt: prompt.slice(0, MAX_PROMPT_CHARS),
           duration,
           resolution,
           aspectRatio,

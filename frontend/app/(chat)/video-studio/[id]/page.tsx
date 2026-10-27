@@ -649,7 +649,7 @@ function EditSidebar({
         <textarea
           value={draft.prompt}
           onChange={(e) => draft.setPrompt(e.target.value)}
-          maxLength={2000}
+          maxLength={60000}
           rows={5}
           className="mt-1.5 w-full resize-y rounded-xl border border-border bg-sunken px-2.5 py-2 text-[13.5px] leading-relaxed outline-none focus:border-primary"
         />
