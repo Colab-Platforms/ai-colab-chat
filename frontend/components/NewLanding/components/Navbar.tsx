@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Phone, Sun, X } from "lucide-react";
 import {
   AnimatePresence,
   motion,
@@ -111,6 +111,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
               <Moon className="w-5 h-5 text-gray-800 dark:hidden" />
               <Sun className="w-5 h-5 text-gray-200 hidden dark:block" />
             </button>
+            
             {/* <a
               href={demoHref}
               className="hidden lg:inline-flex h-9 items-center rounded-full bg-black px-5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
@@ -142,6 +143,13 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
               <Button className="rounded-full bg-[linear-gradient(145deg,#6A45D9,#4A3198)] dark:bg-[linear-gradient(145deg,#9677FF,#6953B3)] hover:brightness-110 text-white px-4 py-2 h-9 text-sm transition-all duration-300">
                 Log in
               </Button>
+            </Link>
+            <Link
+              href="/support"
+              className="p-2 rounded-full bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+              aria-label="Contact us"
+            >
+              <Phone className="w-5 h-5 text-gray-800 dark:text-gray-200" />
             </Link>
             <button
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
