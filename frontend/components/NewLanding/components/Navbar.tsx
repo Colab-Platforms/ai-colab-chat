@@ -144,13 +144,22 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                 Log in
               </Button>
             </Link>
-            <Link
-              href="/support"
-              className="p-2 rounded-full bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-              aria-label="Contact us"
-            >
-              <Phone className="w-5 h-5 text-gray-800 dark:text-gray-200" />
+            <Link href="/try" className="hidden lg:block">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-4 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Contact Us
+              </Button>
             </Link>
+            {/* <Link href="/try" className="lg:hidden">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-3 py-2 h-9 text-sm text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Contact Us
+              </Button>
+            </Link> */}
             <button
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
               className="inline-flex lg:hidden p-2 rounded-full hover:bg-gray-800/80 transition-colors"
@@ -190,6 +199,15 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <Link
+                    href="/try"
+                    className="block rounded-2xl px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-900/70 hover:text-landing-primary transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Contact Us
+                  </Link>
+                </li>
                 <li>
                   <a
                     href={demoHref}
