@@ -121,7 +121,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
             <Link href="/try" className="hidden lg:block">
               <Button
                 variant="outline"
-                className="rounded-full border-landing-primary px-6 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+                className="rounded-full border-landing-primary px-6 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300 dark:text-white"
               >
                 Try it free
               </Button>
@@ -144,10 +144,10 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                 Log in
               </Button>
             </Link>
-            <Link href="/try" className="hidden lg:block">
+            <Link href="/support" className="hidden lg:block">
               <Button
                 variant="outline"
-                className="rounded-full border-landing-primary px-4 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+                className="rounded-full border-landing-primary px-4 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300 dark:text-white"
               >
                 Contact Us
               </Button>
@@ -201,7 +201,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                 ))}
                 <li>
                   <Link
-                    href="/try"
+                    href="/support"
                     className="block rounded-2xl px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-900/70 hover:text-landing-primary transition-colors"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
