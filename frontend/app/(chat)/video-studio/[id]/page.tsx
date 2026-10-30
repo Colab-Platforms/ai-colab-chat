@@ -40,7 +40,6 @@ import {
 } from "@/components/studio/video-job-parts";
 import {
   etaSecondsFor,
-  formatSecondsLeft,
   isVideoFailure,
   isVideoWorking,
   percentFor,
@@ -364,11 +363,7 @@ export default function VideoJobPage() {
                 body="We've stopped checking for now. Reload the page to pick the job back up — it's still running on our side."
               />
             ) : (
-              <JobProgressStage
-                percent={percent}
-                stageIndex={stageIndex}
-                secondsLeft={formatSecondsLeft(etaSeconds, (Date.now() - clockBase.current) / 1000)}
-              />
+              <JobProgressStage />
             )
           ) : failed ? (
             <JobMessageStage
@@ -405,7 +400,6 @@ export default function VideoJobPage() {
           <SessionStrip
             items={session}
             activeId={video.id}
-            activePercent={percent}
             onSelect={(id) => {
               setEditing(false);
               router.push(`/video-studio/${id}`);

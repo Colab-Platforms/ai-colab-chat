@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Phone, Sun, X } from "lucide-react";
 import {
   AnimatePresence,
   motion,
@@ -111,6 +111,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
               <Moon className="w-5 h-5 text-gray-800 dark:hidden" />
               <Sun className="w-5 h-5 text-gray-200 hidden dark:block" />
             </button>
+            
             {/* <a
               href={demoHref}
               className="hidden lg:inline-flex h-9 items-center rounded-full bg-black px-5 text-sm font-medium text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
@@ -120,7 +121,7 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
             <Link href="/try" className="hidden lg:block">
               <Button
                 variant="outline"
-                className="rounded-full border-landing-primary px-6 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+                className="rounded-full border-landing-primary px-6 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300 dark:text-white"
               >
                 Try it free
               </Button>
@@ -143,6 +144,22 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                 Log in
               </Button>
             </Link>
+            <Link href="/support" className="hidden lg:block">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-4 text-landing-primary hover:bg-landing-primary/10 transition-all duration-300 dark:text-white"
+              >
+                Contact Us
+              </Button>
+            </Link>
+            {/* <Link href="/try" className="lg:hidden">
+              <Button
+                variant="outline"
+                className="rounded-full border-landing-primary px-3 py-2 h-9 text-sm text-landing-primary hover:bg-landing-primary/10 transition-all duration-300"
+              >
+                Contact Us
+              </Button>
+            </Link> */}
             <button
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
               className="inline-flex lg:hidden p-2 rounded-full hover:bg-gray-800/80 transition-colors"
@@ -182,6 +199,15 @@ export function Navbar({ scrolled }: { scrolled?: boolean } = {}) {
                     </Link>
                   </li>
                 ))}
+                <li>
+                  <Link
+                    href="/support"
+                    className="block rounded-2xl px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100/80 dark:hover:bg-gray-900/70 hover:text-landing-primary transition-colors"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Contact Us
+                  </Link>
+                </li>
                 <li>
                   <a
                     href={demoHref}

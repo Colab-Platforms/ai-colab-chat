@@ -1,16 +1,11 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode } from "react";
 import { Check, Loader2, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { GeneratedVideo } from "@/components/chat/video-card";
-import {
-  VIDEO_STAGES,
-  etaSecondsFor,
-  isVideoFailure,
-  isVideoWorking,
-  percentFor,
-} from "@/components/studio/video-job-progress";
+import { GlimmerWrap } from "@/components/studio/glimmer-wrap";
+import { VIDEO_STAGES, isVideoFailure, isVideoWorking } from "@/components/studio/video-job-progress";
 
 /* ---------------- status pill ---------------- */
 
@@ -32,39 +27,12 @@ export function StatusPill({ tone, label }: { tone: "working" | "ready" | "faile
 
 /* ---------------- progress stage ---------------- */
 
-/**
- * The big "it's rendering" frame. The percentage is time-based (the provider
- * gives us none) while the label comes from the real job status, so the two
- * are kept consistent by `percentFor`'s per-stage floor.
- */
-export function JobProgressStage({
-  percent,
-  stageIndex,
-  secondsLeft,
-}: {
-  percent: number;
-  stageIndex: number;
-  secondsLeft: number;
-}) {
+/** The big "it's rendering" frame: a drifting field of glints behind the status text. */
+export function JobProgressStage() {
   return (
-    <div className="relative grid min-h-70 w-full max-w-full flex-1 place-items-center overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#1b1a23,#2a2135_55%,#3a2a44)] text-center">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_60%_at_50%_45%,rgba(140,107,255,0.18),transparent_70%)] motion-safe:animate-pulse" />
-      <div className="relative z-10 flex w-[min(360px,80%)] flex-col items-center gap-2.5 text-white">
-        <div className="text-[clamp(2rem,7vw,3.25rem)] font-semibold leading-none tracking-tight tabular-nums">
-          {Math.round(percent)}%
-        </div>
-        <p className="min-h-[18px] text-[13px] text-white/70">{VIDEO_STAGES[Math.min(stageIndex, 3)]}</p>
-        <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/15">
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-        <p className="min-h-[14px] text-[11px] text-white/45">
-          {percent >= 95 ? "Almost there…" : `About ${secondsLeft} s left`}
-        </p>
-      </div>
-    </div>
+    <GlimmerWrap className="min-h-70 w-full max-w-full flex-1 rounded-2xl text-center">
+      <p className="glimmer-shimmer-text text-[15px] font-medium">Video is Generating Please wait …</p>
+    </GlimmerWrap>
   );
 }
 
@@ -160,27 +128,14 @@ const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.ro
 export function SessionStrip({
   items,
   activeId,
-  activePercent,
   onSelect,
   onDelete,
 }: {
   items: GeneratedVideo[];
   activeId: number;
-  activePercent: number;
   onSelect: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
-  // Background items can be generating too (switched away from mid-render),
-  // and nothing else re-renders this strip while that's happening — tick our
-  // own clock so their badges keep climbing instead of sitting on "…".
-  const hasBackgroundJob = items.some((item) => item.id !== activeId && isVideoWorking(item.status));
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!hasBackgroundJob) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [hasBackgroundJob]);
-
   if (items.length === 0) return null;
 
   return (
@@ -190,16 +145,6 @@ export function SessionStrip({
         {items.map((item) => {
           const working = isVideoWorking(item.status);
           const failed = isVideoFailure(item.status);
-          const backgroundPercent = () => {
-            const elapsedSeconds = item.createdAt ? (now - new Date(item.createdAt).getTime()) / 1000 : 0;
-            const etaSeconds = etaSecondsFor({ resolution: item.resolution, duration: item.duration });
-            return percentFor({ status: item.status, elapsedSeconds, etaSeconds, previous: 0 });
-          };
-          const badge = working
-            ? `${Math.round(item.id === activeId ? activePercent : backgroundPercent())}%`
-            : failed
-              ? "!"
-              : clock(item.duration);
           return (
             <div key={item.id} className="group relative shrink-0">
               <button
@@ -211,19 +156,23 @@ export function SessionStrip({
                   item.id === activeId && "border-transparent outline outline-2 outline-offset-1 outline-primary",
                 )}
               >
-                {item.thumbnailUrl ? (
+                {working ? (
+                  <GlimmerWrap className="h-full w-full" density={16} seed={item.id} />
+                ) : item.thumbnailUrl ? (
                   <img src={item.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
                 ) : item.fileUrl ? (
                   <video src={item.fileUrl} preload="metadata" muted className="h-full w-full object-cover" />
                 ) : null}
-                <span
-                  className={cn(
-                    "absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white",
-                    failed ? "bg-destructive" : "bg-black/60",
-                  )}
-                >
-                  {badge}
-                </span>
+                {!working && (
+                  <span
+                    className={cn(
+                      "absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white",
+                      failed ? "bg-destructive" : "bg-black/60",
+                    )}
+                  >
+                    {failed ? "!" : clock(item.duration)}
+                  </span>
+                )}
               </button>
               <button
                 type="button"

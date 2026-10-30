@@ -523,3 +523,42 @@ html:not(.dark) .rays-group path[stroke="#a791b6"] {
   .studio-marquee { overflow-x: auto; }
   .studio-marquee-track { animation: none; }
 }
+
+/* Glimmer Wrap: a field of fine glints drifting past, flashing as they catch
+   the light — used as the video-generation loading state. */
+@keyframes glimmer-twinkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  50% {
+    opacity: var(--glimmer-peak, 1);
+    transform: scale(1);
+  }
+}
+
+@keyframes glimmer-drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(var(--glimmer-dx, -12px), var(--glimmer-dy, 10px)); }
+}
+
+@keyframes glimmer-text-shimmer {
+  to { background-position: -200% 0; }
+}
+
+.glimmer-shimmer-text {
+  background-image: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.55) 35%,
+    #ffffff 50%,
+    rgba(255, 255, 255, 0.55) 65%,
+    rgba(255, 255, 255, 0.55) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: glimmer-text-shimmer 2.6s linear infinite;
+}
