@@ -157,6 +157,7 @@ class VideoService {
     "google/veo-3.1-lite": { "720p": 0.05, "1080p": 0.08 },
     "google/veo-3.1": { "720p": 0.4 },
     "minimax/hailuo-2.3": { "1080p": 0.0817 },
+    "bytedance/seedance-2.5": { "480p": 0.1028, "720p": 0.2312, "1080p": 0.5686 },
   };
 
 

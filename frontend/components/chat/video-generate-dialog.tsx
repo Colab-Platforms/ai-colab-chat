@@ -71,6 +71,13 @@ const MODEL_CONSTRAINTS: Record<
     resolutions: ["480p", "720p"],
     aspectRatios: ["16:9", "9:16", "1:1"],
   },
+  // Up to 30s. The backend re-checks the durations against OpenRouter's live
+  // catalogue.
+  "bytedance/seedance-2.5": {
+    durations: [4, 6, 8, 10, 12, 15, 20, 25, 30],
+    resolutions: ["480p", "720p", "1080p"],
+    aspectRatios: ["16:9", "9:16", "1:1"],
+  },
   // OpenRouter's actual supported_durations for this model is exactly
   // [4, 6, 8] not every integer in that range. The dialog used to offer
   // 5s/7s, which the provider would have rejected.
@@ -85,9 +92,10 @@ const MODEL_CONSTRAINTS: Record<
     resolutions: ["720p"],
     aspectRatios: ["16:9", "9:16"],
   },
-  // 1080p is the only priced tier; OpenRouter's playground offers 6s and 10s at it.
+  // 1080p is the only priced tier, and Hailuo 2.3 only does 6s at 1080p (10s
+  // needs 768p, which isn't priced yet, so it isn't offered).
   "minimax/hailuo-2.3": {
-    durations: [6, 10],
+    durations: [6],
     resolutions: ["1080p"],
     aspectRatios: ["16:9"],
   },
@@ -108,6 +116,7 @@ export const constraintsFor = (model: VideoModelOption | undefined) =>
 export const IMAGE_TO_VIDEO_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
+  "bytedance/seedance-2.5",
   "google/veo-3.1-lite",
   "google/veo-3.1",
   "minimax/hailuo-2.3",
@@ -124,6 +133,7 @@ const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3"]);
 export const MULTI_IMAGE_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
+  "bytedance/seedance-2.5",
 ]);
 export const MAX_FRAME_PAIR_IMAGES = 2;
 
@@ -141,6 +151,7 @@ export const maxImagesFor = (model: VideoModelOption | undefined) => {
 export const AUDIO_REFERENCE_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
+  "bytedance/seedance-2.5",
 ]);
 export const MAX_REFERENCE_AUDIO_SECONDS = 16;
 

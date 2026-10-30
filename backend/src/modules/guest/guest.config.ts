@@ -15,7 +15,8 @@ export const GUEST_LIMITS = {
 export const GUEST_MODEL_EXTERNAL_IDS: readonly string[] = [
   // "openai/gpt-oss-20b:free",
   // "google/gemma-4-26b-a4b-it:free",
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  // "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "x-ai/grok-4.7",
   "openai/gpt-5.6-sol", 
   "deepseek/deepseek-v4-flash",
   "anthropic/claude-opus-5",

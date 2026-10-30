@@ -96,7 +96,7 @@ async function applyPlanRenames() {
 const PLAN_VIDEO_MODELS: Record<string, string[]> = {
     Free: [],
     Plus: ["bytedance/seedance-2.0-mini", "google/veo-3.1-lite"],
-    Pro: ["bytedance/seedance-2.0", "bytedance/seedance-2.0-mini", "google/veo-3.1-lite", "google/veo-3.1", "minimax/hailuo-2.3"],
+    Pro: ["bytedance/seedance-2.0", "bytedance/seedance-2.0-mini", "google/veo-3.1-lite", "google/veo-3.1", "minimax/hailuo-2.3", "bytedance/seedance-2.5"],
 };
 
 export async function seedPlans() {

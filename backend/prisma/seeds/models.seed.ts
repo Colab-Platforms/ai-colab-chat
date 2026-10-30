@@ -522,6 +522,32 @@ export async function seedModels() {
         "1080p": 2.7233,
       },
     },
+    {
+      name: "Seedance 2.5",
+      externalId: "bytedance/seedance-2.5",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "ByteDance's latest video model 480p/720p/1080p, up to 30s clips, text/image/video/audio inputs",
+      isActive: true,
+      // BytePlus pricing for 16:9 with no reference video:
+      //   480p:  $0.1028/sec → 9,770 tokens/sec  → 3.4267 credits/sec ($0.03/credit)
+      //   720p:  $0.2312/sec → 21,974 tokens/sec → 7.7067 credits/sec
+      //   1080p: $0.5686/sec → 54,041 tokens/sec → 18.9533 credits/sec
+      // Billed at these rates for every input type (see EXACT_USD_PER_SECOND),
+      // so there is no separate image-input rate.
+      videoCostPerSecond: 21974,
+      videoCostPerSecondByResolution: {
+        "480p": 9770,
+        "720p": 21974,
+        "1080p": 54041,
+      },
+      creditCostPerSecond: 7.7067,
+      creditCostPerSecondByResolution: {
+        "480p": 3.4267,
+        "720p": 7.7067,
+        "1080p": 18.9533,
+      },
+    },
   ];
 
   for (const model of MODELS) {

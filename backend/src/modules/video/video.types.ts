@@ -66,6 +66,7 @@ export const MAX_INPUT_IMAGES = 8;
 export const MULTI_IMAGE_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
+  "bytedance/seedance-2.5",
 ]);
 
 /** Models limited to a first/last frame pair. */
@@ -89,6 +90,7 @@ export const MAX_REFERENCE_AUDIO_SECONDS = 16;
 export const AUDIO_REFERENCE_MODELS = new Set([
   "bytedance/seedance-2.0",
   "bytedance/seedance-2.0-mini",
+  "bytedance/seedance-2.5",
 ]);
 
 export interface ListVideosQuery {
