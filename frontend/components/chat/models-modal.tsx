@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Check, Loader2, Brain, Plus } from "lucide-react";
+import { Search, Check, Loader2, Brain, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -49,6 +49,9 @@ interface ModelsModalProps {
   chatType: ChatType;
   onChatTypeChange: (type: ChatType) => void;
   hasImageAttachment: boolean;
+  /** Auto mode picks the model per message from the user's saved priority. */
+  autoEnabled: boolean;
+  onAutoChange: (enabled: boolean) => void;
 }
 
 // Shown first in the picker, in this order. Matched by OpenRouter id, so a
@@ -117,6 +120,8 @@ export function ModelsModal({
   chatType,
   onChatTypeChange,
   hasImageAttachment,
+  autoEnabled,
+  onAutoChange,
 }: ModelsModalProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ModalTab>(chatType);
@@ -188,7 +193,15 @@ export function ModelsModal({
     }
   };
 
+  const handleAutoClick = () => {
+    onAutoChange(true);
+    window.dispatchEvent(new Event("ai-colab:model-selected"));
+    onOpenChange(false);
+  };
+
   const handleModelClick = (modelId: number) => {
+    // Picking a specific model turns Auto off.
+    if (autoEnabled) onAutoChange(false);
     onToggleModel(modelId);
     window.dispatchEvent(new Event("ai-colab:model-selected"));
     if (isSingle) {
@@ -197,7 +210,7 @@ export function ModelsModal({
   };
 
   const renderModelCard = (model: Model) => {
-    const selected = selectedModels.includes(model.id);
+    const selected = !autoEnabled && selectedModels.includes(model.id);
     const icon = model.externalId ? getModelIcon(model.externalId) : null;
     const badge = getModelBadge(model);
     return (
@@ -352,6 +365,35 @@ export function ModelsModal({
             </div>
           ) : (
             <div className="flex flex-col gap-5">
+              {/* Image generation has no scored models to route between. */}
+              {activeTab !== "IMAGE_GENERATION" && !search.trim() && (
+                <button
+                  type="button"
+                  onClick={handleAutoClick}
+                  className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
+                    autoEnabled
+                      ? "border-primary/50 bg-primary/5"
+                      : "border-border/50 hover:border-primary/40 hover:bg-muted/40"
+                  }`}
+                >
+                  <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                    <span className="font-medium text-[13px] leading-tight">Auto</span>
+                    <span className="text-[11px] text-muted-foreground leading-tight">
+                      Picks the right model for each message, based on the cost-vs-quality
+                      preference in your settings.
+                    </span>
+                  </div>
+                  {autoEnabled && (
+                    <div className="rounded-full bg-primary p-0.5">
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              )}
+
               {popularModels.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-2 px-0.5">

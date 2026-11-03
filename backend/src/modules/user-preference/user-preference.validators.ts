@@ -8,6 +8,7 @@ const updatePreferencesSchema = Joi.object({
     .valid(...VOICE_IDS)
     .allow(null)
     .optional(),
+  autoModelPriority: Joi.string().valid("ECONOMY", "BALANCED", "QUALITY").optional(),
 }).min(1);
 
 export const validateUpdatePreferencesSchema = (data: unknown) => {

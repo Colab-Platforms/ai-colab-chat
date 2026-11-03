@@ -106,9 +106,17 @@ model UserPreference {
   // Null means "use the voice-agent's env-configured default" see
   // ELEVENLABS_DEFAULT_VOICE_ID fallback in voice-agent/src/bot.py.
   voiceId                 String?
+  // What "Auto" in the model picker optimises for (see modules/auto-model).
+  autoModelPriority       AutoModelPriority @default(BALANCED)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   user                    User     @relation(fields: [userId], references: [id])
+}
+
+enum AutoModelPriority {
+  ECONOMY
+  BALANCED
+  QUALITY
 }
 
 enum ContextType {
@@ -641,6 +649,9 @@ model Model {
   defaultForCapabilities ModelCapability[] @default([])
   tokenMultiplier        Float             @default(1.0)
   isFreeModel            Boolean           @default(false)
+  // Auto mode: 1-10 answer quality. Null = never picked by Auto (tokenMultiplier
+  // is the cost side; this is the quality side).
+  autoQualityScore       Int?
   videoCostPerSecond     Int?
   videoCostPerSecondByResolution Json?
   videoCostPerSecondByResolutionImageInput Json?

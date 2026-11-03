@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Compass, Sun, Moon, Columns2, Focus } from "lucide-react";
+import { Compass, Sun, Moon, Columns2, Focus, Coins, Scale, Gem } from "lucide-react";
 import { useTheme } from "@/context/theme-context";
 import {
   SectionLabel,
@@ -26,6 +26,8 @@ import {
 } from "@/lib/services";
 import { toast } from "@/lib/toast";
 
+type AutoPriority = "ECONOMY" | "BALANCED" | "QUALITY";
+
 export default function PreferencesPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
@@ -46,6 +48,7 @@ export default function PreferencesPage() {
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
   const [loadingPrefs, setLoadingPrefs] = useState(true);
   const [togglingFollowUp, setTogglingFollowUp] = useState(false);
+  const [autoPriority, setAutoPriority] = useState<AutoPriority>("BALANCED");
 
   // ── Voice preference state ───────────────────────────────────────────────
   const [voiceOptions, setVoiceOptions] = useState<{ id: string; name: string }[]>([]);
@@ -60,6 +63,7 @@ export default function PreferencesPage() {
       const prefs = res?.data?.data;
       setFollowUpEnabled(prefs?.enableFollowUpQuestions ?? false);
       setSelectedVoiceId(prefs?.voiceId ?? "");
+      setAutoPriority(prefs?.autoModelPriority ?? "BALANCED");
     } catch {
       setFollowUpEnabled(false);
     } finally {
@@ -94,6 +98,17 @@ export default function PreferencesPage() {
       toast.error("Failed to update preference");
     } finally {
       setTogglingFollowUp(false);
+    }
+  };
+
+  const handleAutoPriorityChange = async (val: AutoPriority) => {
+    const previous = autoPriority;
+    setAutoPriority(val);
+    try {
+      await userPreferenceService.updatePreferences({ autoModelPriority: val });
+    } catch {
+      setAutoPriority(previous);
+      toast.error("Failed to update Auto model preference");
     }
   };
 
@@ -163,6 +178,20 @@ export default function PreferencesPage() {
             options={[
               { value: "columns", label: "Columns", icon: Columns2 },
               { value: "focus", label: "Focus", icon: Focus },
+            ]}
+          />
+        </SettingRow>
+        <SettingRow
+          title="Auto model"
+          description="When you choose Auto in the model picker, which matters more: lower cost, a balance, or the best answer quality."
+        >
+          <Segmented
+            value={autoPriority}
+            onChange={handleAutoPriorityChange}
+            options={[
+              { value: "ECONOMY", label: "Economy", icon: Coins },
+              { value: "BALANCED", label: "Balanced", icon: Scale },
+              { value: "QUALITY", label: "Quality", icon: Gem },
             ]}
           />
         </SettingRow>

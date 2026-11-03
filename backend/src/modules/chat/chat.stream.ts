@@ -1184,7 +1184,17 @@ export async function streamChat(req: Request, res: Response) {
       }
     }
 
-    const systemPrompt = personaPrompt ?? getDefaultSystemPrompt(chatType);
+    // A specialist brought in mid-chat inherits earlier replies written as the
+    // general assistant; models imitate that history over a bare system prompt
+    // (it answered "who are you" as the platform, not as the specialist).
+    const hasEarlierReplies = conversationHistory.some(
+      (m) => m.role === "assistant",
+    );
+    const systemPrompt = personaPrompt
+      ? hasEarlierReplies
+        ? `${personaPrompt}\n\nThe earlier replies in this conversation may have come from a different assistant. From this message on, answer strictly in the role defined above, including when asked who you are or what you can do.`
+        : personaPrompt
+      : getDefaultSystemPrompt(chatType);
     if (systemPrompt) {
       conversationHistory.unshift(
         buildSystemMessage(systemPrompt, model.externalId),

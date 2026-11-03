@@ -12,6 +12,7 @@ import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat
 import { videoService } from "@/lib/services";
 import type { GeneratedVideo } from "@/components/chat/video-card";
 import { toast } from "@/lib/toast";
+import { isAutoModelEnabled, resolveAutoModelId } from "@/lib/auto-model";
 import { createSmoothRevealer } from "@/lib/smoothReveal";
 import {
   affectsCodeTurn,
@@ -20,6 +21,10 @@ import {
   reduceCodeTurn,
   useCodeWorkspace,
 } from "@/features/code-workspace";
+import { getAssistantLook } from "@/components/chat/assistant-theme";
+import { lift } from "@/components/chat/assistant-hero";
+import { useTheme } from "@/context/theme-context";
+import type { SpecialistOption } from "@/lib/intent-suggestions";
 import * as LucideIcons from "lucide-react";
 import { Bot, Sparkles, MessageSquare } from "lucide-react";
 import { flushMindmapEdits } from "@/components/chat/mindmap/mindmap-autosave-registry";
@@ -108,6 +113,31 @@ export default function ChatPage() {
   const [initialPrompt, setInitialPrompt] = useState("");
   const [assistant, setAssistant] = useState<{ id: number; name: string; description?: string | null; icon: string; supportsCodeMode?: boolean } | null>(null);
   const codePanelOpen = useCodeWorkspace((s) => s.isOpen);
+  const { theme } = useTheme();
+  const [specialists, setSpecialists] = useState<SpecialistOption[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    assistantService
+      .list({ isActive: "true", pageSize: "100" })
+      .then((res) => {
+        if (!cancelled) setSpecialists(res.data.data?.data ?? []);
+      })
+      .catch(() => { /* picker just stays hidden */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Bring a specialist into this chat from now on, or leave the current one.
+  // The backend reads the chat's assistant on every turn, so the next message
+  // already uses it; earlier messages are untouched.
+  const handleSwitchSpecialist = useCallback(async (next: SpecialistOption | null) => {
+    try {
+      await chatService.update(chatId, { assistantId: next?.id ?? null });
+      setAssistant(next as any);
+      toast.success(next ? `${next.name} joined this chat` : "Left the specialist");
+    } catch {
+      toast.error("Couldn't switch specialist");
+    }
+  }, [chatId]);
   const [folder, setFolder] = useState<{ name: string; description?: string | null } | null>(null);
   const [chatTitle, setChatTitle] = useState("");
   // Documents studio: format/template chosen up front, sent with the first message only.
@@ -900,7 +930,13 @@ export default function ChatPage() {
     setIsSending(true);
     setIsStreaming(true);
     isStreamingRef.current = true;
-    const targetModelIds = modelIds && modelIds.length > 0 ? modelIds : [...selectedModels];
+    let targetModelIds = modelIds && modelIds.length > 0 ? modelIds : [...selectedModels];
+    // Auto mode: pick the model for THIS message. Explicit modelIds (the
+    // pending first message, already resolved on the new-chat page) skip it.
+    if (!(modelIds && modelIds.length > 0) && isAutoModelEnabled()) {
+      const autoId = await resolveAutoModelId({ content, chatId, chatType, attachmentIds });
+      if (autoId) targetModelIds = [autoId];
+    }
     if (targetModelIds.length === 0) {
       toast.error("Please select a model");
       setIsSending(false);
@@ -1719,6 +1755,19 @@ export default function ChatPage() {
         chatType={chatCapability}
         draftStorageKey={`chat_draft_${chatId}`}
         supportsCodeMode={Boolean(assistant?.supportsCodeMode)}
+        specialists={specialists}
+        currentAssistantId={assistant?.id ?? null}
+        onSwitchSpecialist={handleSwitchSpecialist}
+        assistantChip={
+          assistant
+            ? {
+                name: assistant.name,
+                Icon: ((LucideIcons as any)[assistant.icon] as React.ElementType) || Sparkles,
+                color: lift(getAssistantLook(assistant).color, theme === "dark"),
+                onClear: () => handleSwitchSpecialist(null),
+              }
+            : undefined
+        }
         placeholder={assistant?.supportsCodeMode && codePanelOpen ? "Ask AI to change the code…" : "Ask a follow-up…"}
         compact
         footerNote={selectedModels.length > 1 ? "Models can disagree. Compare the answers before acting on important ones." : undefined}

@@ -186,8 +186,16 @@ export const attachmentService = {
 
 export const userPreferenceService = {
   getPreferences: () => api.get("/preferences"),
-  updatePreferences: (data: { enableFollowUpQuestions?: boolean; voiceId?: string | null }) =>
-    api.put("/preferences", data),
+  updatePreferences: (data: {
+    enableFollowUpQuestions?: boolean;
+    voiceId?: string | null;
+    autoModelPriority?: "ECONOMY" | "BALANCED" | "QUALITY";
+  }) => api.put("/preferences", data),
+};
+
+export const autoModelService = {
+  resolve: (data: { content: string; chatId?: number; chatType?: string; attachmentIds?: number[] }) =>
+    api.post("/auto-model/resolve", data),
 };
 
 export const assistantService = {

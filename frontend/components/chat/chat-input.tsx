@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,9 @@ import { attachmentService } from "@/lib/services";
 import { toast } from "@/lib/toast";
 import { usePlanCapabilities } from "@/context/plan-capabilities-context";
 import { ModelsModal } from "@/components/chat/models-modal";
+import { useAutoModel } from "@/lib/auto-model";
 import { ModelAvatar, ModelAvatarStack } from "@/components/chat/model-avatar";
+import { detectIntent, type SpecialistOption } from "@/lib/intent-suggestions";
 
 // Dynamically imported so react-speech-recognition never runs on the server
 const MicButton = dynamic(
@@ -158,6 +160,13 @@ interface ChatInputProps {
     color: string;
     onClear: () => void;
   };
+  /**
+   * Specialists the user can bring into THIS chat mid-conversation. Enables the
+   * "Specialists" picker and the "Looks like you want a specialist" suggestion.
+   */
+  specialists?: SpecialistOption[];
+  currentAssistantId?: number | null;
+  onSwitchSpecialist?: (specialist: SpecialistOption) => void;
 }
 
 /** What onSend may receive: a real ChatType, or the code-workspace pill. */
@@ -399,13 +408,20 @@ export function ChatInput({
   footerNote,
   assistantChip,
   templateChip,
+  specialists,
+  currentAssistantId = null,
+  onSwitchSpecialist,
 }: ChatInputProps) {
   const [content, setContent] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [modelsModalOpen, setModelsModalOpen] = useState(false);
+  const [autoEnabled, setAutoEnabled] = useAutoModel();
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
   const [chatType, setChatType] = useState<ChatType>("STANDARD");
+  // In a conversation (compact) the type buttons are normally hidden; a chat
+  // that can switch specialists shows the full row, Assistants → included.
+  const rowCompact = compact && !onSwitchSpecialist;
   const [codeMode, setCodeMode] = useState(false);
   const codeModeActive = supportsCodeMode && codeMode;
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -578,6 +594,37 @@ export function ChatInput({
       return;
     }
     enableCodeMode();
+  };
+
+  // "Looks like you want X" offers. Never switches by itself (see
+  // lib/intent-suggestions); only runs in plain Chat mode.
+  const [dismissedIntent, setDismissedIntent] = useState<string | null>(null);
+  const intent = useMemo(() => {
+    if (chatType !== "STANDARD" || isSending) return null;
+    return detectIntent(content, {
+      supportsCodeMode,
+      codeModeActive,
+      imageGenEnabled,
+      specialists: onSwitchSpecialist ? (specialists ?? []) : [],
+      currentAssistantId,
+    });
+  }, [content, chatType, isSending, supportsCodeMode, codeModeActive, imageGenEnabled, specialists, onSwitchSpecialist, currentAssistantId]);
+  const intentKey = intent
+    ? intent.kind === "SPECIALIST" ? `S${intent.specialist.id}` : intent.kind
+    : null;
+  const visibleIntent = intent && intentKey !== dismissedIntent ? intent : null;
+
+  const acceptIntent = () => {
+    if (!visibleIntent) return;
+    if (visibleIntent.kind === "IMAGE") {
+      setCodeMode(false);
+      applyChatType("IMAGE_GENERATION", false);
+    } else if (visibleIntent.kind === "CODE") {
+      enableCodeMode();
+    } else {
+      onSwitchSpecialist?.(visibleIntent.specialist);
+    }
+    setDismissedIntent(intentKey);
   };
 
   // Through a ref so the effect depends only on *whether* a template is
@@ -991,8 +1038,15 @@ export function ChatInput({
     }
   };
 
+  // Auto picks exactly one model per message, so it implies single mode.
+  const handleAutoChange = (enabled: boolean) => {
+    setAutoEnabled(enabled);
+    if (enabled && maxModels !== 1) handleModeToggle("single");
+  };
+
   // Single / Multiple mode toggle
   const handleModeToggle = (mode: "single" | "multiple") => {
+    if (mode === "multiple" && autoEnabled) setAutoEnabled(false);
     if (mode === "single" && maxModels !== 1) {
       // Caller controls maxModels; we just reduce selection to 1
       if (selectedModels.length > 1) {
@@ -1110,6 +1164,37 @@ export function ChatInput({
                       <X className="h-3 w-3" />
                     </button>
                   </span>
+                </div>
+              )}
+
+              {visibleIntent && (
+                <div className="mb-1 mt-1 flex flex-shrink-0 items-center px-2 animate-in fade-in slide-in-from-bottom-1">
+                  <div className="inline-flex max-w-full items-center gap-2 rounded-xl bg-accent-soft py-1 pl-3 pr-1.5 text-xs text-accent-ink">
+                    {visibleIntent.kind === "IMAGE" && <ImageIcon className="h-3.5 w-3.5 flex-shrink-0" />}
+                    {visibleIntent.kind === "CODE" && <Code2 className="h-3.5 w-3.5 flex-shrink-0" />}
+                    {visibleIntent.kind === "SPECIALIST" && <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />}
+                    <span className="truncate">
+                      {visibleIntent.kind === "IMAGE" && "Looks like you want an image. Switch to Image mode?"}
+                      {visibleIntent.kind === "CODE" && "Looks like you want to build something. Switch to Code mode?"}
+                      {visibleIntent.kind === "SPECIALIST" &&
+                        `This looks like a job for ${visibleIntent.specialist.name}. Bring them in?`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={acceptIntent}
+                      className="flex-shrink-0 rounded-lg bg-accent-ink px-2.5 py-1 font-medium text-white transition-opacity hover:opacity-90"
+                    >
+                      {visibleIntent.kind === "SPECIALIST" ? "Switch" : "Yes"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDismissedIntent(intentKey)}
+                      title="Dismiss"
+                      className="flex-shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1395,7 +1480,12 @@ export function ChatInput({
                         title={picked.length === 0 ? "Select a model" : many ? "Change models" : "Change model"}
                         className="ml-1 flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-transparent text-[13px] font-medium text-foreground hover:bg-sidebar-accent transition-colors min-w-0"
                       >
-                        {picked.length === 0 ? (
+                        {autoEnabled ? (
+                          <>
+                            <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                            <span>Auto</span>
+                          </>
+                        ) : picked.length === 0 ? (
                           <span className="text-muted-foreground">Select model</span>
                         ) : many ? (
                           <>
@@ -1515,10 +1605,10 @@ export function ChatInput({
 
           {/* Quick capability switcher — shortcuts into the same chatType
               state/handler as the "+" menu's Capabilities section. */}
-          {!isExpanded && (!compact || supportsCodeMode) && (
+          {!isExpanded && (!rowCompact || supportsCodeMode) && (
             <div className="flex flex-wrap items-center justify-center gap-2 pt-3">
               {(
-                compact ? [] : [
+                rowCompact ? [] : [
                   { type: "STANDARD" as const, label: "Chat", icon: MessageSquare, locked: false },
                   { type: "WEB_SEARCH" as const, label: "Web search", icon: Search, locked: false },
                   { type: "IMAGE_GENERATION" as const, label: "Image", icon: ImageIcon, locked: !imageGenEnabled },
@@ -1570,7 +1660,7 @@ export function ChatInput({
                   Code
                 </motion.button>
               )}
-              {onGenerateVideoClick && !compact && (
+              {onGenerateVideoClick && !rowCompact && (
                 <motion.button
                   type="button"
                   whileHover={{ scale: 1.03 }}
@@ -1581,6 +1671,35 @@ export function ChatInput({
                   {videoGenEnabled ? <Film className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                   Video
                 </motion.button>
+              )}
+              {onSwitchSpecialist && specialists && specialists.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 px-2 py-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      Assistants
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="top" align="end" className="max-h-72 w-64 overflow-y-auto">
+                    <DropdownMenuLabel>Bring an assistant into this chat</DropdownMenuLabel>
+                    {specialists.map((s) => (
+                      <DropdownMenuItem
+                        key={s.id}
+                        disabled={s.id === currentAssistantId}
+                        onClick={() => onSwitchSpecialist(s)}
+                        className="flex flex-col items-start gap-0.5"
+                      >
+                        <span className="text-sm font-medium">{s.name}</span>
+                        {s.description && (
+                          <span className="line-clamp-1 text-xs text-muted-foreground">{s.description}</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
               {onAssistantsClick && (
                 <button
@@ -1621,6 +1740,8 @@ export function ChatInput({
         hasImageAttachment={attachments.some((a) =>
           a.mimeType.startsWith("image/"),
         )}
+        autoEnabled={autoEnabled}
+        onAutoChange={handleAutoChange}
       />
     </>
   );

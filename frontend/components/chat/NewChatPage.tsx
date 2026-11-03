@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { motion, type Variants } from "framer-motion";
 import { chatService, messageService, modelService, assistantService, folderService, videoService, promptSuggestionService, websiteTemplateService } from "@/lib/services";
+import { isAutoModelEnabled, resolveAutoModelId } from "@/lib/auto-model";
 import * as LucideIcons from "lucide-react";
 import { ChatInput } from "@/components/chat/chat-input";
 import { VideoGenerateDialog, type VideoGenerateParams } from "@/components/chat/video-generate-dialog";
@@ -230,9 +231,17 @@ export function NewChatPage() {
       const pendingFolderId = rawPendingFolderId ? Number(rawPendingFolderId) : null;
       const validPendingFolderId = pendingFolderId && !Number.isNaN(pendingFolderId) ? pendingFolderId : null;
 
-      const payload: any = { 
+      // Auto mode: decide the model for this first message up front; the chat
+      // page then sends it as an explicit model (no second resolve).
+      let sendModelIds = selectedModels;
+      if (isAutoModelEnabled()) {
+        const autoId = await resolveAutoModelId({ content, chatType, attachmentIds });
+        if (autoId) sendModelIds = [autoId];
+      }
+
+      const payload: any = {
         title: content.substring(0, 50),
-        modelIds: selectedModels,
+        modelIds: sendModelIds,
         // "CODE" (code-workspace pill) is a one-turn flag, not a capability.
         capability: chatType === "CODE" ? "STANDARD" : chatType || "STANDARD",
       };
@@ -261,7 +270,7 @@ export function NewChatPage() {
         `pending_chat_${chatId}`,
         JSON.stringify({
           content,
-          modelIds: selectedModels,
+          modelIds: sendModelIds,
           chatType: chatType || "STANDARD",
           attachmentIds,
           attachmentObjects,

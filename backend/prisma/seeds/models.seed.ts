@@ -580,6 +580,66 @@ export async function seedModels() {
     });
   }
 
+  // Auto-mode quality scores (1-10). Starting points only: applied just where
+  // a model has no score yet, so values tuned later aren't overwritten by a
+  // re-seed. A model with no score is never picked by Auto.
+  const AUTO_QUALITY_SEED: Record<string, number> = {
+    "anthropic/claude-opus-5.5": 10,
+    "google/gemini-4-argon": 9,
+    "anthropic/claude-sonnet-5.5": 8,
+    "openai/gpt-5.6-sol": 8,
+    "x-ai/grok-4.7": 8,
+    "deepseek/deepseek-v4-flash": 5,
+    "anthropic/claude-haiku-5.5": 5,
+    // Anthropic
+    "anthropic/claude-opus-5": 9,
+    "anthropic/claude-opus-4.8": 9,
+    "anthropic/claude-opus-4.7": 8,
+    "anthropic/claude-sonnet-5": 8,
+    "anthropic/claude-sonnet-4.6": 7,
+    "anthropic/claude-haiku-4.5": 4,
+    // OpenAI
+    "openai/gpt-5.6-terra": 7,
+    "openai/gpt-5.6-luna": 5,
+    "openai/gpt-5.4": 7,
+    "openai/gpt-5.1": 6,
+    "openai/gpt-4.1": 6,
+    // Google
+    "google/gemini-3.8-flash": 7,
+    "google/gemini-3-flash-preview": 6,
+    "google/gemini-3.1-flash-lite-preview": 4,
+    // DeepSeek / Qwen / Mistral / GLM / Kimi / Perplexity
+    "deepseek/deepseek-v4-pro": 7,
+    "deepseek/deepseek-v3.2": 5,
+    "qwen/qwen3.8-max-0902": 7,
+    "qwen/qwen3.8-flash": 4,
+    "qwen/qwen3.6-35b-a3b": 4,
+    "mistralai/mistral-medium-3-5": 6,
+    "mistralai/mistral-small-2603": 4,
+    "z-ai/glm-5.3-flashx": 5,
+    "moonshotai/kimi-k2.5": 6,
+    "perplexity/sonar": 5,
+    // Free models (cost 0): kept <= 6 so they only win Economy/Balanced on easy requests
+    "nvidia/nemotron-3-ultra-550b-a55b:free": 6,
+    "nvidia/nemotron-3-super-120b-a12b:free": 5,
+    "google/gemma-4-31b-it:free": 5,
+    "nvidia/nemotron-3-nano-30b-a3b:free": 4,
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": 4,
+    "google/gemma-4-26b-a4b-it:free": 4,
+    "openai/gpt-oss-20b:free": 4,
+    "cohere/north-mini-code:free": 4,
+    "poolside/laguna-m.1:free": 4,
+    "nvidia/nemotron-nano-9b-v2:free": 3,
+    "nvidia/nemotron-nano-12b-v2-vl:free": 3,
+    "poolside/laguna-xs-2.1:free": 3,
+  };
+  for (const [externalId, score] of Object.entries(AUTO_QUALITY_SEED)) {
+    await prisma.model.updateMany({
+      where: { externalId, autoQualityScore: null },
+      data: { autoQualityScore: score },
+    });
+  }
+
   // Retired/dead free model IDs kept out of MODELS above so the upsert
   // loop doesn't recreate them, and explicitly deactivated here in case
   // they're already in the DB from an earlier seed run.

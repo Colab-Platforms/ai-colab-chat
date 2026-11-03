@@ -36,6 +36,10 @@ class UserPreferenceService {
       updateData.voiceId = data.voiceId;
     }
 
+    if (data.autoModelPriority !== undefined) {
+      updateData.autoModelPriority = data.autoModelPriority;
+    }
+
     const preference = await prisma.userPreference.upsert({
       where: { userId },
       update: updateData,
@@ -43,6 +47,7 @@ class UserPreferenceService {
         userId,
         enableFollowUpQuestions: data.enableFollowUpQuestions ?? true,
         voiceId: data.voiceId ?? null,
+        autoModelPriority: data.autoModelPriority ?? "BALANCED",
       },
     });
 

@@ -35,6 +35,7 @@ import githubRoutes from "@/modules/github/github.route.js";
 import vercelRoutes from "@/modules/vercel/vercel.route.js";
 import guestRoutes from "@/modules/guest/guest.route.js";
 import promptSuggestionRoutes from "@/modules/prompt-suggestion/prompt-suggestion.route.js";
+import autoModelRoutes from "@/modules/auto-model/auto-model.route.js";
 
 
 
@@ -85,5 +86,6 @@ router.use("/github", githubRoutes);
 router.use("/vercel", vercelRoutes);
 router.use("/guest", guestRoutes);
 router.use("/prompt-suggestions", promptSuggestionRoutes);
+router.use("/auto-model", autoModelRoutes);
 
 export default router;

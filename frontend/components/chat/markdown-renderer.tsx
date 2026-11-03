@@ -5,6 +5,9 @@ import { PhotoProvider, PhotoView } from "react-photo-view";
 import "react-photo-view/dist/react-photo-view.css";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Copy, Check, Download, X } from "lucide-react";
@@ -119,7 +122,24 @@ const MemoizedCodeBlock = React.memo(
   }
 );
 
-const remarkPluginsList = [remarkGfm];
+const remarkPluginsList = [remarkGfm, remarkMath];
+// Bad LaTeX from a model shouldn't blank the message: render the error inline.
+const rehypePluginsList: any[] = [[rehypeKatex, { throwOnError: false, strict: false }]];
+
+// Models often write \( \) and \[ \] instead of $ and $$; remark-math only
+// understands the dollar forms. Code fences are left untouched.
+function normalizeMathDelimiters(text: string): string {
+  return text
+    .split(/(```[\s\S]*?```|`[^`\n]*`)/g)
+    .map((part, i) =>
+      i % 2 === 1
+        ? part
+        : part
+            .replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => `\n$$\n${m.trim()}\n$$\n`)
+            .replace(/\\\(([\s\S]+?)\\\)/g, (_, m) => `$${m.trim()}$`),
+    )
+    .join("");
+}
 
 const markdownComponents: any = {
   img({ src, alt }: any) {
@@ -228,12 +248,12 @@ export const MarkdownRenderer = React.memo(({ content }: MarkdownRendererProps) 
     >
       <div className="prose-chat">
         <ReactMarkdown
-        
           remarkPlugins={remarkPluginsList}
+          rehypePlugins={rehypePluginsList}
           urlTransform={(value) => value}
           components={markdownComponents}
         >
-          {content}
+          {normalizeMathDelimiters(content)}
         </ReactMarkdown>
       </div>
     </PhotoProvider>
