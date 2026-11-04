@@ -158,6 +158,8 @@ class VideoService {
     "google/veo-3.1": { "720p": 0.4 },
     "minimax/hailuo-2.3": { "1080p": 0.0817 },
     "bytedance/seedance-2.5": { "480p": 0.1028, "720p": 0.2312, "1080p": 0.5686 },
+    "alibaba/wan-3.0": { "480p": 0.05, "720p": 0.1, "1080p": 0.2 },
+    "alibaba/wan-3.0-prime": { "480p": 0.068, "720p": 0.14, "1080p": 0.28 },
   };
 
 

@@ -57,6 +57,8 @@ export interface VideoModelOption {
  * round-trips just to fail. Falls back to a conservative default for any
  * model not listed here yet.
  */
+const WAN_DURATIONS = Array.from({ length: 29 }, (_, i) => i + 2);
+
 const MODEL_CONSTRAINTS: Record<
   string,
   { durations: number[]; resolutions: string[]; aspectRatios: string[] }
@@ -99,6 +101,18 @@ const MODEL_CONSTRAINTS: Record<
     resolutions: ["1080p"],
     aspectRatios: ["16:9"],
   },
+  // Wan 3.0 and Prime share the same limits (OpenRouter's live catalogue): any
+  // whole second from 2 to 30.
+  "alibaba/wan-3.0": {
+    durations: WAN_DURATIONS,
+    resolutions: ["480p", "720p", "1080p"],
+    aspectRatios: ["16:9", "4:3", "1:1", "3:4", "9:16"],
+  },
+  "alibaba/wan-3.0-prime": {
+    durations: WAN_DURATIONS,
+    resolutions: ["480p", "720p", "1080p"],
+    aspectRatios: ["16:9", "4:3", "1:1", "3:4", "9:16"],
+  },
 };
 
 const DEFAULT_CONSTRAINTS = {
@@ -120,10 +134,12 @@ export const IMAGE_TO_VIDEO_MODELS = new Set([
   "google/veo-3.1-lite",
   "google/veo-3.1",
   "minimax/hailuo-2.3",
+  "alibaba/wan-3.0",
+  "alibaba/wan-3.0-prime",
 ]);
 
 /** Models that only take a first frame. Mirrors SINGLE_FRAME_MODELS in backend video.types.ts. */
-const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3"]);
+const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3", "alibaba/wan-3.0-prime"]);
 
 /**
  * Models that take a 3+ image sequence (sent as ordered reference images).

@@ -73,7 +73,7 @@ export const MULTI_IMAGE_MODELS = new Set([
 export const MAX_FRAME_PAIR_IMAGES = 2;
 
 /** Models that only take a first frame (no last frame). */
-export const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3"]);
+export const SINGLE_FRAME_MODELS = new Set(["minimax/hailuo-2.3", "alibaba/wan-3.0-prime"]);
 
 /**
  * Longest reference audio accepted. Seedance's own reference-to-video caps

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertCircle, Download, Film, Loader2, Maximize, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, Download, ExternalLink, Film, Loader2, Maximize, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { videoService } from "@/lib/services";
 import { toast } from "@/lib/toast";
@@ -280,6 +281,18 @@ export function VideoCard({
               Download
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            title="Open in Video Studio"
+            asChild
+          >
+            <Link href={`/video-studio/${video.id}`}>
+              <ExternalLink className="mr-1.5 h-3 w-3" />
+              Open in Studio
+            </Link>
+          </Button>
           <Button
             variant="ghost"
             size="sm"

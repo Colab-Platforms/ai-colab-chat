@@ -218,7 +218,7 @@ export async function seedModels() {
       name: "Gemini 3.8 Flash",
       externalId: "google/gemini-3.8-flash",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "VISION"],
       description: "Google's high-performance Flash model for fast reasoning, coding, multimodal understanding, and agents.",
       isActive: true,
     },
@@ -226,7 +226,7 @@ export async function seedModels() {
       name: "Gemini 3 Flash Preview",
       externalId: "google/gemini-3-flash-preview",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "VISION"],
       description: "Fast multimodal reasoning model for chat, coding, agentic workflows, and long-context tasks.",
       isActive: true,
     },
@@ -274,7 +274,7 @@ export async function seedModels() {
       name: "GLM 5.3 FlashX",
       externalId: "z-ai/glm-5.3-flashx",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "VISION"],
       description: "Fast multimodal model optimized for coding, visual understanding, reasoning, and long-horizon agents.",
       isActive: true,
     },
@@ -282,7 +282,7 @@ export async function seedModels() {
       name: "Qwen 3.8 Max",
       externalId: "qwen/qwen3.8-max-0902",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
       description: "Alibaba's flagship Qwen model for multimodal reasoning, coding, agents, and long-context tasks.",
       isActive: true,
     },
@@ -290,7 +290,7 @@ export async function seedModels() {
       name: "Gemini 4 Argon",
       externalId: "google/gemini-4-argon",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "DEEP_RESEARCH", "VISION"],
       description: "Google's flagship reasoning model for complex software engineering, deep math and science, and autonomous multi-step agents.",
       isActive: true,
     },
@@ -330,7 +330,7 @@ export async function seedModels() {
       name: "Qwen 3.6 35B A3B",
       externalId: "qwen/qwen3.6-35b-a3b",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "VISION"],
       description: "Alibaba's open-weight multimodal MoE model (35B total, 3B active) for efficient inference.",
       isActive: true,
     },
@@ -338,7 +338,7 @@ export async function seedModels() {
       name: "Qwen 3.8 Flash",
       externalId: "qwen/qwen3.8-flash",
       modelProviderId: openRouter.id,
-      capabilities: ["STANDARD", "VISION", "VIDEO_GENERATION"],
+      capabilities: ["STANDARD", "VISION"],
       description: "Alibaba's multimodal reasoning model for coding, agentic workflows, document and chart analysis, and long-video analysis.",
       isActive: true,
     },
@@ -546,6 +546,54 @@ export async function seedModels() {
         "480p": 3.4267,
         "720p": 7.7067,
         "1080p": 18.9533,
+      },
+    },
+    {
+      name: "Wan 3.0",
+      externalId: "alibaba/wan-3.0",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "Alibaba's video model 480p/720p/1080p, 2-30s clips with native audio, text and first/last-frame image input",
+      isActive: true,
+      // OpenRouter pricing_skus (flat $/sec per resolution, same for image input):
+      //   480p:  $0.05/sec → 4,752 tokens/sec  → 1.6667 credits/sec ($0.03/credit)
+      //   720p:  $0.10/sec → 9,504 tokens/sec  → 3.3333 credits/sec
+      //   1080p: $0.20/sec → 19,008 tokens/sec → 6.6667 credits/sec
+      videoCostPerSecond: 9504,
+      videoCostPerSecondByResolution: {
+        "480p": 4752,
+        "720p": 9504,
+        "1080p": 19008,
+      },
+      creditCostPerSecond: 3.3333,
+      creditCostPerSecondByResolution: {
+        "480p": 1.6667,
+        "720p": 3.3333,
+        "1080p": 6.6667,
+      },
+    },
+    {
+      name: "Wan 3.0 Prime",
+      externalId: "alibaba/wan-3.0-prime",
+      modelProviderId: openRouter.id,
+      capabilities: ["VIDEO_GENERATION"],
+      description: "Alibaba's fast-mode Wan 3.0 480p/720p/1080p, 2-30s clips with native audio, text and first-frame image input",
+      isActive: true,
+      // OpenRouter pricing_skus (flat $/sec per resolution, same for image input):
+      //   480p:  $0.068/sec → 6,463 tokens/sec  → 2.2667 credits/sec ($0.03/credit)
+      //   720p:  $0.14/sec  → 13,306 tokens/sec → 4.6667 credits/sec
+      //   1080p: $0.28/sec  → 26,611 tokens/sec → 9.3333 credits/sec
+      videoCostPerSecond: 13306,
+      videoCostPerSecondByResolution: {
+        "480p": 6463,
+        "720p": 13306,
+        "1080p": 26611,
+      },
+      creditCostPerSecond: 4.6667,
+      creditCostPerSecondByResolution: {
+        "480p": 2.2667,
+        "720p": 4.6667,
+        "1080p": 9.3333,
       },
     },
   ];
