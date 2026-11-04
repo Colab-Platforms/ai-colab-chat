@@ -421,12 +421,21 @@ export default function AssetsPage() {
       />
 
       <Dialog open={!!playing} onOpenChange={(open) => !open && setPlaying(null)}>
-        <DialogContent className="sm:max-w-3xl p-3 gap-2">
+        {/* Grid children default to min-width:auto, so an unshrinkable title or video would widen the dialog past its max width. */}
+        <DialogContent className="sm:max-w-3xl p-3 gap-2 [&>*]:min-w-0">
           <DialogHeader className="px-1 pt-1">
-            <DialogTitle className="text-sm font-medium truncate pr-8">{playing?.title}</DialogTitle>
+            <DialogTitle className="text-sm font-medium line-clamp-2 break-words pr-8" title={playing?.title}>
+              {playing?.title}
+            </DialogTitle>
           </DialogHeader>
           {playing?.fileUrl && (
-            <video src={playing.fileUrl} controls autoPlay className="w-full rounded-lg bg-black max-h-[70dvh]" />
+            <video
+              src={playing.fileUrl}
+              controls
+              autoPlay
+              playsInline
+              className="mx-auto block max-h-[70dvh] max-w-full rounded-lg bg-black object-contain"
+            />
           )}
         </DialogContent>
       </Dialog>
