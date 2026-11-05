@@ -22,10 +22,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { videoService, creditWalletService } from "@/lib/services";
 import {
+  allImages,
+  EMPTY_VIDEO_IMAGES,
+  fitImagesToCaps,
   ImageSequenceStrip,
+  imageCount,
+  imagePayload,
   MAX_STUDIO_IMAGES,
   MultiImageDialog,
-  type StudioImage,
+  type ImageCaps,
+  type VideoImages,
 } from "@/components/studio/multi-image-dialog";
 import { toast } from "@/lib/toast";
 
@@ -151,13 +157,25 @@ export const MULTI_IMAGE_MODELS = new Set([
   "bytedance/seedance-2.0-mini",
   "bytedance/seedance-2.5",
 ]);
-export const MAX_FRAME_PAIR_IMAGES = 2;
 
-/** How many images the model can actually use (0 = text-to-video only). */
-export const maxImagesFor = (model: VideoModelOption | undefined) => {
-  if (!model || !IMAGE_TO_VIDEO_MODELS.has(model.externalId)) return 0;
-  if (SINGLE_FRAME_MODELS.has(model.externalId)) return 1;
-  return MULTI_IMAGE_MODELS.has(model.externalId) ? MAX_STUDIO_IMAGES : MAX_FRAME_PAIR_IMAGES;
+/** Which image kinds the model can actually use (all off = text-to-video only). */
+export const imageCapsFor = (model: VideoModelOption | undefined): ImageCaps => {
+  if (!model || !IMAGE_TO_VIDEO_MODELS.has(model.externalId)) return { first: false, last: false, references: 0 };
+  return {
+    first: true,
+    last: !SINGLE_FRAME_MODELS.has(model.externalId),
+    references: MULTI_IMAGE_MODELS.has(model.externalId) ? MAX_STUDIO_IMAGES : 0,
+  };
+};
+
+/** Note for the picker when the model cannot use every section. */
+export const imageLimitNote = (model: VideoModelOption | undefined, caps: ImageCaps) => {
+  if (!model || !caps.first) return null;
+  if (!caps.last) return `${model.name} only takes a first frame.`;
+  if (caps.references === 0) {
+    return `${model.name} only uses a first and last frame. Pick a Seedance model to add reference images.`;
+  }
+  return null;
 };
 
 /**
@@ -177,8 +195,10 @@ export interface VideoGenerateParams {
   duration: number;
   resolution: string;
   aspectRatio: string;
-  /** Ordered frame sequence (frame 1…n). */
-  imageUrls?: string[];
+  firstFrameUrl?: string;
+  lastFrameUrl?: string;
+  /** Ordered reference images. */
+  referenceImageUrls?: string[];
 }
 
 /**
@@ -203,7 +223,7 @@ export function VideoGenerateDialog({
   const [duration, setDuration] = useState(4);
   const [resolution, setResolution] = useState("720p");
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [images, setImages] = useState<StudioImage[]>([]);
+  const [images, setImages] = useState<VideoImages>(EMPTY_VIDEO_IMAGES);
   const [imagesOpen, setImagesOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null);
@@ -238,14 +258,18 @@ export function VideoGenerateDialog({
   const selectedModel = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
   const constraints = constraintsFor(selectedModel);
   const supportsImageToVideo = selectedModel ? IMAGE_TO_VIDEO_MODELS.has(selectedModel.externalId) : false;
-  const maxImages = maxImagesFor(selectedModel);
-  const hasImageInput = images.some((i) => i.fileUrl);
+  const caps = imageCapsFor(selectedModel);
+  const hasImageInput = allImages(images).some((i) => i.fileUrl);
 
   const removeImage = (id: string) =>
     setImages((prev) => {
-      const gone = prev.find((i) => i.id === id);
+      const gone = allImages(prev).find((i) => i.id === id);
       if (gone) URL.revokeObjectURL(gone.previewUrl);
-      return prev.filter((i) => i.id !== id);
+      return {
+        first: prev.first?.id === id ? null : prev.first,
+        last: prev.last?.id === id ? null : prev.last,
+        references: prev.references.filter((i) => i.id !== id),
+      };
     });
 
   // Keep duration/resolution/aspectRatio valid whenever the model changes  
@@ -256,10 +280,11 @@ export function VideoGenerateDialog({
     if (!constraints.durations.includes(duration)) setDuration(constraints.durations[0]);
     if (!constraints.resolutions.includes(resolution)) setResolution(constraints.resolutions[0]);
     if (!constraints.aspectRatios.includes(aspectRatio)) setAspectRatio(constraints.aspectRatios[0]);
-    if (images.length > maxImages) {
-      images.slice(maxImages).forEach((i) => URL.revokeObjectURL(i.previewUrl));
-      setImages(images.slice(0, maxImages));
-      if (maxImages > 0) toast.error(`${selectedModel?.name} uses at most ${maxImages} images — extra ones were removed.`);
+    const { next, dropped } = fitImagesToCaps(images, caps);
+    if (dropped.length > 0) {
+      dropped.forEach((i) => URL.revokeObjectURL(i.previewUrl));
+      setImages(next);
+      if (caps.first) toast.error(`${selectedModel?.name} cannot use some of the images, so they were removed.`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedModel?.id]);
@@ -285,11 +310,11 @@ export function VideoGenerateDialog({
         duration,
         resolution,
         aspectRatio,
-        imageUrls: images.length > 0 ? images.map((i) => i.fileUrl) : undefined,
+        ...imagePayload(images),
       });
       setPrompt("");
-      images.forEach((i) => URL.revokeObjectURL(i.previewUrl));
-      setImages([]);
+      allImages(images).forEach((i) => URL.revokeObjectURL(i.previewUrl));
+      setImages(EMPTY_VIDEO_IMAGES);
       onOpenChange(false);
     } catch (err: unknown) {
       const response = (err as { response?: { data?: { message?: string; code?: string } } })?.response;
@@ -363,7 +388,7 @@ export function VideoGenerateDialog({
             <ImageSequenceStrip images={images} onEdit={() => setImagesOpen(true)} onRemove={removeImage} />
             <Button type="button" variant="outline" size="sm" onClick={() => setImagesOpen(true)}>
               <ImagePlus className="mr-1.5 h-3.5 w-3.5" />
-              {images.length > 0 ? "Edit images" : "Add images"}
+              {imageCount(images) > 0 ? "Edit images" : "Add images"}
             </Button>
           </div>
         )}
@@ -374,12 +399,8 @@ export function VideoGenerateDialog({
           onOpenChange={setImagesOpen}
           images={images}
           onConfirm={setImages}
-          maxImages={maxImages}
-          limitNote={
-            maxImages > 0 && maxImages < MAX_STUDIO_IMAGES
-              ? `${selectedModel?.name} only uses a first and last frame, so up to ${maxImages} images. Pick a Seedance model for longer sequences.`
-              : null
-          }
+          caps={caps}
+          limitNote={imageLimitNote(selectedModel, caps)}
         />
 
         <div className="grid grid-cols-3 gap-2">
@@ -445,7 +466,7 @@ export function VideoGenerateDialog({
               !prompt.trim() ||
               !modelId ||
               isSubmitting ||
-              images.some((i) => i.uploading) ||
+              allImages(images).some((i) => i.uploading) ||
               !selectedModel?.allowedForPlan ||
               insufficientCredits
             }

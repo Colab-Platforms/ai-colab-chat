@@ -275,24 +275,34 @@ class VideoService {
     // out as exact first/last frames; 3+ go out as ordered reference images
     // (OpenRouter drops input_references whenever frame_images is present, so
     // the two can't be combined in one request).
-    const images = input.imageUrls?.length
-      ? input.imageUrls
-      : [input.firstFrameUrl, input.lastFrameUrl].filter((u): u is string => Boolean(u));
-    if (images.length > MAX_FRAME_PAIR_IMAGES && !MULTI_IMAGE_MODELS.has(model.externalId)) {
-      vlog("create", `user=${userId} ${images.length} images rejected — ${model.externalId} only takes a first/last frame`);
+    let firstFrameUrl = input.firstFrameUrl ?? null;
+    let lastFrameUrl = input.lastFrameUrl ?? null;
+    let referenceImageUrls = input.referenceImageUrls ?? [];
+    const hasExplicitImages = Boolean(firstFrameUrl || lastFrameUrl || referenceImageUrls.length);
+    if (!hasExplicitImages && input.imageUrls?.length) {
+      // Legacy clients: one ordered list. 1–2 images are a first/last pair, more are references.
+      if (input.imageUrls.length > MAX_FRAME_PAIR_IMAGES) referenceImageUrls = input.imageUrls;
+      else [firstFrameUrl = null, lastFrameUrl = null] = input.imageUrls;
+    }
+
+    if (lastFrameUrl && !firstFrameUrl) {
+      throw new ApiError("A last frame needs a first frame too.", STATUS_CODES.BAD_REQUEST);
+    }
+    if (lastFrameUrl && SINGLE_FRAME_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} last frame rejected — ${model.externalId} only takes a first frame`);
       throw new ApiError(
-        `${model.name} can only use up to ${MAX_FRAME_PAIR_IMAGES} images (first and last frame). Pick a Seedance model or remove some images.`,
+        `${model.name} only takes a first frame image. Remove the last frame.`,
         STATUS_CODES.BAD_REQUEST,
       );
     }
-    if (images.length > 1 && SINGLE_FRAME_MODELS.has(model.externalId)) {
-      vlog("create", `user=${userId} ${images.length} images rejected — ${model.externalId} only takes a first frame`);
+    if (referenceImageUrls.length > 0 && !MULTI_IMAGE_MODELS.has(model.externalId)) {
+      vlog("create", `user=${userId} reference images rejected — ${model.externalId} only takes a first/last frame`);
       throw new ApiError(
-        `${model.name} only takes a first frame image. Remove the extra images.`,
+        `${model.name} can't use reference images. Pick a Seedance model or remove them.`,
         STATUS_CODES.BAD_REQUEST,
       );
     }
-    const asReferences = images.length > MAX_FRAME_PAIR_IMAGES;
+    const images = [firstFrameUrl, lastFrameUrl, ...referenceImageUrls].filter((u): u is string => Boolean(u));
 
     const duration = input.duration ?? DEFAULT_DURATION;
     const resolution = input.resolution ?? DEFAULT_RESOLUTION;
@@ -365,9 +375,9 @@ class VideoService {
           duration,
           resolution,
           aspectRatio,
-          firstFrameUrl: asReferences ? null : (images[0] ?? null),
-          lastFrameUrl: asReferences ? null : (images[1] ?? null),
-          referenceImageUrls: asReferences ? images : [],
+          firstFrameUrl,
+          lastFrameUrl,
+          referenceImageUrls,
           referenceAudioUrl: input.referenceAudioUrl ?? null,
           reservedTokens,
         },

@@ -8,10 +8,15 @@ import {
   constraintsFor,
   IMAGE_TO_VIDEO_MODELS,
   MAX_REFERENCE_AUDIO_SECONDS,
-  maxImagesFor,
+  imageCapsFor,
   type VideoModelOption,
 } from "@/components/chat/video-generate-dialog";
-import type { StudioImage } from "@/components/studio/multi-image-dialog";
+import {
+  allImages,
+  fitImagesToCaps,
+  videoImagesFromUrls,
+  type VideoImages,
+} from "@/components/studio/multi-image-dialog";
 
 export const MAX_REFERENCE_AUDIO_BYTES = 10 * 1024 * 1024;
 
@@ -39,7 +44,9 @@ export interface VideoDraftSeed {
   duration?: number;
   resolution?: string;
   aspectRatio?: string;
-  imageUrls?: string[];
+  firstFrameUrl?: string | null;
+  lastFrameUrl?: string | null;
+  referenceImageUrls?: string[] | null;
   referenceAudioUrl?: string | null;
 }
 
@@ -57,15 +64,7 @@ export function useVideoDraft(seed?: VideoDraftSeed) {
   const [duration, setDuration] = useState(seed?.duration ?? 5);
   const [resolution, setResolution] = useState(seed?.resolution ?? "720p");
   const [aspectRatio, setAspectRatio] = useState(seed?.aspectRatio ?? "16:9");
-  const [images, setImages] = useState<StudioImage[]>(() =>
-    (seed?.imageUrls ?? []).map((url, i) => ({
-      id: `seed-${i}-${url}`,
-      name: `Image ${i + 1}`,
-      fileUrl: url,
-      previewUrl: url,
-      uploading: false,
-    })),
-  );
+  const [images, setImages] = useState<VideoImages>(() => videoImagesFromUrls(seed ?? {}));
   const [audio, setAudio] = useState<ReferenceAudio | null>(() =>
     seed?.referenceAudioUrl
       ? {
@@ -106,9 +105,9 @@ export function useVideoDraft(seed?: VideoDraftSeed) {
   const model = useMemo(() => models.find((m) => m.id === modelId), [models, modelId]);
   const constraints = constraintsFor(model);
   const supportsImageToVideo = model ? IMAGE_TO_VIDEO_MODELS.has(model.externalId) : false;
-  const maxImages = maxImagesFor(model);
-  const hasImageInput = images.some((i) => i.fileUrl);
-  const imagesUploading = images.some((i) => i.uploading);
+  const imageCaps = imageCapsFor(model);
+  const hasImageInput = allImages(images).some((i) => i.fileUrl);
+  const imagesUploading = allImages(images).some((i) => i.uploading);
   const supportsAudioReference = model ? AUDIO_REFERENCE_MODELS.has(model.externalId) : false;
 
   const clearAudio = useCallback(() => {
@@ -128,10 +127,11 @@ export function useVideoDraft(seed?: VideoDraftSeed) {
     }
     if (!constraints.resolutions.includes(resolution)) setResolution(constraints.resolutions[0]);
     if (!constraints.aspectRatios.includes(aspectRatio)) setAspectRatio(constraints.aspectRatios[0]);
-    if (images.length > maxImages) {
-      images.slice(maxImages).forEach((i) => URL.revokeObjectURL(i.previewUrl));
-      setImages(images.slice(0, maxImages));
-      if (maxImages > 0) toast.error(`${model.name} uses at most ${maxImages} images — extra ones were removed.`);
+    const { next, dropped } = fitImagesToCaps(images, imageCaps);
+    if (dropped.length > 0) {
+      dropped.forEach((i) => URL.revokeObjectURL(i.previewUrl));
+      setImages(next);
+      if (imageCaps.first) toast.error(`${model.name} cannot use some of the images, so they were removed.`);
     }
     if (!supportsAudioReference) clearAudio();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,9 +148,13 @@ export function useVideoDraft(seed?: VideoDraftSeed) {
   const removeImage = useCallback(
     (id: string) =>
       setImages((prev) => {
-        const gone = prev.find((i) => i.id === id);
+        const gone = allImages(prev).find((i) => i.id === id);
         if (gone) URL.revokeObjectURL(gone.previewUrl);
-        return prev.filter((i) => i.id !== id);
+        return {
+          first: prev.first?.id === id ? null : prev.first,
+          last: prev.last?.id === id ? null : prev.last,
+          references: prev.references.filter((i) => i.id !== id),
+        };
       }),
     [],
   );
@@ -212,7 +216,7 @@ export function useVideoDraft(seed?: VideoDraftSeed) {
     clearAudio,
     credits,
     constraints,
-    maxImages,
+    imageCaps,
     supportsImageToVideo,
     supportsAudioReference,
     imagesUploading,

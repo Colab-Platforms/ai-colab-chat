@@ -35,6 +35,7 @@ export interface GeneratedVideo {
   referenceImageUrls?: string[];
   referenceAudioUrl?: string | null;
   firstFrameUrl?: string | null;
+  lastFrameUrl?: string | null;
   startedAt?: string | null;
 }
 

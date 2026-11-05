@@ -26,9 +26,9 @@ import { cn } from "@/lib/utils";
 import { useVideoJob } from "@/hooks/use-video-job";
 import { useVideoDraft } from "@/hooks/use-video-draft";
 import type { GeneratedVideo } from "@/components/chat/video-card";
-import type { VideoModelOption } from "@/components/chat/video-generate-dialog";
+import { imageLimitNote, type VideoModelOption } from "@/components/chat/video-generate-dialog";
 import { ChipSelect } from "@/components/studio/studio-parts";
-import { MultiImageDialog, MAX_STUDIO_IMAGES } from "@/components/studio/multi-image-dialog";
+import { allImages, imagePayload, MultiImageDialog } from "@/components/studio/multi-image-dialog";
 import {
   JobChecklist,
   JobMessageStage,
@@ -195,8 +195,9 @@ export default function VideoJobPage() {
     resolution: source.resolution,
     aspectRatio: source.aspectRatio,
     chatId: source.chatId ?? undefined,
-    imageUrls: source.referenceImageUrls?.length ? source.referenceImageUrls : undefined,
     firstFrameUrl: source.firstFrameUrl ?? undefined,
+    lastFrameUrl: source.lastFrameUrl ?? undefined,
+    referenceImageUrls: source.referenceImageUrls?.length ? source.referenceImageUrls : undefined,
     referenceAudioUrl: source.referenceAudioUrl ?? undefined,
   });
 
@@ -544,22 +545,23 @@ export default function VideoJobPage() {
 /* ---------------- attachments (read-only) ---------------- */
 
 function Attachments({ video }: { video: GeneratedVideo }) {
-  const images = video.referenceImageUrls?.length
-    ? video.referenceImageUrls
-    : video.firstFrameUrl
-      ? [video.firstFrameUrl]
-      : [];
+  const images = [
+    ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, label: "First frame" }] : []),
+    ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, label: "Last frame" }] : []),
+    ...(video.referenceImageUrls ?? []).map((url, i) => ({ url, label: `Reference ${i + 1}` })),
+  ];
   if (images.length === 0 && !video.referenceAudioUrl) return null;
 
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-faint">Attachments</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {images.map((url, i) => (
+        {images.map(({ url, label }, i) => (
           <img
             key={`${url}-${i}`}
             src={url}
-            alt={`Reference ${i + 1}`}
+            alt={label}
+            title={label}
             loading="lazy"
             className="h-[46px] w-[46px] rounded-lg border border-border object-cover"
           />
@@ -597,7 +599,9 @@ function EditSidebar({
     duration: number;
     resolution: string;
     aspectRatio: string;
-    imageUrls?: string[];
+    firstFrameUrl?: string;
+    lastFrameUrl?: string;
+    referenceImageUrls?: string[];
     referenceAudioUrl?: string;
   }) => void;
 }) {
@@ -607,11 +611,9 @@ function EditSidebar({
     duration: video.duration,
     resolution: video.resolution,
     aspectRatio: video.aspectRatio,
-    imageUrls: video.referenceImageUrls?.length
-      ? video.referenceImageUrls
-      : video.firstFrameUrl
-        ? [video.firstFrameUrl]
-        : [],
+    firstFrameUrl: video.firstFrameUrl,
+    lastFrameUrl: video.lastFrameUrl,
+    referenceImageUrls: video.referenceImageUrls,
     referenceAudioUrl: video.referenceAudioUrl,
   });
   const [imagesOpen, setImagesOpen] = useState(false);
@@ -629,7 +631,7 @@ function EditSidebar({
       duration: draft.duration,
       resolution: draft.resolution,
       aspectRatio: draft.aspectRatio,
-      imageUrls: draft.images.length > 0 ? draft.images.map((i) => i.fileUrl) : undefined,
+      ...imagePayload(draft.images),
       referenceAudioUrl: draft.audio?.fileUrl || undefined,
     });
   };
@@ -652,11 +654,12 @@ function EditSidebar({
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wider text-faint">Attachments</p>
         <div className="mt-2 flex flex-wrap gap-2">
-          {draft.images.map((image) => (
+          {allImages(draft.images).map((image) => (
             <span key={image.id} className="relative">
               <img
                 src={image.previewUrl}
                 alt={image.name}
+                title={image.name}
                 className="h-[46px] w-[46px] rounded-lg border border-border object-cover"
               />
               {image.uploading && (
@@ -800,12 +803,8 @@ function EditSidebar({
         onOpenChange={setImagesOpen}
         images={draft.images}
         onConfirm={draft.setImages}
-        maxImages={draft.maxImages}
-        limitNote={
-          draft.maxImages > 0 && draft.maxImages < MAX_STUDIO_IMAGES
-            ? `${draft.model?.name} only uses a first and last frame, so up to ${draft.maxImages} images.`
-            : null
-        }
+        caps={draft.imageCaps}
+        limitNote={imageLimitNote(draft.model, draft.imageCaps)}
       />
     </aside>
   );

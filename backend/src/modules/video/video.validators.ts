@@ -19,6 +19,11 @@ export const createVideoSchema = Joi.object({
   // uses a model-facing URL is never trusted to be http(s)-safe otherwise.
   firstFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
   lastFrameUrl: Joi.string().uri({ scheme: ["https"] }).max(2000).optional(),
+  referenceImageUrls: Joi.array()
+    .items(Joi.string().uri({ scheme: ["https"] }).max(2000))
+    .max(MAX_INPUT_IMAGES)
+    .optional()
+    .messages({ "array.max": `You can add at most ${MAX_INPUT_IMAGES} reference images` }),
   imageUrls: Joi.array()
     .items(Joi.string().uri({ scheme: ["https"] }).max(2000))
     .max(MAX_INPUT_IMAGES)

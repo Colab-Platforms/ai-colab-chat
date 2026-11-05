@@ -46,9 +46,11 @@ export interface CreateVideoInput {
   /** Image-to-video: public HTTPS URLs from the existing attachment upload flow. */
   firstFrameUrl?: string;
   lastFrameUrl?: string;
+  /** Ordered reference images (Seedance only), independent of the first/last frame. */
+  referenceImageUrls?: string[];
   /**
-   * Ordered image sequence (frame 1 … n) from the multi-image picker. Takes
-   * precedence over firstFrameUrl/lastFrameUrl when present.
+   * Legacy single ordered list: 1–2 entries are treated as first/last frame,
+   * 3+ as reference images. Ignored when any of the explicit fields above is set.
    */
   imageUrls?: string[];
   /** Optional voice/dialogue/music reference, uploaded via POST /videos/reference-audio. */

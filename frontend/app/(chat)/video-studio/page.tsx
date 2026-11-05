@@ -21,9 +21,11 @@ import {
 } from "@/components/studio/studio-parts";
 import {
   ImageSequenceStrip,
-  MAX_STUDIO_IMAGES,
+  imageCount,
+  imagePayload,
   MultiImageDialog,
 } from "@/components/studio/multi-image-dialog";
+import { constraintsFor, imageLimitNote } from "@/components/chat/video-generate-dialog";
 import { VIDEO_TEMPLATES } from "@/components/studio/studio-templates";
 import { TemplateUseDialog, type TemplatePhoto } from "@/components/studio/template-use-dialog";
 
@@ -54,7 +56,7 @@ export default function VideoStudioPage() {
     audio,
     credits,
     constraints,
-    maxImages,
+    imageCaps,
     supportsImageToVideo,
     supportsAudioReference,
     estimate,
@@ -135,11 +137,16 @@ export default function VideoStudioPage() {
     aspectRatio: string;
     duration: number;
     firstFrameUrl?: string;
-    imageUrls?: string[];
+    lastFrameUrl?: string;
+    referenceImageUrls?: string[];
     referenceAudioUrl?: string;
     title: string;
+    /** Overrides the composer's model/resolution (templates always use Seedance). */
+    modelId?: number;
+    resolution?: string;
   }) => {
-    if (!modelId || busy) return;
+    const useModelId = opts.modelId ?? modelId;
+    if (!useModelId || busy) return;
     setBusy(true);
     try {
       const chatRes = await chatService.create({
@@ -150,12 +157,13 @@ export default function VideoStudioPage() {
       window.dispatchEvent(new CustomEvent("refresh-chats", { detail: { immediate: true } }));
       const videoRes = await videoService.create({
         prompt: opts.text,
-        modelId,
+        modelId: useModelId,
         duration: opts.duration,
-        resolution,
+        resolution: opts.resolution ?? resolution,
         aspectRatio: opts.aspectRatio,
         firstFrameUrl: opts.firstFrameUrl,
-        imageUrls: opts.imageUrls,
+        lastFrameUrl: opts.lastFrameUrl,
+        referenceImageUrls: opts.referenceImageUrls,
         referenceAudioUrl: opts.referenceAudioUrl,
         chatId,
       });
@@ -178,34 +186,45 @@ export default function VideoStudioPage() {
       text: prompt.trim(),
       aspectRatio,
       duration,
-      imageUrls: images.length > 0 ? images.map((i) => i.fileUrl) : undefined,
+      ...imagePayload(images),
       referenceAudioUrl: audio?.fileUrl || undefined,
       title: prompt.trim(),
     });
   };
 
+  // Templates always run on Seedance, whatever the composer has selected:
+  // the composer's own pick if it already is one, else the first Seedance
+  // the user's plan allows.
+  const templateModel =
+    (model?.externalId.startsWith("bytedance/seedance") && model.allowedForPlan ? model : undefined) ??
+    models.find((m) => m.externalId.startsWith("bytedance/seedance") && m.allowedForPlan);
+
   /**
    * "Make mine like this": the template's stored prompt plus the user's photo
-   * as the first frame, so the clip starts from their subject. The template's
-   * duration/ratio are used when this model supports them, else the nearest.
+   * as a reference image (never the first/last frame), so the clip features
+   * their subject without starting on their exact photo. The template's
+   * duration/ratio are used when the Seedance model supports them, else the
+   * nearest.
    */
   const handleTemplateSubmit = ({ photo, extra }: { photo: TemplatePhoto | null; extra: string }) => {
     const t = activeTemplate;
-    if (!t || !model) return;
-    if (!videoGenEnabled || !model.allowedForPlan) {
-      toast.error("Video generation isn't available on your plan for this model.");
+    if (!t) return;
+    if (!videoGenEnabled || !templateModel) {
+      toast.error("Template videos need a Seedance model, which isn't available on your plan.");
       return;
     }
+    const tc = constraintsFor(templateModel);
+    const useResolution = tc.resolutions.includes(resolution) ? resolution : tc.resolutions[0];
     const wantedDuration = t.duration ?? duration;
-    const useDuration = constraints.durations.includes(wantedDuration)
+    const useDuration = tc.durations.includes(wantedDuration)
       ? wantedDuration
-      : constraints.durations.reduce((a, b) => (Math.abs(b - wantedDuration) < Math.abs(a - wantedDuration) ? b : a));
-    const useAspect = t.aspectRatio && constraints.aspectRatios.includes(t.aspectRatio) ? t.aspectRatio : aspectRatio;
+      : tc.durations.reduce((a, b) => (Math.abs(b - wantedDuration) < Math.abs(a - wantedDuration) ? b : a));
+    const useAspect = t.aspectRatio && tc.aspectRatios.includes(t.aspectRatio) ? t.aspectRatio : tc.aspectRatios.includes(aspectRatio) ? aspectRatio : tc.aspectRatios[0];
 
     const perSecond =
-      (photo ? model.creditCostPerSecondByResolutionImageInput?.[resolution] : undefined) ??
-      model.creditCostPerSecondByResolution?.[resolution] ??
-      model.creditCostPerSecond;
+      (photo ? templateModel.creditCostPerSecondByResolutionImageInput?.[useResolution] : undefined) ??
+      templateModel.creditCostPerSecondByResolution?.[useResolution] ??
+      templateModel.creditCostPerSecond;
     const cost = Math.ceil(useDuration * perSecond);
     if (credits !== null && cost > credits) {
       toast.error(`Not enough video credits: this needs ${cost}, you have ${credits}.`);
@@ -213,15 +232,17 @@ export default function VideoStudioPage() {
     }
 
     let text = t.prompt;
-    if (photo) text += "\n\nStart from the attached photo: animate this person or object in this style, keeping them recognisable.";
+    if (photo) text += "\n\nThe attached reference image shows the person or object to feature: recreate this video with them in it, keeping them recognisable.";
     if (extra) text += `\n\nAdditional details: ${extra}`;
     if (typeof t.id === "number") void studioTemplateService.recordUse(t.id).catch(() => {});
     generate({
       text: text.slice(0, 2000),
       aspectRatio: useAspect,
       duration: useDuration,
-      firstFrameUrl: photo?.fileUrl,
+      referenceImageUrls: photo ? [photo.fileUrl] : undefined,
       title: t.title,
+      modelId: templateModel.id,
+      resolution: useResolution,
     });
   };
 
@@ -247,7 +268,7 @@ export default function VideoStudioPage() {
                 title={
                   !supportsImageToVideo
                     ? "This model can't start from an image"
-                    : images.length > 0
+                    : imageCount(images) > 0
                       ? "Edit images"
                       : "Add images"
                 }
@@ -358,7 +379,7 @@ export default function VideoStudioPage() {
         {audio && (
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Tip: say how to use the audio, e.g. &ldquo;the character speaks in the voice from the audio&rdquo;.
-            {images.length > 0 && " With audio attached, your images guide the character but may not be the exact first frame."}
+            {imageCount(images) > 0 && " With audio attached, your images guide the character but may not be the exact first frame."}
           </p>
         )}
         <p className="mt-2 text-center text-xs text-muted-foreground">
@@ -423,12 +444,8 @@ export default function VideoStudioPage() {
         onOpenChange={setImagesOpen}
         images={images}
         onConfirm={draft.setImages}
-        maxImages={maxImages}
-        limitNote={
-          maxImages > 0 && maxImages < MAX_STUDIO_IMAGES
-            ? `${model?.name} only uses a first and last frame, so up to ${maxImages} images. Pick a Seedance model for longer sequences.`
-            : null
-        }
+        caps={imageCaps}
+        limitNote={imageLimitNote(model, imageCaps)}
       />
 
       <TemplateUseDialog
@@ -436,7 +453,7 @@ export default function VideoStudioPage() {
         kind="video"
         busy={busy}
         photoDisabledReason={
-          model && !supportsImageToVideo ? `${model.name} can't start from a photo choose another video model.` : null
+          null
         }
         onOpenChange={(open) => !open && !busy && setActiveTemplate(null)}
         onSubmit={handleTemplateSubmit}

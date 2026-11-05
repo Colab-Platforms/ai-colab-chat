@@ -163,35 +163,44 @@ export const submitPendingVideoJobs = async (): Promise<void> => {
         // image references instead (they guide the subject rather than pin the
         // exact first/last frame).
         //
-        // A 3+ image sequence is stored in referenceImageUrls and always goes
-        // out as ordered image references (never frame_images, which would
-        // make OpenRouter ignore them).
-        const sequenceImages = video.referenceImageUrls ?? [];
-        const hasSequence = sequenceImages.length > 0;
-        const frameImages: FrameImage[] =
-          video.referenceAudioUrl || hasSequence
-            ? []
-            : [
-                ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
-                ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
-              ];
-        const imageReferences: InputReference[] = hasSequence
-          ? sequenceImages.map((url) => ({ type: "image_url" as const, url }))
+        // Reference images (stored separately from the first/last frame) always
+        // go out as input_references, never frame_images, which would make
+        // OpenRouter ignore them. When references are combined with a
+        // first/last frame, the frames join the references and lose their
+        // exact-frame pinning.
+        const references = video.referenceImageUrls ?? [];
+        const hasReferences = references.length > 0;
+        const asReferences = Boolean(video.referenceAudioUrl) || hasReferences;
+        const frameImages: FrameImage[] = asReferences
+          ? []
           : [
-              ...(video.firstFrameUrl ? [{ type: "image_url" as const, url: video.firstFrameUrl }] : []),
-              ...(video.lastFrameUrl ? [{ type: "image_url" as const, url: video.lastFrameUrl }] : []),
+              ...(video.firstFrameUrl ? [{ url: video.firstFrameUrl, frameType: "first_frame" as const }] : []),
+              ...(video.lastFrameUrl ? [{ url: video.lastFrameUrl, frameType: "last_frame" as const }] : []),
             ];
-        const inputReferences: InputReference[] =
-          video.referenceAudioUrl || hasSequence
-            ? [
-                ...imageReferences,
-                ...(video.referenceAudioUrl ? [{ type: "audio_url" as const, url: video.referenceAudioUrl }] : []),
-              ]
-            : [];
-        // The references carry no frame index on the wire, so the order the
-        // user arranged is spelled out in the prompt instead.
-        const prompt = hasSequence
-          ? `${video.prompt}\n\nThe ${sequenceImages.length} reference images are an ordered frame sequence (image 1 = first frame, image ${sequenceImages.length} = last frame). Follow this order and keep the subject, style and scene consistent with them.`
+        const imageReferences: InputReference[] = [
+          ...(video.firstFrameUrl ? [video.firstFrameUrl] : []),
+          ...references,
+          ...(video.lastFrameUrl ? [video.lastFrameUrl] : []),
+        ].map((url) => ({ type: "image_url" as const, url }));
+        const inputReferences: InputReference[] = asReferences
+          ? [
+              ...imageReferences,
+              ...(video.referenceAudioUrl ? [{ type: "audio_url" as const, url: video.referenceAudioUrl }] : []),
+            ]
+          : [];
+        // The references carry no role on the wire, so what each image is
+        // for is spelled out in the prompt instead.
+        const roles: string[] = [];
+        let n = 0;
+        if (hasReferences && video.firstFrameUrl) roles.push(`image ${++n} is the first frame`);
+        if (hasReferences) {
+          const from = n + 1;
+          n += references.length;
+          roles.push(references.length === 1 ? `image ${from} is a reference image` : `images ${from}–${n} are reference images, in order`);
+        }
+        if (hasReferences && video.lastFrameUrl) roles.push(`image ${++n} is the last frame`);
+        const prompt = hasReferences
+          ? `${video.prompt}\n\nAttached images: ${roles.join("; ")}. Keep the subject, style and scene consistent with them.`
           : video.prompt;
         vlogBlock("submit", `job=${video.id} submitting to OpenRouter`, {
           model: video.model.externalId,
