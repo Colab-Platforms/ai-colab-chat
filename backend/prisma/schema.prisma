@@ -252,7 +252,26 @@ model Folder {
   deletedAt   DateTime?
   chats       Chat[]
   contexts    ContextMemory[]
+  documents   FolderDocument[]
   user        User            @relation(fields: [userId], references: [id])
+}
+
+// A reference file (PRD, scope of work, spec…) attached to a project. Its text
+// is extracted once at upload and sent to the model with every chat in the
+// folder; the file itself is kept so the user can see and remove it.
+model FolderDocument {
+  id                 Int      @id @default(autoincrement())
+  folderId           Int
+  fileName           String
+  fileUrl            String
+  mimeType           String
+  fileSize           Int
+  cloudinaryPublicId String?
+  extractedText      String   @db.Text
+  createdAt          DateTime @default(now())
+  folder             Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([folderId])
 }
 
 model Chat {

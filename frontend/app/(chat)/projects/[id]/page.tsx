@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, MessageSquare, NotebookPen, Pencil, SquarePen, Trash2 } from "lucide-react";
+import { useRef } from "react";
+import { ArrowLeft, FileText, Loader2, MessageSquare, NotebookPen, Paperclip, Pencil, SquarePen, Trash2, X } from "lucide-react";
 import { chatService, contextService, folderService } from "@/lib/services";
 import { startNewChatInFolder } from "@/lib/newChat";
 import { toast } from "@/lib/toast";
@@ -23,7 +24,21 @@ interface ProjectChat {
   updatedAt: string;
 }
 
+interface ProjectDocument {
+  id: number;
+  fileName: string;
+  fileSize: number;
+  textChars: number;
+}
+
 const PAGE_SIZE = 20;
+// Mirrors the backend limits in folder-document.service.ts.
+const MAX_DOCUMENTS = 5;
+const DOCUMENT_ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.xls,.xlsx";
+
+function formatSize(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -34,6 +49,9 @@ export default function ProjectDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [brief, setBrief] = useState("");
   const [briefContextId, setBriefContextId] = useState<number | null>(null);
+  const [documents, setDocuments] = useState<ProjectDocument[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const [chats, setChats] = useState<ProjectChat[]>([]);
   const [chatTotal, setChatTotal] = useState<number | null>(null);
@@ -66,6 +84,40 @@ export default function ProjectDetailPage() {
       /* no brief shown not fatal */
     }
   }, [folderId]);
+
+  const loadDocuments = useCallback(async () => {
+    try {
+      const res = await folderService.listDocuments(folderId);
+      setDocuments(res.data.data || []);
+    } catch {
+      /* documents card just stays empty */
+    }
+  }, [folderId]);
+
+  const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingDoc(true);
+    try {
+      await folderService.uploadDocument(folderId, file);
+      await loadDocuments();
+      toast.success("Document added to this project");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to upload document");
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleRemoveDocument = async (docId: number) => {
+    try {
+      await folderService.deleteDocument(folderId, docId);
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    } catch {
+      toast.error("Failed to remove document");
+    }
+  };
 
   const loadChats = useCallback(
     async (pageNum: number, append: boolean) => {
@@ -101,8 +153,9 @@ export default function ProjectDetailPage() {
     }
     loadFolder();
     loadBrief();
+    loadDocuments();
     loadChats(1, false);
-  }, [folderId, loadFolder, loadBrief, loadChats]);
+  }, [folderId, loadFolder, loadBrief, loadDocuments, loadChats]);
 
   const handleEdit = async (v: ProjectFormValues) => {
     setSaving(true);
@@ -271,6 +324,7 @@ export default function ProjectDetailPage() {
             )}
           </section>
 
+          <div className="space-y-4">
           <aside className="rounded-2xl border border-border bg-surface p-5 shadow-cl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-[14px] font-semibold text-foreground">
@@ -287,7 +341,7 @@ export default function ProjectDetailPage() {
             </div>
             {brief ? (
               <>
-                <p className="mt-3 whitespace-pre-wrap text-[13.5px] leading-relaxed text-foreground">{brief}</p>
+                <p className="mt-3 max-h-56 overflow-y-auto whitespace-pre-wrap pr-1 text-[13.5px] leading-relaxed text-foreground">{brief}</p>
                 <p className="mt-3 text-xs text-faint">Added to every chat in this project.</p>
               </>
             ) : (
@@ -296,6 +350,67 @@ export default function ProjectDetailPage() {
               </p>
             )}
           </aside>
+
+          <aside className="rounded-2xl border border-border bg-surface p-5 shadow-cl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[14px] font-semibold text-foreground">
+                <Paperclip className="w-4 h-4 text-primary" />
+                Documents
+                <span className="text-[13px] font-normal text-faint">
+                  {documents.length}/{MAX_DOCUMENTS}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => docInputRef.current?.click()}
+                disabled={uploadingDoc || documents.length >= MAX_DOCUMENTS}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-primary hover:text-accent-hover transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploadingDoc && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {uploadingDoc ? "Reading…" : "Add"}
+              </button>
+              <input
+                ref={docInputRef}
+                type="file"
+                accept={DOCUMENT_ACCEPT}
+                className="hidden"
+                onChange={handleUploadDocument}
+              />
+            </div>
+            {documents.length > 0 ? (
+              <>
+                <ul className="mt-3 max-h-52 space-y-1.5 overflow-y-auto pr-1">
+                  {documents.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2 text-[13px]"
+                    >
+                      <FileText className="w-4 h-4 shrink-0 text-faint" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-foreground">{d.fileName}</span>
+                        <span className="text-xs text-faint">{formatSize(d.fileSize)}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDocument(d.id)}
+                        title="Remove document"
+                        className="shrink-0 text-faint hover:text-destructive transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs text-faint">Read by the AI in every chat in this project.</p>
+              </>
+            ) : (
+              <p className="mt-3 text-[13.5px] leading-relaxed text-muted-foreground">
+                Add a PRD, scope of work or spec (PDF, Word, PowerPoint, text, Excel or CSV, up to 8 MB). The AI reads
+                it in every chat in this project.
+              </p>
+            )}
+          </aside>
+          </div>
         </div>
       </div>
 

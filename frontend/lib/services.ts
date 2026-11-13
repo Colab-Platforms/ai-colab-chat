@@ -84,6 +84,16 @@ export const folderService = {
     api.delete(`/folders/${id}`, {
       params: { deleteChats: deleteChats ? "true" : "false" },
     }),
+  listDocuments: (id: number) => api.get(`/folders/${id}/documents`),
+  uploadDocument: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/folders/${id}/documents`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteDocument: (id: number, docId: number) =>
+    api.delete(`/folders/${id}/documents/${docId}`),
 };
 
 export const userService = {

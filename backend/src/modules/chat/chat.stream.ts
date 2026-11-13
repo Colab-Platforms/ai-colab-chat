@@ -17,6 +17,7 @@ import {
   getUsdPerToken,
 } from "@/utils/walletUtils.js";
 import AttachmentService from "@/modules/attachment/attachment.service.js";
+import { buildFolderDocumentsBlock } from "@/modules/folder/folder-document.service.js";
 import mammoth from "mammoth";
 import { parseOffice } from "officeparser";
 import {
@@ -1201,6 +1202,14 @@ export async function streamChat(req: Request, res: Response) {
       );
     }
 
+    // Reference documents attached to the chat's project, if it has one.
+    const projectDocsBlock = await buildFolderDocumentsBlock(chat.folderId);
+    if (projectDocsBlock) {
+      conversationHistory.unshift(
+        buildSystemMessage(projectDocsBlock, model.externalId),
+      );
+    }
+
     const selectedContexts = await getSelectedContextsForChat(userId, chatId);
     const contextStrings = selectedContexts.map((c: any) => c.memory);
 
@@ -2126,6 +2135,13 @@ export async function regenerateChat(req: Request, res: Response) {
     if (systemPromptRegen) {
       conversationHistory.unshift(
         buildSystemMessage(systemPromptRegen, model.externalId),
+      );
+    }
+
+    const projectDocsBlockRegen = await buildFolderDocumentsBlock(chat.folderId);
+    if (projectDocsBlockRegen) {
+      conversationHistory.unshift(
+        buildSystemMessage(projectDocsBlockRegen, model.externalId),
       );
     }
 
