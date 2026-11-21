@@ -427,9 +427,9 @@ function Benefits({ dark, w }: { dark: boolean; w: number }) {
 //  Testimonials
 // ─────────────────────────────────────────────────────
 const REVIEWS: [string, string, string, string, string][] = [
-  ["Rolling context windows mean I never lose details during research sessions. Highly recommended for any engineering or design team.", "Briana Patton", "Product Owner, FlowState", "BP", "oklch(0.58 0.19 290)"],
-  ["Attaching code/wireframes and getting feedback from three different models side-by-side saves us hours of iteration every single day.", "Elena Rostova", "Lead Designer, Vertex", "ER", "oklch(0.6 0.14 255)"],
-  ["One plan for every AI model solved all our subscription headaches. Our developers are 2x more productive with Colab AI.", "Omar Raza", "CTO, NexusDev", "OR", "oklch(0.62 0.15 160)"],
+  ["Rolling context windows mean I never lose details during research sessions. Highly recommended for any engineering or design team.", "Briana Patton", "Product Owner", "BP", "oklch(0.58 0.19 290)"],
+  ["Attaching code/wireframes and getting feedback from three different models side-by-side saves us hours of iteration every single day.", "Elena Rostova", "Lead Designer", "ER", "oklch(0.6 0.14 255)"],
+  ["One plan for every AI model solved all our subscription headaches. Our developers are 2x more productive with Colab AI.", "Omar Raza", "CTO", "OR", "oklch(0.62 0.15 160)"],
 ];
 
 function Testimonials({ w }: { w: number }) {
@@ -893,7 +893,7 @@ function Footer({ w }: { w: number }) {
           ))}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <span style={{ fontSize: 13, color: "#8E8A99" }}>© Colab AI, Inc., 2026. All rights reserved</span>
+          <span style={{ fontSize: 13, color: "#8E8A99" }}>© Colabplatforms.ai AI, Inc., 2026. All rights reserved</span>
           <div style={{ display: "flex", gap: 4, marginRight: -10 }}>
             {SOCIALS.map((s) => (
               <a key={s.n} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.n} className="cl-flink" style={{ width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#8E8A99", transition: "color .2s" }}>
