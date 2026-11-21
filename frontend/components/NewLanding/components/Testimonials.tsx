@@ -27,7 +27,7 @@ const TESTIMONIALS: Testimonial[] = [
     text: "Colab AI helped us cut project delays by 40%. Everything from tasks to docs to chats is finally in one place. My team is moving faster than ever.",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=face",
     name: "Sarah Mendez",
-    role: "Head of Operations, AltForms",
+    role: "Head of Operations",
   },
   {
     id: 2,
@@ -35,7 +35,7 @@ const TESTIMONIALS: Testimonial[] = [
     text: "Switching between GPT-4, Claude, and Gemini in a single chat is a game changer. The token wallet and comparison tools are built for productivity.",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop&crop=face",
     name: "Bilal Ahmed",
-    role: "IT Manager, TechCorp",
+    role: "IT Manager",
   },
   {
     id: 3,
@@ -43,7 +43,7 @@ const TESTIMONIALS: Testimonial[] = [
     text: "Rolling context windows mean I never lose details during research sessions. Highly recommended for any engineering or design team.",
     avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=face",
     name: "Briana Patton",
-    role: "Product Owner, FlowState",
+    role: "Product Owner",
   },
   {
     id: 4,
@@ -51,7 +51,7 @@ const TESTIMONIALS: Testimonial[] = [
     text: "Attaching code/wireframes and getting feedback from three different models side-by-side saves us hours of iteration every single day.",
     avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&h=120&fit=crop&crop=face",
     name: "Elena Rostova",
-    role: "Lead Designer, Vertex",
+    role: "Lead Designer",
   },
   {
     id: 5,
@@ -59,7 +59,7 @@ const TESTIMONIALS: Testimonial[] = [
     text: "Unified token billing and multiple API models solved all our subscription headaches. Our developers are 2x more productive with Colab AI.",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=face",
     name: "Omar Raza",
-    role: "CTO, NexusDev",
+    role: "CTO",
   },
 ];
 

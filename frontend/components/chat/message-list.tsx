@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Check } from "lucide-react";
 import { MessageBubble, type MessageTemplate } from "./message-bubble";
+import { ModelAvatar } from "./model-avatar";
 import { SelectionContextTooltip } from "./selection-context-tooltip";
 import { VideoCard, type GeneratedVideo } from "./video-card";
 
@@ -145,7 +147,62 @@ function processMessagesWithVersions(
 /** Discriminated render item how `messages` and `videos` merge into one timeline. */
 type RenderItem =
   | { kind: "message"; createdAt: string; message: Message; editVersions?: Message[]; editVersionIndex?: number }
-  | { kind: "video"; createdAt: string; video: GeneratedVideo };
+  | { kind: "video"; createdAt: string; video: GeneratedVideo }
+  | { kind: "model-switch"; createdAt: string; model: { id: number; name: string; externalId?: string } };
+
+/**
+ * The model shown for a message, when it's a single-model (non-compare)
+ * assistant reply with exactly one responding model — compare-mode replies
+ * (multiple models answering the same turn) aren't a "switch", so they're
+ * left out of switch detection.
+ */
+function singleModelOf(message: Message) {
+  const responses = message.modelResponses || [];
+  const modelIds = new Set(responses.map((r) => r.model?.id));
+  if (modelIds.size !== 1) return null;
+  return responses[0]?.model ?? null;
+}
+
+/**
+ * Inserts a "Switched to <model>" marker wherever the active model changes
+ * between consecutive assistant replies. The marker is placed above the user
+ * message that started the turn whose reply switched models (not between
+ * that user message and its reply), so it reads as "from here on, this
+ * model answers" rather than as part of the reply itself.
+ */
+function insertModelSwitches(items: RenderItem[]): RenderItem[] {
+  const result: RenderItem[] = [];
+  let lastModelId: number | null = null;
+  let lastUserIdx = -1;
+
+  for (const item of items) {
+    if (item.kind === "message" && item.message.role === "USER") {
+      result.push(item);
+      lastUserIdx = result.length - 1;
+      continue;
+    }
+
+    if (item.kind === "message" && item.message.role === "ASSISTANT") {
+      const model = singleModelOf(item.message);
+      if (model) {
+        if (lastModelId !== null && lastModelId !== model.id) {
+          const marker: RenderItem = { kind: "model-switch", createdAt: item.message.createdAt, model };
+          if (lastUserIdx !== -1) {
+            result.splice(lastUserIdx, 0, marker);
+            lastUserIdx = -1;
+          } else {
+            result.push(marker);
+          }
+        }
+        lastModelId = model.id;
+      }
+    }
+
+    result.push(item);
+  }
+
+  return result;
+}
 
 /**
  * Stable merge by createdAt both inputs already arrive in ascending
@@ -202,9 +259,9 @@ export function MessageList({
   }, [forceScrollToBottom, messages.length]);
 
   const processed = processMessagesWithVersions(messages, editVersionIndices);
-  const merged = mergeWithVideos(processed, videos);
+  const merged = insertModelSwitches(mergeWithVideos(processed, videos));
   // The template was attached to the message that started the chat.
-  const firstUserIdx = merged.findIndex((e) => e.kind !== "video" && e.message.role === "USER");
+  const firstUserIdx = merged.findIndex((e) => e.kind === "message" && e.message.role === "USER");
 
   return (
     <>
@@ -215,6 +272,19 @@ export function MessageList({
             entry.kind === "video" ? (
               <div key={`video-${entry.video.id}`} className="mx-auto mb-4 w-full max-w-3xl px-4">
                 <VideoCard video={entry.video} onDeleted={onVideoDeleted} />
+              </div>
+            ) : entry.kind === "model-switch" ? (
+              <div
+                key={`model-switch-${entry.model.id}-${entry.createdAt}`}
+                className="mx-auto mb-4 flex w-full max-w-3xl items-center justify-center gap-2 px-4"
+              >
+                <div className="h-px flex-1 bg-border" />
+                <div className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                  <ModelAvatar externalId={entry.model.externalId} name={entry.model.name} size={14} />
+                  <span>Switched to {entry.model.name}</span>
+                  <Check className="h-3 w-3 text-emerald-500" />
+                </div>
+                <div className="h-px flex-1 bg-border" />
               </div>
             ) : (
               <MessageBubble
