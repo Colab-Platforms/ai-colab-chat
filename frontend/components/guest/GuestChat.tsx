@@ -341,7 +341,7 @@ export function GuestChat() {
       <header className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <Sparkles className="h-4 w-4" />
-          Colab AI
+          Colabplatforms.ai
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium">
             Free trial
           </span>
@@ -363,7 +363,7 @@ export function GuestChat() {
           {turns.length === 0 && (
             <div className="mt-16 text-center">
               <h1 className="text-2xl font-semibold sm:text-3xl">
-                Try Colab AI. No sign-up needed.
+                Try Colabplatforms.ai. No sign-up needed.
               </h1>
               <p className="mx-auto mt-3 max-w-md text-muted-foreground">
                 {config

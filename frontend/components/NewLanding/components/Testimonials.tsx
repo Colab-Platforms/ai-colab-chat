@@ -24,7 +24,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: 1,
     stars: 5,
-    text: "Colab AI helped us cut project delays by 40%. Everything from tasks to docs to chats is finally in one place. My team is moving faster than ever.",
+    text: "Colabplatforms.ai helped us cut project delays by 40%. Everything from tasks to docs to chats is finally in one place. My team is moving faster than ever.",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop&crop=face",
     name: "Sarah Mendez",
     role: "Head of Operations",
@@ -56,7 +56,7 @@ const TESTIMONIALS: Testimonial[] = [
   {
     id: 5,
     stars: 5,
-    text: "Unified token billing and multiple API models solved all our subscription headaches. Our developers are 2x more productive with Colab AI.",
+    text: "Unified token billing and multiple API models solved all our subscription headaches. Our developers are 2x more productive with Colabplatforms.ai.",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=face",
     name: "Omar Raza",
     role: "CTO",

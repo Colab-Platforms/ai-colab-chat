@@ -267,7 +267,7 @@ function Features({ theme, w }: { theme: string; w: number }) {
                     <span
                       key={k}
                       role="img"
-                      aria-label={`Colab AI ${title}`}
+                      aria-label={`Colabplatforms.ai ${title}`}
                       style={{ position: "absolute", inset: 0, backgroundImage: `url(${featImg(k, theme)})`, backgroundSize: k === "agents" ? "contain" : "cover", backgroundPosition: k === "agents" ? "center" : "left top", backgroundRepeat: "no-repeat", opacity: i === tab ? 1 : 0, transform: `scale(${i === tab ? 1 : 1.03})`, transition: "opacity .6s ease,transform .8s cubic-bezier(.2,.8,.2,1)" }}
                     />
                   ))}
@@ -336,7 +336,7 @@ function Benefits({ dark, w }: { dark: boolean; w: number }) {
   return (
     <section id="benefits" className="cl-s" style={{ padding: sectionPad }}>
       <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: "clamp(28px,4vw,44px)" }}>
-        <SectionHead label="What you get" title="Ask once. Get answers from every AI model." blurb="Colab AI finds the right context, helps you take the next step and improves how work gets done." />
+        <SectionHead label="What you get" title="Ask once. Get answers from every AI model." blurb="Colabplatforms.ai finds the right context, helps you take the next step and improves how work gets done." />
         <div
           className="cl-noscroll"
           style={{
@@ -363,7 +363,7 @@ function Benefits({ dark, w }: { dark: boolean; w: number }) {
             </div>
           </BenefitCard>
 
-          <BenefitCard pill="Question to action" kicker="Instant action" title="Instant answers. Under 2 seconds." text="Move work forward without switching tools.">
+          <BenefitCard pill="Question to action" kicker="Instant action" title="Quick answers. No tab-hopping." text="Move work forward without switching tools.">
             <div style={phoneStyle}>
               <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
                 <Ms name="menu" size={18} style={{ color: "var(--ph-muted)" }} />
@@ -429,7 +429,7 @@ function Benefits({ dark, w }: { dark: boolean; w: number }) {
 const REVIEWS: [string, string, string, string, string][] = [
   ["Rolling context windows mean I never lose details during research sessions. Highly recommended for any engineering or design team.", "Briana Patton", "Product Owner", "BP", "oklch(0.58 0.19 290)"],
   ["Attaching code/wireframes and getting feedback from three different models side-by-side saves us hours of iteration every single day.", "Elena Rostova", "Lead Designer", "ER", "oklch(0.6 0.14 255)"],
-  ["One plan for every AI model solved all our subscription headaches. Our developers are 2x more productive with Colab AI.", "Omar Raza", "CTO", "OR", "oklch(0.62 0.15 160)"],
+  ["One plan for every AI model solved all our subscription headaches. Our developers are 2x more productive with Colabplatforms.ai.", "Omar Raza", "CTO", "OR", "oklch(0.62 0.15 160)"],
 ];
 
 function Testimonials({ w }: { w: number }) {
@@ -761,24 +761,24 @@ function Pricing({ w }: { w: number }) {
 // ─────────────────────────────────────────────────────
 const FAQ_DATA: [string, [string, string][]][] = [
   ["General", [
-    ["How does Colab AI work?", "Pick one or more AI models, type your message and get answers in one chat. In Multi mode, each model you choose answers the same prompt side by side so you can compare them."],
+    ["How does Colabplatforms.ai work?", "Pick one or more AI models, type your message and get answers in one chat. In Multi mode, each model you choose answers the same prompt side by side so you can compare them."],
     ["Is there a free trial available?", "Yes. The Free plan gives you every AI model with about 40 messages a month. No card needed."],
-    ["Who is Colab AI built for?", "Anyone who uses AI for work or study, from writers and students to founders, marketers and developers. Teams can use Colab AI for Business."],
+    ["Who is Colabplatforms.ai built for?", "Anyone who uses AI for work or study, from writers and students to founders, marketers and developers. Teams can use Colabplatforms.ai for Business."],
     ["Can I use multiple AI models at the same time?", "Yes. Switch to Multi mode, pick the models you want, and each one answers the same prompt in its own column."],
     ["Can I switch plans later?", "Yes. You can move between Free, Plus and Pro from Settings. Changes start from your next billing cycle."],
-    ["Does Colab AI work for solo users?", "Yes. Free, Plus and Pro are individual plans. You don’t need a team to sign up."],
+    ["Does Colabplatforms.ai work for solo users?", "Yes. Free, Plus and Pro are individual plans. You don’t need a team to sign up."],
   ]],
   ["AI Capabilities", [
     ["Which AI models are included?", "Models from OpenAI, Anthropic, Google, DeepSeek, Mistral, Perplexity, Qwen and more, plus image and video models. New models are added as they launch."],
-    ["Can Colab AI create images and videos?", "Yes, on Plus and Pro. Image Studio and Video Studio use top image and video models from a prompt or your own reference images."],
+    ["Can Colabplatforms.ai create images and videos?", "Yes, on Plus and Pro. Image Studio and Video Studio use top image and video models from a prompt or your own reference images."],
     ["Can it search the web?", "Yes. Web search gives live answers with links to the sources it used."],
     ["Can it make documents?", "Yes. Turn notes and files into PDFs, Word documents, PowerPoint decks and Excel sheets."],
   ]],
   ["Integration & Security", [
     ["Is my data used to train AI models?", "No. Your chats and files are not used to train AI models."],
     ["How do I pay?", "In rupees through Cashfree. Every payment comes with a GST invoice."],
-    ["Can I use Colab AI on my phone?", "Yes. Colab AI works in your phone’s browser with the same features as desktop."],
-    ["Is there a plan for teams?", "Yes. Colab AI for Business adds admin controls, model access settings and one GST invoice for the whole team."],
+    ["Can I use Colabplatforms.ai on my phone?", "Yes. Colabplatforms.ai works in your phone’s browser with the same features as desktop."],
+    ["Is there a plan for teams?", "Yes. Colabplatforms.ai for Business adds admin controls, model access settings and one GST invoice for the whole team."],
   ]],
 ];
 
@@ -856,16 +856,16 @@ function CTA() {
 // ─────────────────────────────────────────────────────
 const FOOTER_SECTIONS: { title: string; links: { label: string; href: string }[] }[] = [
   { title: "Product", links: [{ label: "Home", href: "/" }, { label: "About", href: "#about" }, { label: "Pricing", href: "#pricing" }, { label: "Business", href: "/business" }, { label: "Get started", href: "/login" }] },
-  { title: "Company", links: [{ label: "About", href: "#about" }, { label: "Careers", href: "#" }, { label: "Blog", href: "#" }] },
+  // { title: "Company", links: [{ label: "About", href: "#about" }, { label: "Careers", href: "#" }, { label: "Blog", href: "#" }] },
   { title: "Legal", links: [{ label: "Terms of use", href: "/terms" }, { label: "Privacy policy", href: "/privacy-policy" }, { label: "Cookie policy", href: "/cookie-policy" }] },
   { title: "Support", links: [{ label: "Help & Support", href: "/support" }, { label: "Raise a ticket", href: "/support" }, { label: "Contact us", href: "/support" }] },
 ];
 
 const SOCIALS = [
-  { n: "Facebook", href: "https://facebook.com", d: "M14 8.5V6.6c0-.8.2-1.3 1.4-1.3H17V2.2c-.3 0-1.3-.2-2.5-.2C12 2 10.4 3.5 10.4 6.2v2.3H7.7v3.4h2.7V22H14V11.9h2.7l.4-3.4H14z" },
-  { n: "LinkedIn", href: "https://linkedin.com", d: "M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.75h4V21H3V9.75zm6.5 0h3.8v1.6h.06c.53-.95 1.83-1.95 3.77-1.95 4.03 0 4.77 2.5 4.77 5.76V21h-4v-5.1c0-1.22-.02-2.79-1.74-2.79-1.74 0-2.01 1.33-2.01 2.7V21H9.5V9.75z" },
-  { n: "X", href: "https://x.com", d: "M17.75 3h3.07l-6.7 7.65L22 21h-6.17l-4.83-6.3L5.47 21H2.4l7.17-8.18L2 3h6.33l4.36 5.77L17.75 3zm-1.08 16.2h1.7L7.4 4.73H5.58L16.67 19.2z" },
-  { n: "Instagram", href: "https://instagram.com", d: "M12 7.2a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6zm0 7.9a3.1 3.1 0 1 1 0-6.2 3.1 3.1 0 0 1 0 6.2zM17.1 5.8a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2zM21.9 7.9c-.1-1.6-.4-3-1.6-4.2S17.7 2.2 16.1 2.1c-1.6-.1-6.6-.1-8.2 0-1.6.1-3 .4-4.2 1.6S2.2 6.3 2.1 7.9c-.1 1.6-.1 6.6 0 8.2.1 1.6.4 3 1.6 4.2s2.6 1.5 4.2 1.6c1.6.1 6.6.1 8.2 0 1.6-.1 3-.4 4.2-1.6s1.5-2.6 1.6-4.2c.1-1.6.1-6.6 0-8.2zM20 17.8a3.2 3.2 0 0 1-1.8 1.8c-1.3.5-4.3.4-5.7.4s-4.4.1-5.7-.4A3.2 3.2 0 0 1 5 17.8c-.5-1.3-.4-4.3-.4-5.7s-.1-4.4.4-5.7A3.2 3.2 0 0 1 6.8 4.6c1.3-.5 4.3-.4 5.7-.4s4.4-.1 5.7.4A3.2 3.2 0 0 1 20 6.4c.5 1.3.4 4.3.4 5.7s.1 4.4-.4 5.7z" },
+  { n: "Facebook", href: "https://www.facebook.com/share/1QTrzPRUjJ/?mibextid=wwXIfr", d: "M14 8.5V6.6c0-.8.2-1.3 1.4-1.3H17V2.2c-.3 0-1.3-.2-2.5-.2C12 2 10.4 3.5 10.4 6.2v2.3H7.7v3.4h2.7V22H14V11.9h2.7l.4-3.4H14z" },
+  { n: "LinkedIn", href: "https://www.linkedin.com/company/colabplatformslimited/", d: "M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.75h4V21H3V9.75zm6.5 0h3.8v1.6h.06c.53-.95 1.83-1.95 3.77-1.95 4.03 0 4.77 2.5 4.77 5.76V21h-4v-5.1c0-1.22-.02-2.79-1.74-2.79-1.74 0-2.01 1.33-2.01 2.7V21H9.5V9.75z" },
+  { n: "X", href: "https://x.com/ColabLtd", d: "M17.75 3h3.07l-6.7 7.65L22 21h-6.17l-4.83-6.3L5.47 21H2.4l7.17-8.18L2 3h6.33l4.36 5.77L17.75 3zm-1.08 16.2h1.7L7.4 4.73H5.58L16.67 19.2z" },
+  { n: "Instagram", href: "https://www.instagram.com/colabplatforms?evlk=czd5OWFkd2k0N3Zs", d: "M12 7.2a4.8 4.8 0 1 0 0 9.6 4.8 4.8 0 0 0 0-9.6zm0 7.9a3.1 3.1 0 1 1 0-6.2 3.1 3.1 0 0 1 0 6.2zM17.1 5.8a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2zM21.9 7.9c-.1-1.6-.4-3-1.6-4.2S17.7 2.2 16.1 2.1c-1.6-.1-6.6-.1-8.2 0-1.6.1-3 .4-4.2 1.6S2.2 6.3 2.1 7.9c-.1 1.6-.1 6.6 0 8.2.1 1.6.4 3 1.6 4.2s2.6 1.5 4.2 1.6c1.6.1 6.6.1 8.2 0 1.6-.1 3-.4 4.2-1.6s1.5-2.6 1.6-4.2c.1-1.6.1-6.6 0-8.2zM20 17.8a3.2 3.2 0 0 1-1.8 1.8c-1.3.5-4.3.4-5.7.4s-4.4.1-5.7-.4A3.2 3.2 0 0 1 5 17.8c-.5-1.3-.4-4.3-.4-5.7s-.1-4.4.4-5.7A3.2 3.2 0 0 1 6.8 4.6c1.3-.5 4.3-.4 5.7-.4s4.4-.1 5.7.4A3.2 3.2 0 0 1 20 6.4c.5 1.3.4 4.3.4 5.7s.1 4.4-.4 5.7z" },
 ];
 
 function Footer({ w }: { w: number }) {

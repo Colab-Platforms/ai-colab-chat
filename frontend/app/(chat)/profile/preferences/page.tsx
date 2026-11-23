@@ -140,7 +140,7 @@ export default function PreferencesPage() {
 
   return (
     <div>
-      <SettingsHeader title="Preferences" description="How Colab AI looks, answers and talks to you." />
+      <SettingsHeader title="Preferences" description="How Colabplatforms.ai looks, answers and talks to you." />
 
       <SectionLabel>Appearance</SectionLabel>
       <SettingsCard>
@@ -199,7 +199,7 @@ export default function PreferencesPage() {
 
       <SectionLabel>Voice</SectionLabel>
       <SettingsCard>
-        <SettingRow title="Assistant voice" description="The voice Colab AI speaks with during voice chats.">
+        <SettingRow title="Assistant voice" description="The voice Colabplatforms.ai speaks with during voice chats.">
           <Select
             value={selectedVoiceId || "default"}
             onValueChange={handleVoiceChange}

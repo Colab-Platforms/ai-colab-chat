@@ -54,7 +54,7 @@ export function ChatHeader({
       const url = `${window.location.origin}/share/${res.data.data.shareId}`;
       if (navigator.share) {
         try {
-          await navigator.share({ title: title || "Colab AI chat", url });
+          await navigator.share({ title: title || "Colabplatforms.ai chat", url });
           return;
         } catch (err) {
           if (err instanceof DOMException && err.name === "AbortError") return;

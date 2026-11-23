@@ -16,9 +16,9 @@ const TABS = ["General", "AI Capabilities", "Integration & Security"];
 const FAQ_DATA: Record<string, FAQItem[]> = {
   General: [
     {
-      question: "How does Colab AI work?",
+      question: "How does Colabplatforms.ai work?",
       answer:
-        "Colab AI is a unified workspace that connects you to 15+ leading AI models. Instead of managing separate subscriptions and API keys, you get a single interface, unified context sharing, and a shared token limit to use the best model for any specific task.",
+        "Colabplatforms.ai is a unified workspace that connects you to 15+ leading AI models. Instead of managing separate subscriptions and API keys, you get a single interface, unified context sharing, and a shared token limit to use the best model for any specific task.",
     },
     {
       question: "Is there a free trial available?",
@@ -26,9 +26,9 @@ const FAQ_DATA: Record<string, FAQItem[]> = {
         "Yes, new users can start with the Free plan which includes 50,000 monthly tokens for the first month. No credit card is required to sign up and start testing the platform.",
     },
     {
-      question: "Who is Colab AI built for?",
+      question: "Who is Colabplatforms.ai built for?",
       answer:
-        "Colab AI is built for developers, designers, product managers, and teams who want to leverage multiple AI models in their daily workflows. It is perfect for anyone looking to compare models side-by-side or automate multi-model tasks.",
+        "Colabplatforms.ai is built for developers, designers, product managers, and teams who want to leverage multiple AI models in their daily workflows. It is perfect for anyone looking to compare models side-by-side or automate multi-model tasks.",
     },
     {
       question: "Can I use multiple AI models at the same time?",
@@ -41,9 +41,9 @@ const FAQ_DATA: Record<string, FAQItem[]> = {
         "After your first month on the Free plan, you can choose to upgrade to a Pro or Pro Plus plan. If you choose not to upgrade, your token balance will reset and you will need to choose a plan to continue.",
     },
     {
-      question: "Does Colab AI work for solo users?",
+      question: "Does Colabplatforms.ai work for solo users?",
       answer:
-        "Yes! Colab AI works perfectly for solo developers, creators, and freelancers. It is designed to scale from a single individual to large engineering teams.",
+        "Yes! Colabplatforms.ai works perfectly for solo developers, creators, and freelancers. It is designed to scale from a single individual to large engineering teams.",
     },
   ],
   "AI Capabilities": [
@@ -67,7 +67,7 @@ const FAQ_DATA: Record<string, FAQItem[]> = {
     {
       question: "Is my data used to train the AI models?",
       answer:
-        "No. We value your privacy and security. None of the data, files, or conversations you submit through Colab AI are used to train the underlying models.",
+        "No. We value your privacy and security. None of the data, files, or conversations you submit through Colabplatforms.ai are used to train the underlying models.",
     },
     {
       question: "Can I connect external developer tools?",

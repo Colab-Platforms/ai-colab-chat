@@ -166,7 +166,7 @@ export function ProjectDialog({
               className={`${fieldCls} py-2.5 resize-y min-h-[96px]`}
             />
             <p className="text-xs text-muted-foreground">
-              Colab AI reads this before every chat in the project, so you don&apos;t have to repeat yourself.
+              Colabplatfroms.ai reads this before every chat in the project, so you don&apos;t have to repeat yourself.
             </p>
           </div>
 

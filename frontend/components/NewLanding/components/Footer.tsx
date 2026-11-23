@@ -206,7 +206,7 @@ export default function Footer() {
           
           {/* Copyright */}
           <p className="text-neutral-500 text-[11px] sm:text-xs select-none">
-            © Colab AI, Inc., 2026. All rights reserved
+            © Colabplatforms.ai, Inc., 2026. All rights reserved
           </p>
 
           {/* Socials */}

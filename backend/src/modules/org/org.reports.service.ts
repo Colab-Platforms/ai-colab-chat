@@ -221,7 +221,7 @@ class OrgReportsService {
           meta: r.meta,
           createdAt: r.createdAt,
           // actorUserId 0 = a system job (e.g. plan expiry); platform admins act as their own user id.
-          actor: a ? { name: `${a.firstName} ${a.lastName}`.trim(), email: a.email } : { name: r.actorUserId === 0 ? "System" : "Colab AI team", email: null },
+          actor: a ? { name: `${a.firstName} ${a.lastName}`.trim(), email: a.email } : { name: r.actorUserId === 0 ? "System" : "Colabplatforms.ai team", email: null },
         };
       }),
     };

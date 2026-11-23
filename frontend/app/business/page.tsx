@@ -5,7 +5,7 @@ import { useTheme } from "@/context/theme-context";
 import { Navbar } from "@/components/NewLanding/components/Navbar";
 
 /**
- * "Colab AI for Business" a standalone public landing page (no app shell,
+ * "Colabplatforms.ai for Business" a standalone public landing page (no app shell,
  * no sign-in needed), under the same floating navbar as the main landing page.
  * The page itself is a self-contained site served unchanged from
  * /business-site/ (its own header removed), so it is embedded rather than
@@ -47,7 +47,7 @@ export default function BusinessPage() {
         ref={frameRef}
         key={theme}
         src={`/business-site/index.html?theme=${theme}&api=${encodeURIComponent(apiUrl)}${hash}`}
-        title="Colab AI for Business"
+        title="Colabplatforms.ai for Business"
         onLoad={handleLoad}
         className="block h-full w-full border-0"
       />

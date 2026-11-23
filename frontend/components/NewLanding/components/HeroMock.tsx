@@ -66,7 +66,7 @@ export default function HeroMock({ dark }: { dark: boolean }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 8px 6px" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 4px" }}>
                 <span style={{ width: 26, height: 26, borderRadius: 8, border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center" }}><img src="/icons/Colab%20Infinite.png" alt="" style={{ width: 22, height: "auto" }} /></span>
-                <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Colab AI</span>
+                <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>Colabplatforms.ai</span>
                 <Ms name="left_panel_close" size={18} style={{ color: "var(--faint)" }} />
               </span>
               <span style={{ display: "flex", gap: 6 }}>

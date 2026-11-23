@@ -341,7 +341,7 @@ export default function AssetsPage() {
       <div className="mx-auto w-full max-w-[1100px] px-6 pt-10 pb-16">
         <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Assets</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Every document, image and video Colab AI has made for you.
+          Every document, image and video Colabplatforms.ai has made for you.
         </p>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">

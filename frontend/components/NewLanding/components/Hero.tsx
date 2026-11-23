@@ -61,8 +61,8 @@ export function Hero() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: EASE, delay: 0.1 }}
           >
-            Multiple Models <br />
-            <span className="text-black dark:text-white">One Powerful Interface</span>
+            Ask the top AIs at once.<br />
+            <span className="text-black dark:text-white">Keep the best answer.</span>
           </motion.h1>
 
           {/* Subtext */}

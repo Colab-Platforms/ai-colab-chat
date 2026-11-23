@@ -12,9 +12,9 @@ const fmt = (d: Date) => dayjs(d).format("D MMM YYYY");
 const money = (v: unknown) => Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const KIND_TEXT = {
-  INITIAL: "Colab AI Business subscription",
-  RENEWAL: "Colab AI Business renewal",
-  SEAT_ADD: "Colab AI Business additional seats (prorated)",
+  INITIAL: "Colabplatforms.ai Business subscription",
+  RENEWAL: "Colabplatforms.ai Business renewal",
+  SEAT_ADD: "Colabplatforms.ai Business additional seats (prorated)",
 } as const;
 
 /**
@@ -113,7 +113,7 @@ export async function sendOrgBillEmail(billId: number, kind: Mail, pdf?: Buffer 
         body: `We received your payment of ${total} for invoice <strong>${bill.number}</strong>. Thank you!`,
       },
       EXPIRED: {
-        subject: `${org.name}: your Colab AI Business plan has ended`,
+        subject: `${org.name}: your Colabplatforms.ai Business plan has ended`,
         body: `We didn't receive payment for invoice <strong>${bill.number}</strong>, so your team has moved to the Free plan. Pay the invoice to restore access immediately no data was deleted.`,
       },
     };

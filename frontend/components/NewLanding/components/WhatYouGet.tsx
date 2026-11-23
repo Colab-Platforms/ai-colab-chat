@@ -320,7 +320,7 @@ export default function WhatYouGet() {
           </div>
           <div className="text-lg text-neutral-400 leading-relaxed max-w-lg">
             <p>
-              Colab AI helps to find the right{" "}
+              Colabplatforms.ai helps to find the right{" "}
               <br className="hidden sm:inline" />
               context, take the next step, and{" "}
               <br className="hidden sm:inline" />
