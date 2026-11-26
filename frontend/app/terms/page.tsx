@@ -1,12 +1,19 @@
-"use client";
-
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
+import { publicMetadata } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "Terms of Use | Colab Platforms AI",
+  description:
+    "Terms for using Colab Platforms AI, a multi-model AI chat platform for prompts, comparisons, conversations, projects, and assistants.",
+  path: "/terms",
+});
 
 const LAST_UPDATED = "July 22, 2026";
 
-const SECTIONS: { title: string; body: React.ReactNode }[] = [
+const SECTIONS: { title: string; body: ReactNode }[] = [
   {
     title: "1. Acceptance of Terms",
     body: (

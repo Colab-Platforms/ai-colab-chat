@@ -31,8 +31,6 @@ const FOOTER_SECTIONS: FooterSection[] = [
     title: "Company",
     links: [
       { label: "About", href: "#about" },
-      { label: "Careers", href: "#" },
-      { label: "Blog", href: "#" },
     ],
   },
   {

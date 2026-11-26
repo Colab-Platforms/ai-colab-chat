@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/context/theme-context";
@@ -11,6 +12,13 @@ import { PwaInstallPrompt } from "@/components/pwa/install-prompt";
 import Script from "next/script";
 // Imported directly (not via the feature index) so it stays a plain string in this server component.
 import { NODEBOX_ERROR_FILTER_SCRIPT } from "@/features/code-workspace/lib/nodeboxErrorFilter";
+import {
+  HOME_DESCRIPTION,
+  HOME_TITLE,
+  OG_IMAGE,
+  SITE_NAME,
+  SITE_URL,
+} from "@/lib/seo";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -29,16 +37,15 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title:
-    "Colab Platforms AI - Multi-Model LLM Chat Platform | Claude, Gemini, Perplexity",
-  description:
-    "Advanced AI chatbot platform by ColabPlatforms. Chat with multiple LLM models simultaneously - Gemini, Claude, Perplexity, and more. Experience the future of AI conversation with our multichat interface.",
+  metadataBase: new URL(SITE_URL),
+  title: HOME_TITLE,
+  description: HOME_DESCRIPTION,
   keywords:
-    "AI, ColabPlatforms, LLM, models, Multichat, chatbot, colab, gemini, claude, perplexity, artificial intelligence, machine learning, natural language processing, AI chat, multi-model AI, conversational AI, AI platform",
-  authors: [{ name: "ColabPlatforms" }],
-  creator: "ColabPlatforms",
-  publisher: "ColabPlatforms",
-  robots: "index, follow",
+    "Colab Platforms AI, LLM, models, Multichat, chatbot, gemini, claude, perplexity, artificial intelligence, multi-model AI, conversational AI",
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  robots: { index: true, follow: true },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -55,33 +62,18 @@ export const metadata: Metadata = {
     apple: "/apple-icon.png",
   },
   openGraph: {
-    title: "ColabPlatforms AI - Multi-Model LLM Chat Platform",
-    description:
-      "Advanced AI chatbot platform by ColabPlatforms. Chat with multiple LLM models simultaneously - Gemini, Claude, Perplexity, and more.",
-    url: "https://chat.colabplatforms.ai",
-    siteName: "ColabPlatforms AI",
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    url: "/",
+    siteName: SITE_NAME,
     type: "website",
-    images: [
-      {
-        // A dedicated opaque social-share card, not the transparent white
-        // logo mark: WhatsApp/Facebook flatten transparent PNGs onto a white
-        // canvas, so a white-on-transparent logo rendered as a blank white
-        // box in link previews.
-        url: "https://res.cloudinary.com/dlmcpmdpn/image/upload/v1790661491/ai-colab-chat/marketing/og-share-image.png",
-        width: 1200,
-        height: 630,
-        alt: "ColabPlatforms AI - Multi-Model LLM Chat Platform",
-      },
-    ],
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ColabPlatforms AI - Multi-Model LLM Chat Platform",
-    description:
-      "Advanced AI chatbot platform by ColabPlatforms. Chat with multiple LLM models simultaneously.",
-    images: [
-      "https://res.cloudinary.com/dlmcpmdpn/image/upload/v1790661491/ai-colab-chat/marketing/og-share-image.png",
-    ],
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    images: [OG_IMAGE.url],
   },
 };
 
@@ -98,6 +90,13 @@ export default function RootLayout({
           id="code-workspace-nodebox-error-filter"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: NODEBOX_ERROR_FILTER_SCRIPT }}
+        />
+        <Script
+          id="theme-class"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("theme")==="dark")document.documentElement.classList.add("dark")}catch(e){}`,
+          }}
         />
         <Script
           id="ms-clarity"
@@ -141,7 +140,12 @@ fbq('track', 'PageView');`,
         <ThemeProvider>
           <AuthProvider>
             <PlanCapabilitiesProvider>
-              <ChatRootShell>{children}</ChatRootShell>
+              {/* Pages that read the query string suspend here. Public pages do not,
+                  so their HTML is still rendered. The fallback matches the old
+                  pre-hydration blank shell for those query-string routes. */}
+              <Suspense fallback={null}>
+                <ChatRootShell>{children}</ChatRootShell>
+              </Suspense>
               <PwaInstallPrompt />
             </PlanCapabilitiesProvider>
           </AuthProvider>

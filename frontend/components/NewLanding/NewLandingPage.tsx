@@ -3,7 +3,6 @@
 import "./landing.css";
 import React, { CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
 import SmoothScrollLayout from "../SmoothScrollLayout";
 import { Hero } from "./components/Hero";
 import { Navbar } from "./components/Navbar";
@@ -11,6 +10,7 @@ import { planService } from "@/lib/services";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "@/context/theme-context";
 import { getPlanFeatureLines } from "@/lib/planFeatures";
+import { FAQ_DATA, FALLBACK_PLANS } from "@/lib/marketing-facts";
 
 // ─────────────────────────────────────────────────────
 //  Assets (copied from netlify-home into /public/new-landing/ref)
@@ -490,28 +490,11 @@ interface PlanTier {
   isFree: boolean;
 }
 
-// Fallback / default data (in case API is empty/fails)
-const FALLBACK_PLANS: PlanTier[] = [
-  {
-    id: 1, name: "Free", price: 0, yearlyPrice: 0, description: "Get started at no cost for your first month.",
-    features: ["Unlimited AI Models", "File Uploads & Attachments", "Community Support", "50,000 monthly tokens"], isPopular: false, isFree: true,
-  },
-  {
-    id: 2, name: "Plus", price: 1799, yearlyPrice: 17988, description: "Ideal for Plus users.",
-    features: ["Unlimited AI Models", "File Uploads & Attachments", "Priority Support", "10,00,000 monthly tokens"], isPopular: true, isFree: false,
-  },
-  {
-    id: 3, name: "Pro", price: 3699, yearlyPrice: 35988, description: "Ideal for Pro users.",
-    features: ["Unlimited AI Models", "File Uploads & Attachments", "Priority Plus Support", "20,00,000 monthly tokens"], isPopular: false, isFree: false,
-  },
-];
-
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 function Pricing({ w }: { w: number }) {
   const { user } = useAuth();
-  const [plans, setPlans] = useState<PlanTier[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState<PlanTier[]>(FALLBACK_PLANS);
   const [cycle, setCycle] = useState<"MONTHLY" | "YEARLY">("MONTHLY");
   const carRef = useRef<HTMLDivElement>(null);
   const wide = w >= 1040;
@@ -561,8 +544,6 @@ function Pricing({ w }: { w: number }) {
       } catch (err) {
         console.error("Error fetching pricing plans in new landing:", err);
         setPlans(FALLBACK_PLANS);
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -595,14 +576,13 @@ function Pricing({ w }: { w: number }) {
     return { amount: inr(plan.price), period: "/month + GST", strike: "", billed: "Billed monthly + GST", save: "" };
   };
 
-  // Ensure we have at least Free, popular and a higher tier mapped
-  const ordered: PlanTier[] = loading
-    ? []
-    : [
-        plans.find((p) => p.isFree) || FALLBACK_PLANS[0],
-        plans.find((p) => p.isPopular) || FALLBACK_PLANS[1],
-        plans.find((p) => !p.isFree && !p.isPopular) || FALLBACK_PLANS[2],
-      ];
+  // Ensure we have at least Free, popular and a higher tier mapped.
+  // Fallback prices are the first render so crawlers see the published plans.
+  const ordered: PlanTier[] = [
+    plans.find((p) => p.isFree) || FALLBACK_PLANS[0],
+    plans.find((p) => p.isPopular) || FALLBACK_PLANS[1],
+    plans.find((p) => !p.isFree && !p.isPopular) || FALLBACK_PLANS[2],
+  ];
 
   // On narrow screens the carousel opens centred on the highlighted plan.
   const centerPopular = useCallback(() => {
@@ -617,22 +597,10 @@ function Pricing({ w }: { w: number }) {
   }, []);
 
   useEffect(() => {
-    if (loading) return;
     requestAnimationFrame(() => requestAnimationFrame(centerPopular));
     const t = setTimeout(centerPopular, 600);
     return () => clearTimeout(t);
-  }, [loading, wide, centerPopular]);
-
-  if (loading) {
-    return (
-      <section id="pricing" className="cl-s" style={{ padding: sectionPad }}>
-        <div style={{ minHeight: 400, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-          <Loader2 className="animate-spin" style={{ width: 32, height: 32, color: "var(--accent)" }} />
-          <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>Loading plans…</p>
-        </div>
-      </section>
-    );
-  }
+  }, [wide, centerPopular]);
 
   return (
     <section id="pricing" className="cl-s" style={{ padding: sectionPad }}>
@@ -756,36 +724,9 @@ function Pricing({ w }: { w: number }) {
   );
 }
 
-// ─────────────────────────────────────────────────────
-//  FAQ
-// ─────────────────────────────────────────────────────
-const FAQ_DATA: [string, [string, string][]][] = [
-  ["General", [
-    ["How does Colab AI work?", "Pick one or more AI models, type your message and get answers in one chat. In Multi mode, each model you choose answers the same prompt side by side so you can compare them."],
-    ["Is there a free trial available?", "Yes. The Free plan gives you every AI model with about 40 messages a month. No card needed."],
-    ["Who is Colab AI built for?", "Anyone who uses AI for work or study, from writers and students to founders, marketers and developers. Teams can use Colab AI for Business."],
-    ["Can I use multiple AI models at the same time?", "Yes. Switch to Multi mode, pick the models you want, and each one answers the same prompt in its own column."],
-    ["Can I switch plans later?", "Yes. You can move between Free, Plus and Pro from Settings. Changes start from your next billing cycle."],
-    ["Does Colab AI work for solo users?", "Yes. Free, Plus and Pro are individual plans. You don’t need a team to sign up."],
-  ]],
-  ["AI Capabilities", [
-    ["Which AI models are included?", "Models from OpenAI, Anthropic, Google, DeepSeek, Mistral, Perplexity, Qwen and more, plus image and video models. New models are added as they launch."],
-    ["Can Colab AI create images and videos?", "Yes, on Plus and Pro. Image Studio and Video Studio use top image and video models from a prompt or your own reference images."],
-    ["Can it search the web?", "Yes. Web search gives live answers with links to the sources it used."],
-    ["Can it make documents?", "Yes. Turn notes and files into PDFs, Word documents, PowerPoint decks and Excel sheets."],
-  ]],
-  ["Integration & Security", [
-    ["Is my data used to train AI models?", "No. Your chats and files are not used to train AI models."],
-    ["How do I pay?", "In rupees through Cashfree. Every payment comes with a GST invoice."],
-    ["Can I use Colab AI on my phone?", "Yes. Colab AI works in your phone’s browser with the same features as desktop."],
-    ["Is there a plan for teams?", "Yes. Colab AI for Business adds admin controls, model access settings and one GST invoice for the whole team."],
-  ]],
-];
-
 function FAQ() {
   const [tab, setTab] = useState(0);
   const [open, setOpen] = useState(0);
-  const items = FAQ_DATA[tab][1];
   return (
     <section id="faq" className="cl-s" style={{ padding: sectionPad }}>
       <div style={{ maxWidth: 820, margin: "0 auto", display: "flex", flexDirection: "column", gap: 28 }}>
@@ -803,20 +744,23 @@ function FAQ() {
             );
           })}
         </div>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {items.map(([q, a], i) => {
-            const isOpen = open === i;
-            return (
-              <div key={q} style={{ borderBottom: "1px solid var(--border)" }}>
-                <button onClick={() => setOpen(isOpen ? -1 : i)} aria-expanded={isOpen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 16, minHeight: 64, padding: "16px 0", border: "none", background: "transparent", color: "var(--text)", fontSize: 17, fontWeight: 500, textAlign: "left", cursor: "pointer" }}>
-                  <span style={{ flex: 1 }}>{q}</span>
-                  <Ms name="add" size={22} style={{ color: "var(--muted)", transform: `rotate(${isOpen ? 45 : 0}deg)`, transition: "transform .25s" }} />
-                </button>
-                {isOpen && <p style={{ margin: 0, padding: "0 40px 20px 0", fontSize: 15.5, lineHeight: 1.6, color: "var(--muted)", textWrap: "pretty" }}>{a}</p>}
-              </div>
-            );
-          })}
-        </div>
+        {FAQ_DATA.map(([label, items], tabIndex) => (
+          <div key={label} hidden={tab !== tabIndex} style={{ display: tab === tabIndex ? "flex" : undefined, flexDirection: "column" }}>
+            {items.map(([q, a], i) => {
+              const isOpen = tab === tabIndex && open === i;
+              return (
+                <div key={q} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <button onClick={() => setOpen(isOpen ? -1 : i)} aria-expanded={isOpen} style={{ width: "100%", display: "flex", alignItems: "center", gap: 16, minHeight: 64, padding: "16px 0", border: "none", background: "transparent", color: "var(--text)", fontSize: 17, fontWeight: 500, textAlign: "left", cursor: "pointer" }}>
+                    <span style={{ flex: 1 }}>{q}</span>
+                    <Ms name="add" size={22} style={{ color: "var(--muted)", transform: `rotate(${isOpen ? 45 : 0}deg)`, transition: "transform .25s" }} />
+                  </button>
+                  {/* Always in the HTML so the full FAQ is crawlable. `hidden` only collapses it. */}
+                  <p hidden={!isOpen} style={{ margin: 0, padding: "0 40px 20px 0", fontSize: 15.5, lineHeight: 1.6, color: "var(--muted)", textWrap: "pretty" }}>{a}</p>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -856,7 +800,7 @@ function CTA() {
 // ─────────────────────────────────────────────────────
 const FOOTER_SECTIONS: { title: string; links: { label: string; href: string }[] }[] = [
   { title: "Product", links: [{ label: "Home", href: "/" }, { label: "About", href: "#about" }, { label: "Pricing", href: "#pricing" }, { label: "Business", href: "/business" }, { label: "Get started", href: "/login" }] },
-  { title: "Company", links: [{ label: "About", href: "#about" }, { label: "Careers", href: "#" }, { label: "Blog", href: "#" }] },
+  { title: "Company", links: [{ label: "About", href: "#about" }] },
   { title: "Legal", links: [{ label: "Terms of use", href: "/terms" }, { label: "Privacy policy", href: "/privacy-policy" }, { label: "Cookie policy", href: "/cookie-policy" }] },
   { title: "Support", links: [{ label: "Help & Support", href: "/support" }, { label: "Raise a ticket", href: "/support" }, { label: "Contact us", href: "/support" }] },
 ];
