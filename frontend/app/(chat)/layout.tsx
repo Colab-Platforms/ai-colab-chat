@@ -1,23 +1,9 @@
-"use client";
+import type { ReactNode } from "react";
+import { noindexMetadata } from "@/lib/seo";
+import { ChatSegmentLayout } from "./chat-segment-layout";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/auth-context";
+export const metadata = noindexMetadata;
 
-export default function ChatLayout({ children }: { children: React.ReactNode }) {
-  const { isLoading, hasRole } = useAuth();
-  const router = useRouter();
-  const isAdmin = hasRole("ADMIN") || hasRole("SUPERADMIN");
-
-  useEffect(() => {
-    if (!isLoading && isAdmin) {
-      router.replace("/admin");
-    }
-  }, [isLoading, isAdmin, router]);
-
-  if (isAdmin) {
-    return null;
-  }
-
-  return children;
+export default function ChatLayout({ children }: { children: ReactNode }) {
+  return <ChatSegmentLayout>{children}</ChatSegmentLayout>;
 }

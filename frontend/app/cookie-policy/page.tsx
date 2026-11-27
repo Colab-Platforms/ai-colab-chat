@@ -1,12 +1,19 @@
-"use client";
-
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
+import { publicMetadata } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "Cookie Policy | Colab Platforms AI",
+  description:
+    "How Colab Platforms AI uses essential, preference, and analytics cookies, including cookies set by sign-in and payment providers.",
+  path: "/cookie-policy",
+});
 
 const LAST_UPDATED = "July 23, 2026";
 
-const SECTIONS: { title: string; body: React.ReactNode }[] = [
+const SECTIONS: { title: string; body: ReactNode }[] = [
   {
     title: "1. What Are Cookies",
     body: (

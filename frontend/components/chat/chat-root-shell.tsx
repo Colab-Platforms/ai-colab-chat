@@ -1,10 +1,18 @@
 "use client";
 
 import type { ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { ChatLayoutView } from "@/components/chat/ChatLayoutView";
 import { DocumentPanelProvider } from "@/context/document-panel-context";
+
+// The shell is client-only (auth lives in localStorage) and is large.
+// Load it when a signed-in chat route actually mounts it, not on public pages.
+const ChatLayoutView = dynamic(
+  () =>
+    import("@/components/chat/ChatLayoutView").then((m) => m.ChatLayoutView),
+  { ssr: false },
+);
 
 /**
  * Keeps a single ChatLayoutView instance for all authenticated chat routes.

@@ -1,12 +1,19 @@
-"use client";
-
+import type { ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
+import { publicMetadata } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "Privacy Policy | Colab Platforms AI",
+  description:
+    "How Colab Platforms AI collects, uses, and protects your information when you use the service.",
+  path: "/privacy-policy",
+});
 
 const LAST_UPDATED = "July 23, 2026";
 
-const SECTIONS: { title: string; body: React.ReactNode }[] = [
+const SECTIONS: { title: string; body: ReactNode }[] = [
   {
     title: "1. Overview",
     body: (
